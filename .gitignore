@@ -1,0 +1,26 @@
+.venv/
+__pycache__/
+*.py[cod]
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+dist/
+build/
+*.egg-info/
+.DS_Store
+.idea/
+
+# Local AI-agent workspace assets. The distributable template source lives under
+# src/agent_feed/templates/standard/.
+/AGENTS.md
+/CLAUDE.md
+/.agents/
+/.codex/
+/.claude/
+/.cursor/
+
+# Local-only validation artifacts. The publishable package surface is limited by
+# pyproject.toml build targets.
+/tests/
+/docs/
+/uv.lock
