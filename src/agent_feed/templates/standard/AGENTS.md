@@ -70,5 +70,5 @@ These gates are always active, but their details live in the owning rule files:
 8. Maintain `README.md` when a human project reader needs to know a changed capability, workflow, command, directory, entry point, or design location.
 9. Read `.agents/project/README.md` before applying repository-specific constraints, and maintain it as the index for every file under `.agents/project/`.
 10. Maintain related indexes and README files when changing `.agents/`, `AGENTS.md`, `.agents/scripts/`, design entrypoints, or repository structure.
-11. Run `sh .agents/scripts/check-agent-assets.sh` or `sh .agents/scripts/verify-agent-dev.sh protocol` after AI protocol, `.agents/`, skill/rule/project constraint names, document links, or session-state JSON changes.
+11. Run `sh .agents/scripts/check-agent-assets.sh` or `sh .agents/scripts/verify-agent-dev.sh docs` after AI protocol, `.agents/`, skill/rule/project constraint names, document links, or session-state JSON changes.
 12. After any `.agents/skills/` change, run `sh .agents/scripts/sync-agent-assets.sh` and verify configured client adapters. Codex uses `.agents/skills` directly; Claude uses `.claude/skills`.

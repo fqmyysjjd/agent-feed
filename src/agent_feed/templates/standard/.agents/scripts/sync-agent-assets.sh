@@ -106,4 +106,4 @@ sync_claude
 sync_cursor
 
 say "Codex uses AGENTS.md and .agents/skills directly; no .codex/skills mirror was written."
-say "Next: run sh .agents/scripts/verify-agent-dev.sh protocol"
+say "Next: run sh .agents/scripts/verify-agent-dev.sh docs"

@@ -8,10 +8,9 @@ sh .agents/scripts/verify-agent-dev.sh <scope>
 
 Scopes:
 
-1. `protocol`: AI engineering assets, links, session-state JSON, and skill mirrors.
-2. `docs`: same as `protocol`.
-3. `code`: selected project code gate.
-4. `full`: `protocol` plus selected project code gate.
+1. `docs`: AI engineering docs, links, session-state JSON, and skill mirrors.
+2. `code`: selected project code gate.
+3. `full`: `docs` plus selected project code gate.
 
 {{VERIFICATION_PROFILE_DOC}}
 

@@ -11,7 +11,7 @@ PROFILE_LABELS = {
     VerificationProfile.PYTHON: "Python",
     VerificationProfile.NODE: "Node",
     VerificationProfile.CUSTOM: "Custom commands",
-    VerificationProfile.NONE: "Protocol only",
+    VerificationProfile.NONE: "Docs only",
 }
 
 
@@ -55,10 +55,9 @@ def verify_script(profile: VerificationProfile) -> str:
         Usage: sh .agents/scripts/verify-agent-dev.sh <scope>
 
         Scopes:
-          protocol  Check AI engineering assets, links, session-state JSON, and skill mirrors.
-          docs      Same as protocol; use for documentation-only changes.
+          docs      Check AI engineering docs, links, session-state JSON, and skill mirrors.
           code      Run the selected code verification gate.
-          full      Run protocol checks and the selected code verification gate.
+          full      Run docs checks and the selected code verification gate.
 
         Selected verification profile: __PROFILE__
         Edit .agents/scripts/verify-agent-dev.sh if this project's real commands differ.
@@ -73,8 +72,8 @@ def verify_script(profile: VerificationProfile) -> str:
           "$@" || fail "$desc failed. Fix the failure above before claiming this verification scope passed."
         }
 
-        run_protocol() {
-          run_step "AI asset and protocol consistency checks" sh .agents/scripts/check-agent-assets.sh
+        run_docs() {
+          run_step "AI docs and asset consistency checks" sh .agents/scripts/check-agent-assets.sh
         }
 
         __RUN_CODE__
@@ -85,9 +84,9 @@ def verify_script(profile: VerificationProfile) -> str:
         fi
 
         case "$1" in
-          protocol|docs)
-            say "Selected scope: $1"
-            run_protocol
+          docs)
+            say "Selected scope: docs"
+            run_docs
             ;;
           code)
             say "Selected scope: code"
@@ -95,7 +94,7 @@ def verify_script(profile: VerificationProfile) -> str:
             ;;
           full)
             say "Selected scope: full"
-            run_protocol
+            run_docs
             run_code
             ;;
           -h|--help|help)
@@ -209,7 +208,7 @@ def run_code_function(profile: VerificationProfile) -> str:
     return dedent(
         """\
         run_code() {
-          fail "no code verification profile configured. Use protocol/docs scope, or choose/configure a project verification profile before claiming code verification passed."
+          fail "no code verification profile configured. Use docs scope, or choose/configure a project verification profile before claiming code verification passed."
         }
         """
     ).rstrip()
@@ -288,8 +287,8 @@ def verification_doc(profile: VerificationProfile) -> str:
 
         ## Meaning
 
-        Agent Feed will validate AI engineering assets with `protocol` and `docs` scopes, but no
-        code verification gate is configured.
+        Agent Feed will validate AI engineering docs and assets with the `docs` scope, but no code
+        verification gate is configured.
 
         Do not claim code verification passed until a real project-specific `run_code()` gate is
         added to `.agents/scripts/verify-agent-dev.sh`.

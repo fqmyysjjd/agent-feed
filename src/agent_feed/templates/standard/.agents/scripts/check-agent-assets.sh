@@ -9,7 +9,7 @@ SCRIPT_NAME="check-agent-assets"
 
 fail() {
   echo "$SCRIPT_NAME: ERROR: $*" >&2
-  echo "$SCRIPT_NAME: Fix the issue above, then rerun: sh .agents/scripts/verify-agent-dev.sh protocol" >&2
+  echo "$SCRIPT_NAME: Fix the issue above, then rerun: sh .agents/scripts/verify-agent-dev.sh docs" >&2
   exit 1
 }
 
@@ -149,7 +149,7 @@ if errors:
     print("check-agent-assets: ERROR: structural checks failed", file=sys.stderr)
     for error in errors:
         print(f"- {error}", file=sys.stderr)
-    print("Fix stale links or README indexes, then rerun protocol verification.", file=sys.stderr)
+    print("Fix stale links or README indexes, then rerun docs verification.", file=sys.stderr)
     sys.exit(1)
 
 state_root = root / ".agents/session-state"

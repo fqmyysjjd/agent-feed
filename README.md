@@ -93,7 +93,7 @@ Agent Feed keeps `AGENTS.md` and `.agents/` canonical.
 | `python` | Python projects | prefers `uv`, falls back to `python3`, then `python`; runs `pytest`, plus `ruff`/`mypy` when installed |
 | `node` | Node projects | prefers `pnpm`, falls back to `npm`; runs `test`, plus `lint`/`typecheck`/`build` scripts when present |
 | `custom` | Any project with custom commands | Fails until `.agents/scripts/verify-agent-dev.sh` is edited |
-| `none` | Protocol-only or docs-only repositories | No code gate configured |
+| `none` | AI docs/assets only repositories | No code gate configured |
 
 `init` intentionally fails when the target already contains `AGENTS.md` or non-empty `.agents`. It also refuses to overwrite unmanaged selected client adapters. This keeps entrypoints, rules, skills, project constraints, session-state boundaries, and client-specific files clean instead of merging unknown existing assets.
 
@@ -131,7 +131,7 @@ This is a working prototype:
 3. It can validate required files, structure, `.agents` references, session-state JSON shape, skill names, scripts, and selected client adapters.
 4. It supports interactive init, check, and sync selection.
 5. It refuses unsafe initialization over existing `AGENTS.md`, `.agents`, or unmanaged selected client adapters.
-6. It can generate Python, Node, custom, or protocol-only verification profiles.
+6. It can generate Python, Node, custom, or docs-only verification profiles.
 7. It can preview and apply non-destructive updates for installed protocol assets.
 
 Not yet mature:

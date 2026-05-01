@@ -10,7 +10,7 @@ Choose the narrowest tests that prove the current task boundary, then broaden wh
 
 1. Documentation or AI protocol only:
    - Check links, references, naming rules, sync requirements, and relevant consistency scripts.
-   - Run `sh .agents/scripts/verify-agent-dev.sh protocol`.
+   - Run `sh .agents/scripts/verify-agent-dev.sh docs`.
 2. Local pure logic or shared utility:
    - Run targeted tests for the changed function or invariant.
    - Add a test when changed behavior has no existing coverage.
@@ -34,9 +34,8 @@ When a test or verification command fails:
 
 Use `sh .agents/scripts/verify-agent-dev.sh <scope>` when it matches the current Task Brief:
 
-1. `protocol`: AI engineering assets, `.agents/` links, session-state JSON, and skill mirrors.
-2. `docs`: documentation-only changes; currently aliases `protocol`.
-3. `code`: project-specific code gate. Configure commands in `.agents/scripts/verify-agent-dev.sh`.
-4. `full`: protocol checks plus code gate.
+1. `docs`: AI engineering docs, `.agents/` links, session-state JSON, and skill mirrors.
+2. `code`: project-specific code gate. Configure commands in `.agents/scripts/verify-agent-dev.sh`.
+3. `full`: docs checks plus code gate.
 
 The script does not choose scope for the AI. Select the narrowest sufficient scope and report any skipped broader checks.
