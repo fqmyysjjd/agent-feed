@@ -42,6 +42,12 @@ from agent_feed.prompts import (
 )
 from agent_feed.templates import canonical_write_plan, write_text
 from agent_feed.uninstall import apply_uninstall_plan, has_deletions, uninstall_plan
+from agent_feed.update import (
+    infer_project_name,
+    infer_verification_profile,
+    is_installed,
+    update_plan as build_update_plan,
+)
 
 
 app = typer.Typer(
@@ -274,6 +280,96 @@ def sync_skills_alias(
     )
 
 
+@app.command("update")
+def update_cmd(
+    path: Annotated[
+        Path | None, typer.Argument(help="Target project path. Defaults to cwd.")
+    ] = None,
+    project_name: Annotated[
+        str | None,
+        typer.Option(
+            "--project-name",
+            help="Override the project display name used for regenerated canonical assets.",
+        ),
+    ] = None,
+    clients: Annotated[
+        str | None,
+        typer.Option(
+            "--clients",
+            help="Comma-separated clients: codex,claude,cursor,all,none. Defaults to all.",
+        ),
+    ] = None,
+    verification_profile: Annotated[
+        str | None,
+        typer.Option("--profile", help="Project code verification profile."),
+    ] = None,
+    interactive: Annotated[
+        bool, typer.Option("-i", "--interactive", help="Prompt for update options.")
+    ] = False,
+    no_input: Annotated[bool, typer.Option("--no-input", help="Never prompt.")] = False,
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Preview update diff without changing files.")
+    ] = False,
+) -> None:
+    """Update installed Agent Feed assets without deleting local files."""
+    target = (path or Path(".")).resolve()
+    selected_clients = _parse_clients(clients, default=DEFAULT_CLIENTS)
+
+    if _should_prompt(
+        interactive=interactive, no_input=no_input, yes=False, explicit=path is not None
+    ):
+        print_welcome()
+        target = prompt_path("Project path", target).resolve()
+        project_name = prompt_text("Project display name", project_name or infer_project_name(target))
+        selected_clients = prompt_clients(selected_clients)
+        selected_verification_profile = prompt_verification_profile(
+            _resolve_update_profile(target, verification_profile)
+        )
+    else:
+        project_name = project_name or infer_project_name(target)
+        selected_verification_profile = _resolve_update_profile(target, verification_profile)
+
+    actions, errors = update_project(
+        target=target,
+        project_name=project_name,
+        clients=selected_clients,
+        verification_profile=selected_verification_profile,
+        dry_run=dry_run,
+    )
+    if actions:
+        print_write_plan(actions)
+    if errors:
+        _print_errors("Update blocked", errors)
+        raise typer.Exit(3)
+
+    if dry_run:
+        console.print("agent-feed: update preview complete; no files changed")
+    else:
+        console.print("[green]agent-feed: update complete[/green]")
+
+
+@app.command("upgrade")
+def upgrade_cmd(
+    path: Annotated[
+        Path | None, typer.Argument(help="Target project path. Defaults to cwd.")
+    ] = None,
+    project_name: Annotated[str | None, typer.Option("--project-name")] = None,
+    clients: Annotated[str | None, typer.Option("--clients")] = None,
+    verification_profile: Annotated[str | None, typer.Option("--profile")] = None,
+    dry_run: Annotated[bool, typer.Option("--dry-run")] = False,
+    no_input: Annotated[bool, typer.Option("--no-input")] = False,
+) -> None:
+    """Alias for update."""
+    update_cmd(
+        path=path,
+        project_name=project_name,
+        clients=clients,
+        verification_profile=verification_profile,
+        dry_run=dry_run,
+        no_input=no_input,
+    )
+
+
 @app.command("check")
 def check_cmd(
     path: Annotated[
@@ -430,9 +526,24 @@ def preview_cmd(
     clients: Annotated[str | None, typer.Option("--clients")] = None,
     verification_profile: Annotated[str | None, typer.Option("--profile")] = None,
 ) -> None:
-    """Preview files init/sync would write."""
+    """Preview init writes or installed-project update diffs."""
     target = (path or Path(".")).resolve()
     selected_clients = _parse_clients(clients, default=DEFAULT_CLIENTS)
+    if is_installed(target):
+        actions, errors = update_project(
+            target=target,
+            project_name=project_name or infer_project_name(target),
+            clients=selected_clients,
+            verification_profile=_resolve_update_profile(target, verification_profile),
+            dry_run=True,
+        )
+        if actions:
+            print_write_plan(actions)
+        if errors:
+            _print_errors("Preview blocked", errors)
+            raise typer.Exit(3)
+        return
+
     selected_verification_profile = _parse_verification_profile(
         verification_profile, default=DEFAULT_VERIFICATION_PROFILE
     )
@@ -459,7 +570,11 @@ def init_project(
         return [], errors
 
     actions: list[WriteAction] = []
-    for path, content in canonical_write_plan(target, project_name, verification_profile):
+    for path, content in canonical_write_plan(
+        target,
+        project_name,
+        verification_profile,
+    ):
         actions.append(write_text(path, content, dry_run=dry_run, force=force_generated))
 
     adapter_actions, adapter_errors = sync_clients(
@@ -480,7 +595,11 @@ def preview_project(
 ) -> list[WriteAction]:
     actions = [
         WriteAction(path=path, action="would update" if path.exists() else "would create")
-        for path, _content in canonical_write_plan(target, project_name, verification_profile)
+        for path, _content in canonical_write_plan(
+            target,
+            project_name,
+            verification_profile,
+        )
     ]
     adapter_actions, _errors = sync_clients(
         target,
@@ -491,12 +610,40 @@ def preview_project(
     return [*actions, *adapter_actions]
 
 
+def update_project(
+    *,
+    target: Path,
+    project_name: str,
+    clients: tuple[Client, ...],
+    verification_profile: VerificationProfile,
+    dry_run: bool,
+) -> tuple[list[WriteAction], list[str]]:
+    canonical_actions, canonical_errors = build_update_plan(
+        target,
+        project_name=project_name,
+        verification_profile=verification_profile,
+        dry_run=dry_run,
+    )
+    if canonical_errors:
+        return canonical_actions, canonical_errors
+
+    adapter_actions, adapter_errors = sync_clients(
+        target,
+        clients=clients,
+        dry_run=dry_run,
+        force_generated=True,
+        prune_generated=False,
+    )
+    return [*canonical_actions, *adapter_actions], adapter_errors
+
+
 def sync_clients(
     root: Path,
     *,
     clients: tuple[Client, ...],
     dry_run: bool,
     force_generated: bool,
+    prune_generated: bool = True,
 ) -> tuple[list[WriteAction], list[str]]:
     if not clients:
         return [WriteAction(path=root, action="skip", detail="no clients selected")], []
@@ -511,7 +658,10 @@ def sync_clients(
             actions.extend(codex.sync(root, dry_run=dry_run))
         elif client == Client.CLAUDE:
             client_actions, client_errors = claude.sync(
-                root, dry_run=dry_run, force_generated=force_generated
+                root,
+                dry_run=dry_run,
+                force_generated=force_generated,
+                prune_generated=prune_generated,
             )
             actions.extend(client_actions)
             errors.extend(client_errors)
@@ -592,6 +742,12 @@ def _parse_verification_profile(
         ) from exc
 
 
+def _resolve_update_profile(root: Path, raw: str | None) -> VerificationProfile:
+    if raw is None or raw.strip() == "":
+        return infer_verification_profile(root)
+    return _parse_verification_profile(raw, default=infer_verification_profile(root))
+
+
 def _with_client_checks(
     checks: tuple[Check, ...], clients: tuple[Client, ...]
 ) -> tuple[Check, ...]:
@@ -623,6 +779,8 @@ def _run_menu_action(action: str) -> int:
             init_cmd(interactive=True)
         elif action == "sync":
             sync_cmd(interactive=True)
+        elif action == "update":
+            update_cmd(interactive=True)
         elif action == "check":
             check_cmd(interactive=True)
         elif action == "status":

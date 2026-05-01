@@ -47,11 +47,13 @@ agent-feed
 agent-feed welcome
 agent-feed --version
 agent-feed init [path] [--project-name NAME] [--clients codex,claude,cursor|all|none] [--profile python|node|custom|none]
+agent-feed update [path] [--clients codex,claude,cursor|all|none] [--profile python|node|custom|none] [--dry-run]
+agent-feed upgrade [path] [--clients codex,claude,cursor|all|none] [--profile python|node|custom|none] [--dry-run]
 agent-feed sync [path] [--clients codex,claude,cursor|all|none]
 agent-feed check [path] [--checks structure,skills,references,session,scripts,codex,claude,cursor|all]
 agent-feed status [path] [--json]
 agent-feed doctor [path] [--fix]
-agent-feed preview [path] [--profile python|node|custom|none]
+agent-feed preview [path] [--clients codex,claude,cursor|all|none] [--profile python|node|custom|none]
 agent-feed uninstall [path] [--dry-run] [--yes]
 ```
 
@@ -95,6 +97,10 @@ Agent Feed keeps `AGENTS.md` and `.agents/` canonical.
 
 `init` intentionally fails when the target already contains `AGENTS.md` or non-empty `.agents`. It also refuses to overwrite unmanaged selected client adapters. This keeps entrypoints, rules, skills, project constraints, session-state boundaries, and client-specific files clean instead of merging unknown existing assets.
 
+`preview` shows the init write plan for projects that do not yet have Agent Feed installed. When the target already has `AGENTS.md` and `.agents/`, it switches to update mode and prints diffs against the bundled template. This makes version drift visible before writing.
+
+`update` refreshes an installed protocol from the bundled template without deleting local files. It updates managed reusable assets, creates missing template files, and skips existing user-maintained `.agents/project/` and `.agents/domain/` files. `upgrade` is an alias for `update`.
+
 `sync` regenerates selected client adapters from canonical assets. Use `--force-generated` only for managed generated files.
 
 `uninstall` removes only files Agent Feed can identify as managed or generated. It prints the removal plan first, skips unmanaged user files, and requires `--yes` in non-interactive shells. Use `--dry-run` before deleting:
@@ -126,11 +132,11 @@ This is a working prototype:
 4. It supports interactive init, check, and sync selection.
 5. It refuses unsafe initialization over existing `AGENTS.md`, `.agents`, or unmanaged selected client adapters.
 6. It can generate Python, Node, custom, or protocol-only verification profiles.
+7. It can preview and apply non-destructive updates for installed protocol assets.
 
 Not yet mature:
 
 1. Brownfield migration/adoption for projects that already have AI instruction assets.
-2. More language and monorepo verification profiles.
-3. Upgrade/update commands for existing installations.
-4. CI integration.
-5. Release packaging workflow and published documentation site.
+2. Monorepo verification profiles.
+3. CI integration.
+4. Release packaging workflow and published documentation site.

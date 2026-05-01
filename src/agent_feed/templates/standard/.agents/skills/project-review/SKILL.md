@@ -11,6 +11,17 @@ Use this skill for code, diff, commit, merge, or AI-generated implementation rev
 
 Do not modify code during a review unless the user explicitly asks for fixes in the same task.
 
+## Review Mode
+
+Classify the review before acting:
+
+1. `Pure review`: the user asked for review, diff review, commit review, or findings. Do not edit files. Return findings and residual risk only.
+2. `Implementation gate`: the review is part of a task that already includes coding, refactor, fix, or tests. Findings may become follow-up fixes inside the same Task Brief.
+
+For implementation gates, route P0/P1 findings and default-fix P2 findings through `.agents/skills/project-fix/SKILL.md`, then rerun relevant verification before final handoff.
+
+If a finding requires an unconfirmed decision outside the current Task Brief, stop and apply `.agents/rules/decision-gates.md`.
+
 ## Required Reading
 
 1. `.agents/rules/outcome-boundary.md`

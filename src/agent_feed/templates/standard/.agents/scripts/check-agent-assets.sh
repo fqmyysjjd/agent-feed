@@ -81,7 +81,9 @@ if [ -e .claude/skills ] && [ ! -d .claude/skills ]; then
 fi
 
 if [ -d .claude/skills ]; then
-  if ! diff_output=$(diff -qr .agents/skills .claude/skills); then
+  diff_output=$(diff -qr .agents/skills .claude/skills || true)
+  diff_output=$(printf '%s\n' "$diff_output" | grep -v '/.DS_Store' || true)
+  if [ -n "$diff_output" ]; then
     printf '%s\n' "$diff_output" >&2
     fail ".claude/skills is out of sync. Run: sh .agents/scripts/sync-agent-assets.sh"
   fi
@@ -152,50 +154,103 @@ if errors:
 
 state_root = root / ".agents/session-state"
 if state_root.exists():
+    allowed_types = {"decision", "constraint", "blocker", "handoff"}
+
+    def fail_state(message: str) -> None:
+        print(f"check-agent-assets: ERROR: {message}", file=sys.stderr)
+        sys.exit(1)
+
+    def require_string(obj: dict, key: str, label: str) -> None:
+        if not isinstance(obj.get(key), str) or not obj.get(key):
+            fail_state(f"{label}.{key} must be a non-empty string")
+
+    def require_keys(obj: dict, keys: list[str], label: str) -> None:
+        for key in keys:
+            if key not in obj:
+                fail_state(f"{label} missing {key}")
+
     for state_file in sorted(state_root.glob("*.json")):
         try:
             data = json.loads(state_file.read_text(encoding="utf-8"))
         except json.JSONDecodeError as exc:
-            print(
-                f"check-agent-assets: ERROR: {state_file} invalid JSON at "
-                f"line {exc.lineno}, column {exc.colno}",
-                file=sys.stderr,
-            )
-            sys.exit(1)
+            fail_state(f"{state_file} invalid JSON at line {exc.lineno}, column {exc.colno}")
 
         if state_file.name == "schema.json":
             continue
-        if not isinstance(data, dict) or data.get("schema_version") != 2:
-            print(
-                f"check-agent-assets: ERROR: {state_file} must be a schema_version 2 object",
-                file=sys.stderr,
-            )
-            sys.exit(1)
+        if not isinstance(data, dict) or data.get("schema_version") != 1:
+            fail_state(f"{state_file} must be a schema_version 1 object")
         if state_file.name == "current.json":
+            require_keys(data, ["updated_at", "sessions"], "current.json")
+            require_string(data, "updated_at", "current.json")
+            active_session_file = data.get("active_session_file")
+            active_session_file_value = None
+            if active_session_file is not None:
+                if not isinstance(active_session_file, str) or not active_session_file:
+                    fail_state("current.json.active_session_file must be a non-empty string")
+                active_session_file_value = active_session_file
+                if not (root / active_session_file).exists():
+                    fail_state(
+                        f"current.json.active_session_file is missing: {active_session_file}"
+                    )
             sessions = data.get("sessions")
             if not isinstance(sessions, list):
-                print(
-                    "check-agent-assets: ERROR: .agents/session-state/current.json "
-                    "sessions must be a list",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
+                fail_state(".agents/session-state/current.json sessions must be a list")
+            session_files: set[str] = set()
             for index, session in enumerate(sessions):
                 if not isinstance(session, dict):
-                    print(
-                        "check-agent-assets: ERROR: current.json "
-                        f"sessions[{index}] must be an object",
-                        file=sys.stderr,
-                    )
-                    sys.exit(1)
-                session_file = session.get("session_file")
+                    fail_state(f"current.json sessions[{index}] must be an object")
+                label = f"current.json.sessions[{index}]"
+                require_keys(session, ["file", "label", "updated_at"], label)
+                for key in ("file", "label", "updated_at"):
+                    require_string(session, key, label)
+                session_file = session.get("file")
                 if not isinstance(session_file, str) or not (root / session_file).exists():
-                    print(
-                        "check-agent-assets: ERROR: current.json "
-                        f"sessions[{index}].session_file is missing: {session_file}",
-                        file=sys.stderr,
-                    )
-                    sys.exit(1)
+                    fail_state(f"{label}.file is missing: {session_file}")
+                if session_file in session_files:
+                    fail_state(f"{label}.file is duplicated: {session_file}")
+                session_files.add(session_file)
+            if active_session_file_value is not None and active_session_file_value not in session_files:
+                fail_state("current.json.active_session_file is not listed in sessions")
+            continue
+
+        require_keys(data, ["session", "current_task", "carry_forwards"], str(state_file))
+        session = data.get("session")
+        if not isinstance(session, dict):
+            fail_state(f"{state_file} session must be an object")
+        require_keys(session, ["id", "label", "updated_at"], f"{state_file}.session")
+        for key in ("id", "label", "updated_at"):
+            require_string(session, key, f"{state_file}.session")
+
+        current_task = data.get("current_task")
+        if not isinstance(current_task, dict):
+            fail_state(f"{state_file} current_task must be an object")
+        for key in ("goal", "current_step", "stop_condition", "next_action"):
+            require_string(current_task, key, f"{state_file}.current_task")
+
+        carry_forwards = data.get("carry_forwards")
+        if not isinstance(carry_forwards, list):
+            fail_state(f"{state_file} carry_forwards must be a list")
+        if len(carry_forwards) > 7:
+            fail_state(f"{state_file} carry_forwards must contain at most 7 items")
+        carry_forward_ids: set[str] = set()
+        for index, item in enumerate(carry_forwards):
+            if not isinstance(item, dict):
+                fail_state(f"{state_file} carry_forwards[{index}] must be an object")
+            label = f"{state_file}.carry_forwards[{index}]"
+            require_keys(
+                item,
+                ["id", "type", "content", "why_keep", "expires_when", "updated_at"],
+                label,
+            )
+            for key in ("id", "type", "content", "why_keep", "expires_when", "updated_at"):
+                require_string(item, key, label)
+            if item.get("type") not in allowed_types:
+                fail_state(f"{label}.type must be one of: {', '.join(sorted(allowed_types))}")
+            item_id = item.get("id")
+            if isinstance(item_id, str):
+                if item_id in carry_forward_ids:
+                    fail_state(f"{label}.id is duplicated: {item_id}")
+                carry_forward_ids.add(item_id)
 PY
 
 say "Agent asset checks passed"

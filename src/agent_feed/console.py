@@ -23,6 +23,7 @@ def print_welcome() -> None:
             "Install and maintain a reusable AI engineering protocol.\n\n"
             "[dim]Typical flow[/dim]\n"
             "  agent-feed init\n"
+            "  agent-feed update\n"
             "  agent-feed check\n"
             "  agent-feed sync",
             title=f"agent-feed {__version__}",
@@ -39,6 +40,17 @@ def print_write_plan(actions: list[WriteAction]) -> None:
     for action in actions:
         table.add_row(action.action, str(action.path), action.detail)
     console.print(table)
+
+    for action in actions:
+        if action.diff:
+            console.print(
+                Panel(
+                    action.diff,
+                    title=f"Diff: {action.path}",
+                    border_style="yellow",
+                    expand=False,
+                )
+            )
 
 
 def print_check_report(report: CheckReport, *, as_json: bool) -> None:

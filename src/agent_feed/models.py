@@ -44,6 +44,7 @@ class WriteAction:
     path: Path
     action: str
     detail: str = ""
+    diff: str = ""
 
 
 @dataclass

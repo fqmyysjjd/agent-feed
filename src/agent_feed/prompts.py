@@ -8,7 +8,13 @@ from typing import Any
 
 from InquirerPy import inquirer as _inquirer
 
-from agent_feed.models import CHECKS, VERIFICATION_PROFILES, Check, Client, VerificationProfile
+from agent_feed.models import (
+    CHECKS,
+    VERIFICATION_PROFILES,
+    Check,
+    Client,
+    VerificationProfile,
+)
 from agent_feed.verification_profiles import PROFILE_LABELS
 
 
@@ -31,6 +37,7 @@ def prompt_main_action() -> str:
             instruction=SELECT_INSTRUCTION,
             choices=[
                 {"name": "Initialize protocol", "value": "init"},
+                {"name": "Update installed protocol", "value": "update"},
                 {"name": "Sync client adapters", "value": "sync"},
                 {"name": "Check protocol health", "value": "check"},
                 {"name": "Show status", "value": "status"},

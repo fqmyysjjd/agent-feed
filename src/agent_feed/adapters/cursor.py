@@ -35,10 +35,15 @@ def sync(
 
     action = "update" if target.exists() else "create"
     if dry_run:
+        if target.exists() and target.read_text(encoding="utf-8") == cursor_rule():
+            return [WriteAction(target, "skip")], []
         return [WriteAction(target, f"would {action}")], []
 
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(cursor_rule(), encoding="utf-8")
+    next_content = cursor_rule()
+    if target.exists() and target.read_text(encoding="utf-8") == next_content:
+        return [WriteAction(target, "skip")], []
+    target.write_text(next_content, encoding="utf-8")
     return [WriteAction(target, action)], []
 
 

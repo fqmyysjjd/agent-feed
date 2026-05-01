@@ -44,12 +44,38 @@ Use these routes:
 9. Project-level actions that write files, change environment state, use network access, touch databases, or perform destructive operations:
    - `.agents/rules/change-risk-gates.md`
 
+## Mixed Task Routing
+
+When a task matches multiple routes, apply every relevant gate instead of choosing only one.
+
+Use this order:
+
+1. Implementation or refactor plus docs/protocol changes:
+   - use `.agents/skills/project-development/SKILL.md` first.
+   - use `.agents/skills/project-review/SKILL.md` after code changes.
+   - use `.agents/skills/design-review/SKILL.md` after README, AGENTS, rules, domain, project, skill, or planning document changes.
+   - use `.agents/skills/skill-maintainer/SKILL.md` when `.agents/skills/` changed.
+   - run the verification scopes required by `.agents/rules/testing-gates.md` and `.agents/rules/review-gates.md`.
+2. Bug, failed check, regression, or review finding plus docs/protocol changes:
+   - use `.agents/skills/project-fix/SKILL.md` first.
+   - use `.agents/skills/project-review/SKILL.md` after the fix.
+   - use `.agents/skills/design-review/SKILL.md` for changed documents or AI protocol assets.
+3. Pure review requested by the user:
+   - use only the relevant review skill.
+   - do not modify files unless the user explicitly asks for fixes.
+4. Protocol-only or documentation-only work:
+   - use `.agents/skills/design-review/SKILL.md`.
+   - use `.agents/skills/skill-maintainer/SKILL.md` if skills changed.
+   - run protocol verification before final handoff.
+
+The final handoff must list every gate that applied and every gate intentionally skipped with the reason.
+
 ## Context Budget
 
 Prefer canonical summaries before deep files:
 
 1. Rebuild the current task result boundary first.
-2. Recover active session-state topics if a session-state file exists.
+2. Recover the active session handoff card if a session-state file exists.
 3. Read `.agents/project/README.md`, then the specific project constraint files needed for repository-specific boundaries.
 4. Read domain overview.
 5. Read rule files for invariant constraints.

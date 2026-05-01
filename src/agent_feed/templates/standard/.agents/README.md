@@ -6,13 +6,14 @@ These files guide AI assistants while they design, implement, review, and fix th
 
 ## Layer Responsibilities
 
-1. `rules/`: reusable AI development constraints and gates.
-2. `project/`: user-maintained project customization layer for current repository constraints.
-3. `session-state/`: local JSON files for active long-running conversations.
-4. `domain/`: stable project/domain knowledge.
-5. `skills/`: task-specific workflows.
-6. `.agents/scripts/`: protocol helper scripts for sync, validation, and verification.
-7. `agents/`: narrow specialist profiles for delegated checks or worker tasks.
+1. `agent-feed.json`: installed Agent Feed template metadata used by preview/update.
+2. `rules/`: reusable AI development constraints and gates.
+3. `project/`: user-maintained project customization layer for current repository constraints.
+4. `session-state/`: local JSON files for active long-running conversations.
+5. `domain/`: stable project/domain knowledge.
+6. `skills/`: task-specific workflows.
+7. `.agents/scripts/`: protocol helper scripts for sync, validation, and verification.
+8. `agents/`: narrow specialist profiles for delegated checks or worker tasks.
 
 ## Highest-Priority Rule
 
@@ -22,15 +23,15 @@ The current task boundary decides when to stop. Decision gates decide when uncon
 
 ## Current Rules
 
-1. `outcome-boundary.md`: near-term task result, Task Brief, stopping condition, and anti-drift rules.
+1. `outcome-boundary.md`: near-term task result, Task Brief, task class gate, stopping condition, and anti-drift rules.
 2. `decision-gates.md`: human confirmation rules for unconfirmed choices that affect future development results.
 3. `context-loading.md`: startup/context-compression loading order and task routing.
-4. `session-state.md`: compact JSON state, conversation identity, continuity, and multi-session registry rules.
+4. `session-state.md`: compact JSON handoff cards, carry-forward cleanup, and optional multi-session pointer rules.
 5. `testing-gates.md`: test selection, minimum coverage, failure handling, and verification evidence rules.
 6. `evidence-gates.md`: external research sourcing, classification, and adoption rules.
 7. `change-risk-gates.md`: project-level change risk classes and verification command rules.
-8. `development-workflow.md`: coding start checklist, comment/docstring discipline, gap handling, and verification ladder.
-9. `review-gates.md`: code/design review gates and Context Capsule format.
+8. `development-workflow.md`: Task Brief implementation addendum, reuse-before-build discipline, comment/docstring discipline, gap handling, and verification ladder.
+9. `review-gates.md`: code/design review gates and Context Capsule handoff requirements.
 
 ## Reference Direction
 

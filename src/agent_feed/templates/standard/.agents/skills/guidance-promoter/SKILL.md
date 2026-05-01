@@ -14,7 +14,7 @@ Use this skill when:
 1. The user corrects how the AI should work in this repository.
 2. The user says a rule, workflow, or conclusion should be remembered.
 3. A repeated failure appears across multiple turns.
-4. Session-state topics become stable enough to promote.
+4. Session-state carry-forwards become stable enough to promote.
 5. The user asks to improve `.agents`, AGENTS, rules, skills, or development protocol docs.
 
 ## Workflow

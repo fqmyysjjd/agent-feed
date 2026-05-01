@@ -11,6 +11,8 @@ from agent_feed.models import Check, CheckReport, ProjectStatus
 
 SKILL_NAME_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 AGENTS_PATH_PATTERN = re.compile(r"\.agents/[A-Za-z0-9_.*/<>-]+")
+SESSION_CARRY_FORWARD_TYPES = {"decision", "constraint", "blocker", "handoff"}
+SESSION_CARRY_FORWARD_LIMIT = 7
 
 
 def run_checks(root: Path, checks: tuple[Check, ...]) -> CheckReport:
@@ -63,6 +65,7 @@ def collect_status(root: Path) -> ProjectStatus:
 def validate_structure(root: Path) -> list[str]:
     required_paths = [
         "AGENTS.md",
+        ".agents/agent-feed.json",
         ".agents/README.md",
         ".agents/rules/outcome-boundary.md",
         ".agents/rules/decision-gates.md",
@@ -83,7 +86,38 @@ def validate_structure(root: Path) -> list[str]:
         f"missing required path: {rel_path}"
         for rel_path in required_paths
         if not (root / rel_path).exists()
-    ]
+    ] + validate_agent_feed_metadata(root)
+
+
+def validate_agent_feed_metadata(root: Path) -> list[str]:
+    metadata_file = root / ".agents/agent-feed.json"
+    if not metadata_file.exists():
+        return []
+    try:
+        data = json.loads(metadata_file.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        return [
+            ".agents/agent-feed.json invalid JSON at "
+            f"line {exc.lineno}, column {exc.colno}"
+        ]
+    if not isinstance(data, dict):
+        return [".agents/agent-feed.json must be a JSON object"]
+
+    errors: list[str] = []
+    for key in [
+        "schema_version",
+        "agent_feed_version",
+        "template",
+        "project_name",
+        "verification_profile",
+    ]:
+        if key not in data:
+            errors.append(f".agents/agent-feed.json missing {key}")
+    if data.get("schema_version") != 1:
+        errors.append(".agents/agent-feed.json schema_version must be 1")
+    if data.get("template") != "standard":
+        errors.append(".agents/agent-feed.json template must be standard")
+    return errors
 
 
 def validate_scripts(root: Path) -> list[str]:
@@ -223,86 +257,60 @@ def validate_session_state(path: Path, data: object, errors: list[str]) -> None:
     if obj is None:
         return
 
-    required = [
-        "schema_version",
-        "session_id",
-        "conversation_identity",
-        "continuity",
-        "created_at",
-        "updated_at",
-        "repository",
-        "purpose",
-        "topics",
-    ]
-    require_keys(path, obj, required, errors)
-    if obj.get("schema_version") != 2:
-        errors.append(f"{path}: schema_version must be 2")
+    require_keys(path, obj, ["schema_version", "session", "current_task", "carry_forwards"], errors)
+    if obj.get("schema_version") != 1:
+        errors.append(f"{path}: schema_version must be 1")
 
-    identity = require_nested_object(path, obj, "conversation_identity", errors)
-    if identity is not None:
-        require_keys(
-            path, identity, ["source", "external_thread_id", "session_alias", "resume_hint"], errors
-        )
+    session = require_nested_object(path, obj, "session", errors)
+    if session is not None:
+        require_keys(path, session, ["id", "label", "updated_at"], errors, prefix="session")
+        require_non_empty_string(path, session, "id", errors, prefix="session")
+        require_non_empty_string(path, session, "label", errors, prefix="session")
+        require_non_empty_string(path, session, "updated_at", errors, prefix="session")
+        if "thread_id" in session and not isinstance(session.get("thread_id"), str):
+            errors.append(f"{path}: session.thread_id must be a string")
+        if "title_history" in session:
+            require_string_list(path, session, "title_history", errors, prefix="session")
 
-    continuity = require_nested_object(path, obj, "continuity", errors)
-    if continuity is not None:
-        require_keys(
-            path,
-            continuity,
-            [
-                "current_user_goal",
-                "active_task_boundary",
-                "active_topic_ids",
-                "last_handoff_summary",
-                "next_required_action",
-            ],
-            errors,
-        )
-        require_string_list(path, continuity, "active_topic_ids", errors)
+    current_task = require_nested_object(path, obj, "current_task", errors)
+    if current_task is not None:
+        for key in ["goal", "current_step", "stop_condition", "next_action"]:
+            require_non_empty_string(path, current_task, key, errors, prefix="current_task")
 
-    topics = obj.get("topics")
-    if not isinstance(topics, list):
-        errors.append(f"{path}: topics must be a list")
+    carry_forwards = obj.get("carry_forwards")
+    if not isinstance(carry_forwards, list):
+        errors.append(f"{path}: carry_forwards must be a list")
         return
 
-    topic_ids: set[str] = set()
-    for index, topic in enumerate(topics):
-        if not isinstance(topic, dict):
-            errors.append(f"{path}: topics[{index}] must be an object")
+    if len(carry_forwards) > SESSION_CARRY_FORWARD_LIMIT:
+        errors.append(
+            f"{path}: carry_forwards must contain at most {SESSION_CARRY_FORWARD_LIMIT} items"
+        )
+
+    carry_forward_ids: set[str] = set()
+    for index, item in enumerate(carry_forwards):
+        prefix = f"carry_forwards[{index}]"
+        if not isinstance(item, dict):
+            errors.append(f"{path}: {prefix} must be an object")
             continue
         require_keys(
             path,
-            topic,
-            [
-                "topic_id",
-                "title",
-                "status",
-                "context",
-                "conclusion",
-                "next_action",
-                "blocking_questions",
-                "related_files",
-                "updated_at",
-            ],
+            item,
+            ["id", "type", "content", "why_keep", "expires_when", "updated_at"],
             errors,
-            prefix=f"topics[{index}]",
+            prefix=prefix,
         )
-        if topic.get("status") not in {"active", "blocked", "ready_for_action"}:
-            errors.append(f"{path}: topics[{index}].status is invalid")
-        topic_id = topic.get("topic_id")
-        if isinstance(topic_id, str):
-            if topic_id in topic_ids:
-                errors.append(f"{path}: duplicate topic_id {topic_id}")
-            topic_ids.add(topic_id)
-        require_string_list(path, topic, "blocking_questions", errors, prefix=f"topics[{index}]")
-        require_string_list(path, topic, "related_files", errors, prefix=f"topics[{index}]")
-
-    if continuity is not None:
-        active_topic_ids = continuity.get("active_topic_ids")
-        if isinstance(active_topic_ids, list):
-            for topic_id in active_topic_ids:
-                if isinstance(topic_id, str) and topic_id not in topic_ids:
-                    errors.append(f"{path}: continuity.active_topic_ids references missing topic {topic_id}")
+        for key in ["id", "type", "content", "why_keep", "expires_when", "updated_at"]:
+            require_non_empty_string(path, item, key, errors, prefix=prefix)
+        item_type = item.get("type")
+        if isinstance(item_type, str) and item_type not in SESSION_CARRY_FORWARD_TYPES:
+            allowed = ", ".join(sorted(SESSION_CARRY_FORWARD_TYPES))
+            errors.append(f"{path}: {prefix}.type must be one of: {allowed}")
+        item_id = item.get("id")
+        if isinstance(item_id, str):
+            if item_id in carry_forward_ids:
+                errors.append(f"{path}: duplicate carry_forwards id {item_id}")
+            carry_forward_ids.add(item_id)
 
 
 def validate_current_session_registry(
@@ -312,74 +320,51 @@ def validate_current_session_registry(
     if obj is None:
         return
 
-    require_keys(
-        path,
-        obj,
-        ["schema_version", "updated_at", "repository", "active_session_ids", "sessions"],
-        errors,
-    )
-    if obj.get("schema_version") != 2:
-        errors.append(f"{path}: schema_version must be 2")
-    require_string_list(path, obj, "active_session_ids", errors)
+    require_keys(path, obj, ["schema_version", "updated_at", "sessions"], errors)
+    if obj.get("schema_version") != 1:
+        errors.append(f"{path}: schema_version must be 1")
+    require_non_empty_string(path, obj, "updated_at", errors)
+
+    active_session_file = obj.get("active_session_file")
+    active_session_file_value: str | None = None
+    if active_session_file is not None:
+        if not isinstance(active_session_file, str) or not active_session_file:
+            errors.append(f"{path}: active_session_file must be a non-empty string")
+        else:
+            active_session_file_value = active_session_file
+            active_path = Path(active_session_file)
+            resolved_active_path = active_path if active_path.is_absolute() else root / active_path
+            if not resolved_active_path.exists():
+                errors.append(f"{path}: active_session_file does not exist: {active_session_file}")
+
     sessions = obj.get("sessions")
     if not isinstance(sessions, list):
         errors.append(f"{path}: sessions must be a list")
         return
 
-    session_ids: set[str] = set()
+    session_files: set[str] = set()
     for index, session in enumerate(sessions):
+        prefix = f"sessions[{index}]"
         if not isinstance(session, dict):
-            errors.append(f"{path}: sessions[{index}] must be an object")
+            errors.append(f"{path}: {prefix} must be an object")
             continue
-        require_keys(
-            path,
-            session,
-            [
-                "session_id",
-                "session_file",
-                "conversation_identity",
-                "current_user_goal",
-                "active_topic_ids",
-                "updated_at",
-            ],
-            errors,
-            prefix=f"sessions[{index}]",
-        )
-        require_string_list(path, session, "active_topic_ids", errors, prefix=f"sessions[{index}]")
-        session_id = session.get("session_id")
-        if isinstance(session_id, str):
-            if session_id in session_ids:
-                errors.append(f"{path}: duplicate sessions[{index}].session_id {session_id}")
-            session_ids.add(session_id)
+        require_keys(path, session, ["file", "label", "updated_at"], errors, prefix=prefix)
+        for key in ["file", "label", "updated_at"]:
+            require_non_empty_string(path, session, key, errors, prefix=prefix)
 
-        identity = require_nested_object(
-            path, session, "conversation_identity", errors
-        )
-        if identity is not None:
-            require_keys(
-                path,
-                identity,
-                ["source", "external_thread_id", "session_alias", "resume_hint"],
-                errors,
-                prefix=f"sessions[{index}].conversation_identity",
-            )
-
-        session_file = session.get("session_file")
+        session_file = session.get("file")
         if not isinstance(session_file, str) or not session_file:
-            errors.append(f"{path}: sessions[{index}].session_file must be a non-empty string")
             continue
         session_path = Path(session_file)
         resolved_session_path = session_path if session_path.is_absolute() else root / session_path
         if not resolved_session_path.exists():
-            errors.append(
-                f"{path}: sessions[{index}].session_file does not exist: {session_file}"
-            )
+            errors.append(f"{path}: {prefix}.file does not exist: {session_file}")
+        if session_file in session_files:
+            errors.append(f"{path}: duplicate {prefix}.file {session_file}")
+        session_files.add(session_file)
 
-    active_session_ids = obj.get("active_session_ids")
-    if isinstance(active_session_ids, list):
-        for session_id in active_session_ids:
-            if isinstance(session_id, str) and session_id not in session_ids:
-                errors.append(f"{path}: active_session_ids references missing session {session_id}")
+    if active_session_file_value is not None and active_session_file_value not in session_files:
+        errors.append(f"{path}: active_session_file is not listed in sessions")
 
 
 def require_object(path: Path, data: object, errors: list[str]) -> dict[str, object] | None:
@@ -425,3 +410,17 @@ def require_string_list(
     label = f"{prefix}.{key}" if prefix else key
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
         errors.append(f"{path}: {label} must be a list of strings")
+
+
+def require_non_empty_string(
+    path: Path,
+    obj: dict[str, object],
+    key: str,
+    errors: list[str],
+    *,
+    prefix: str = "",
+) -> None:
+    value = obj.get(key)
+    label = f"{prefix}.{key}" if prefix else key
+    if not isinstance(value, str) or not value:
+        errors.append(f"{path}: {label} must be a non-empty string")

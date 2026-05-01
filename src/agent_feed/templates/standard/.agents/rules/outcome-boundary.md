@@ -51,6 +51,20 @@ For any implementation, fix, review, design, or AI-protocol change, turn the tas
 
 Do not start editing if `Goal`, `Stop`, `Write set`, or `Verification gate` are unclear.
 
+## Task Class Gate
+
+Classify the task before choosing how much planning is needed:
+
+1. `Direct action`: small local edit, command run, typo fix, narrow reference update, or obvious deterministic repair. Act directly after recovering the Task Brief.
+2. `Implementation task`: code, tests, package metadata, generated template behavior, project structure, or public command behavior. Use `.agents/rules/development-workflow.md`.
+3. `Design task`: architecture, module ownership, public contract, persistence, verification profile, adapter behavior, product scope, or multi-step implementation plan. Write only until the design is development-ready.
+4. `Exploration/review task`: read-only analysis, code review, gap review, or feasibility check. Do not edit unless the user asks for fixes.
+5. `Decision task`: any unconfirmed choice that can affect future development results. Apply `.agents/rules/decision-gates.md`.
+
+For long or difficult tasks, produce a compact plan before editing when the next action would otherwise require guessing. Stop for user confirmation at the point where the plan introduces a new public behavior, source-of-truth boundary, dependency/tooling choice, adapter behavior, verification contract, or delivery scope.
+
+If a new gap appears during design or implementation, do not silently absorb it into the current task. Continue only when the gap is local, reversible, and already covered by the Task Brief; otherwise pause, summarize the gap, provide concrete options, and ask for a decision.
+
 ## Design Readiness Standard
 
 A design is ready for development only when it answers:

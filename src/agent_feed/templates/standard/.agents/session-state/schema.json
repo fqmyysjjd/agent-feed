@@ -1,81 +1,58 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "AI Development Session State",
+  "title": "AI Development Session Handoff",
   "type": "object",
-  "required": [
-    "schema_version",
-    "session_id",
-    "conversation_identity",
-    "continuity",
-    "created_at",
-    "updated_at",
-    "repository",
-    "purpose",
-    "topics"
-  ],
+  "required": ["schema_version", "session", "current_task", "carry_forwards"],
   "additionalProperties": false,
   "properties": {
-    "schema_version": { "type": "integer", "const": 2 },
-    "session_id": { "type": "string", "minLength": 1 },
-    "conversation_identity": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "session": {
       "type": "object",
-      "required": ["source", "external_thread_id", "session_alias", "resume_hint"],
+      "required": ["id", "label", "updated_at"],
       "additionalProperties": false,
       "properties": {
-        "source": { "type": "string" },
-        "external_thread_id": { "type": "string" },
-        "session_alias": { "type": "string", "minLength": 1 },
-        "resume_hint": { "type": "string", "minLength": 1 }
+        "id": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 },
+        "updated_at": { "type": "string", "minLength": 1 },
+        "thread_id": {
+          "type": "string",
+          "description": "Optional AI-client thread id when the environment exposes it."
+        },
+        "title_history": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Optional known conversation titles or aliases."
+        }
       }
     },
-    "continuity": {
+    "current_task": {
       "type": "object",
-      "required": [
-        "current_user_goal",
-        "active_task_boundary",
-        "active_topic_ids",
-        "last_handoff_summary",
-        "next_required_action"
-      ],
+      "required": ["goal", "current_step", "stop_condition", "next_action"],
       "additionalProperties": false,
       "properties": {
-        "current_user_goal": { "type": "string", "minLength": 1 },
-        "active_task_boundary": { "type": "string" },
-        "active_topic_ids": { "type": "array", "items": { "type": "string" } },
-        "last_handoff_summary": { "type": "string" },
-        "next_required_action": { "type": "string" }
+        "goal": { "type": "string", "minLength": 1 },
+        "current_step": { "type": "string", "minLength": 1 },
+        "stop_condition": { "type": "string", "minLength": 1 },
+        "next_action": { "type": "string", "minLength": 1 }
       }
     },
-    "created_at": { "type": "string" },
-    "updated_at": { "type": "string" },
-    "repository": { "type": "string" },
-    "purpose": { "type": "string" },
-    "topics": {
+    "carry_forwards": {
       "type": "array",
+      "maxItems": 7,
       "items": {
         "type": "object",
-        "required": [
-          "topic_id",
-          "title",
-          "status",
-          "context",
-          "conclusion",
-          "next_action",
-          "blocking_questions",
-          "related_files",
-          "updated_at"
-        ],
+        "required": ["id", "type", "content", "why_keep", "expires_when", "updated_at"],
         "additionalProperties": false,
         "properties": {
-          "topic_id": { "type": "string" },
-          "title": { "type": "string", "minLength": 1 },
-          "status": { "type": "string", "enum": ["active", "blocked", "ready_for_action"] },
-          "context": { "type": "string" },
-          "conclusion": { "type": "string" },
-          "next_action": { "type": "string" },
-          "blocking_questions": { "type": "array", "items": { "type": "string" } },
-          "related_files": { "type": "array", "items": { "type": "string" } },
-          "updated_at": { "type": "string" }
+          "id": { "type": "string", "minLength": 1 },
+          "type": {
+            "type": "string",
+            "enum": ["decision", "constraint", "blocker", "handoff"]
+          },
+          "content": { "type": "string", "minLength": 1 },
+          "why_keep": { "type": "string", "minLength": 1 },
+          "expires_when": { "type": "string", "minLength": 1 },
+          "updated_at": { "type": "string", "minLength": 1 }
         }
       }
     }

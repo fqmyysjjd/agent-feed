@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "agent_feed_version": "{{AGENT_FEED_VERSION}}",
+  "template": "standard",
+  "project_name": "{{PROJECT_NAME}}",
+  "verification_profile": "{{VERIFICATION_PROFILE}}",
+  "managed_paths": [
+    "AGENTS.md",
+    ".agents/README.md",
+    ".agents/agent-feed.json",
+    ".agents/rules/",
+    ".agents/skills/",
+    ".agents/scripts/",
+    ".agents/agents/README.md",
+    ".agents/session-state/README.md",
+    ".agents/session-state/schema.json",
+    ".agents/session-state/.gitignore"
+  ],
+  "user_maintained_paths": [
+    ".agents/project/",
+    ".agents/domain/"
+  ]
+}

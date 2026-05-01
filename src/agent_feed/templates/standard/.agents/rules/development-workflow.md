@@ -2,38 +2,53 @@
 
 Use this rule for implementation, refactor, test, and project-structure work.
 
-## Start Checklist
+## Implementation Addendum
 
-Before editing, identify:
+Before editing code, tests, package metadata, project structure, or implementation-facing docs, first complete the Task Brief in `.agents/rules/outcome-boundary.md`.
+
+Then add only the implementation-specific details below:
 
 ```md
-Current task boundary:
-Stopping condition:
 Milestone or phase:
-Task:
+Task type: implementation / refactor / test / project-structure / implementation-doc
 Owner module:
-Write set:
 Read-only docs:
-Contracts touched:
 Public API touched: yes/no
 Store/persistence touched: yes/no
 Migration touched: yes/no
 Tests expected:
-Test gate:
 Comment/docstring impact:
 Forbidden changes:
 ```
 
-Do not start coding if `Current task boundary`, `Stopping condition`, `Owner module`, `Write set`, `Contracts touched`, `Test gate`, or `Comment/docstring impact` are unclear.
+Do not duplicate or contradict the Task Brief. `Goal`, `Stop`, `Write set`, `Contracts/boundaries`, and `Verification gate` are owned by `.agents/rules/outcome-boundary.md`.
+
+Do not start implementation work if the Task Brief is missing, or if `Owner module`, `Task type`, `Tests expected`, or `Comment/docstring impact` are unclear.
+
+If implementation reveals a new write target, contract boundary, verification gate, or out-of-scope change, stop and update the Task Brief or apply `.agents/rules/decision-gates.md` before continuing.
+
+## Reuse Before Build
+
+Before writing non-trivial implementation code:
+
+1. Search the current repository for an existing owner, helper, adapter, test fixture, parser, validator, command pattern, or script that already solves the problem.
+2. Trace upstream callers and downstream consumers before replacing or duplicating behavior.
+3. Prefer standard library, already-installed dependencies, and established project patterns over new local abstractions.
+4. For complex generic domains such as parsing, diffing, schema validation, CLI prompting, testing, formatting, protocol handling, or runtime orchestration, check whether a proven library or existing project dependency should be used instead of hand-writing the logic.
+5. If choosing an external dependency would affect package surface, install behavior, license risk, runtime behavior, network use, or future maintenance, stop and apply `.agents/rules/decision-gates.md`.
+6. Use web research for external library choices when current ecosystem reliability, popularity, maintenance, or API facts matter. Do not present web-derived claims without source and date.
+
+Only build from scratch when reuse is unavailable, unsafe, heavier than the task requires, or incompatible with the project boundary. Record that reasoning briefly when the choice is not obvious.
 
 ## Implementation Rules
 
 1. Implement the smallest scoped change that satisfies the task.
-2. Preserve public/internal boundaries and documented ownership.
-3. Keep public contracts separate from internal implementation details.
-4. Prefer existing project patterns over new abstractions.
-5. Add or update tests for changed behavior, failure paths, boundaries, or invariants.
-6. Update design docs only when a contract or boundary truly changes.
+2. Reuse existing code, dependency, or project pattern when it is a better fit than new code.
+3. Preserve public/internal boundaries and documented ownership.
+4. Keep public contracts separate from internal implementation details.
+5. Prefer existing project patterns over new abstractions.
+6. Add or update tests for changed behavior, failure paths, boundaries, or invariants.
+7. Update design docs only when a contract or boundary truly changes.
 
 ## Comment And Docstring Discipline
 

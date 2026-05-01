@@ -1,53 +1,55 @@
 # Session State
 
-This rule defines how AI agents preserve session-local conclusions created during multi-turn development work.
+Session state is a compact handoff card for context compression.
 
-It is not a runtime feature, product memory, durable project documentation, or replacement for design documents.
+It is not product memory, a transcript, a backlog, or durable documentation. Its only job is to let the next AI turn recover what matters now.
 
-## Purpose
+## What To Store
 
-Context compression can dilute conclusions from a long conversation. Stable project assets such as rules, domain docs, skills, and design documents are reusable, but session-specific conclusions often exist only in chat.
+Use `.agents/session-state/<session_id>.json` only when context compression could dilute information that still affects the next action.
 
-Use `.agents/session-state/<session_id>.json` to maintain a compact, mutable state file for the current conversation.
+Store only:
 
-Use `.agents/session-state/current.json` as the optional local active-session registry when the environment does not expose a stable conversation id or when multiple AI conversations are open in the same repository.
+1. `current_task`: what is being advanced, where it currently stands, when to stop, and the next action.
+2. `carry_forwards`: short conclusions that must survive compression because they affect later behavior.
 
-## Mandatory Recording Triggers
+Do not store:
 
-Before continuing to unrelated work or final handoff, update session state or promote the conclusion to a stable asset when any of these occur:
+1. Detailed transcripts.
+2. Facts already represented in stable docs.
+3. Completed tasks that do not affect the next action.
+4. Low-value notes or "might be useful later" ideas.
+5. Implementation logs that can be recovered from code, tests, or git diff.
 
-1. The user gives a correction that changes future AI development behavior.
-2. The user confirms or rejects a rule, skill name, protocol boundary, or documentation responsibility.
-3. The conversation establishes a decision that will guide later development, review, or documentation work.
-4. The current task has an unresolved next action, blocker, or pending validation that would be costly to reconstruct after context compression.
-5. The AI notices that a prior important conclusion existed only in chat.
+## Carry-Forward Rules
 
-Do not use session state for detailed transcripts, low-value notes, or facts already fully represented in stable project docs.
+Each carry-forward must answer:
 
-## Update Rules
+1. `content`: the conclusion, blocker, constraint, or handoff.
+2. `why_keep`: why losing it would harm the next AI action.
+3. `expires_when`: when it should be deleted or promoted.
 
-1. Update an existing topic when the same concern evolves, advances, narrows, or changes direction slightly.
-2. Add a new topic only when the session has a genuinely different concern.
-3. Remove a topic when its task is complete and no longer needed for the next action.
-4. Keep each topic compact enough to be read quickly after context compression.
-5. Do not preserve stale conclusions.
+Keep at most 7 carry-forwards. If more are needed, delete stale items or promote stable conclusions into `.agents/rules/`, `.agents/project/`, `.agents/domain/`, `.agents/skills/`, README, or design docs.
 
-## Required Checkpoints
-
-At the start of a new turn, after context compression, or before continuing a long-running task:
-
-1. Identify the current session state file.
-2. If the environment exposes a stable thread id, use the matching session file.
-3. If no stable id is available, read `.agents/session-state/current.json` if it exists and find the matching `sessions[]` entry.
-4. Match by `conversation_identity.external_thread_id` first when present.
-5. If no thread id exists, match by `conversation_identity.resume_hint`, `current_user_goal`, active topic ids, and the user's latest request.
-6. If multiple entries plausibly match, ask the user which session state to use instead of guessing.
-7. Read the chosen file.
-8. Reconcile it with the user's latest message and current task boundary.
+## Maintenance Rules
 
 Before final handoff:
 
-1. Update session state if unresolved conclusions remain relevant.
-2. Remove topics that are complete and no longer needed.
-3. Update this conversation's `.agents/session-state/current.json` registry entry when needed.
-4. Mention in the Context Capsule whether session state was updated, promoted, not needed, or cleaned.
+1. Update `current_task` if the task is still active.
+2. Update an existing carry-forward when the same concern evolves; do not add a near-duplicate.
+3. Add a carry-forward only for a new decision, constraint, blocker, or handoff that still affects the next action.
+4. Delete carry-forwards whose `expires_when` condition has been met.
+5. Promote durable cross-session guidance into stable docs, then delete the carry-forward.
+6. If no current task or carry-forward remains, remove the session file or remove it from `.agents/session-state/current.json`.
+7. Mention in the Context Capsule whether session state was updated, cleaned, promoted, or not needed, with the reason.
+
+## Current Registry
+
+`.agents/session-state/current.json` is optional. Use it only as a simple pointer when multiple AI conversations exist in the same repository or the AI client does not expose a stable thread id.
+
+Keep it minimal:
+
+1. `active_session_file`: the best match for the current conversation when known.
+2. `sessions[]`: file, label, and updated_at for currently useful handoff cards.
+
+AI clients may not expose thread id, title, rename history, or archive status to repository files. Do not pretend that metadata is known. If the environment exposes a thread id or title, store it in the session object. If not, match by `session.label`, `current_task.goal`, `carry_forwards`, and the user's latest request. If multiple sessions match, ask the user.

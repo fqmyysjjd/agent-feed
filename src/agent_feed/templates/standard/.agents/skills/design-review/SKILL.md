@@ -28,7 +28,15 @@ The review's highest-priority question is:
 
 Can the next development step proceed from this design without inventing missing decisions?
 
-If yes, state that the design is ready for the next development step and stop. If no, identify the blocking gaps and either close them in the document or ask for the required decision.
+If yes, state that the design is ready for the next development step and stop.
+
+If no, identify the blocking gaps. Close a gap directly only when all of these are true:
+
+1. The answer is already supported by existing source-of-truth files.
+2. The change stays inside the current Task Brief.
+3. The change does not alter public behavior, CLI/API contracts, architecture ownership, adapter behavior, verification gates, source-of-truth boundaries, persistence, security, release scope, or product positioning.
+
+When any condition is false, do not fill the gap yourself. Apply `.agents/rules/decision-gates.md` and ask for the required decision.
 
 ## Output
 
