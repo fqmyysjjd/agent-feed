@@ -45,6 +45,17 @@ class WriteAction:
     action: str
     detail: str = ""
     diff: str = ""
+    persistent: bool = False
+
+    @property
+    def severity(self) -> str:
+        if self.action in {"blocked", "review"}:
+            return "warning"
+        if self.action.startswith("would"):
+            return "preview"
+        if self.action in {"skip"}:
+            return "neutral"
+        return "success"
 
 
 @dataclass

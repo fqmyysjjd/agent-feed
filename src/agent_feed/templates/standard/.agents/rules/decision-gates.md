@@ -10,6 +10,8 @@ If a discovered gap, ambiguity, or improvement would affect future development r
 
 Do not treat "I found a gap" as permission to design and implement the missing policy.
 
+When the user suggests a concrete solution, first evaluate it against the current project context and relevant code. If adopting that solution would change public behavior, persistence, environment setup, source-of-truth ownership, adapter behavior, verification, security, release scope, or AI protocol rules, present the assessment and wait for confirmation before editing unless the user has already confirmed the exact plan.
+
 ## Must Stop And Ask
 
 Pause and ask for a decision before changing files when the choice would affect:

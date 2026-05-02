@@ -12,3 +12,4 @@ Replace this template with concrete source-tree ownership rules.
 4. Define where adapters/integrations live.
 5. Define where generated files may be written.
 6. Define which directories must not be imported by production code.
+7. If this project adds custom skills, define whether they are project-local, imported, or reviewed standards.

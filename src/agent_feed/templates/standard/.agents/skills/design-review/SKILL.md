@@ -1,6 +1,8 @@
 ---
 name: design-review
 description: Use when reviewing design documents, architecture plans, implementation routes, gap analyses, README, AGENTS, rules, domain docs, or skills.
+source: agent-feed
+trust: core
 ---
 
 # Design Review Skill

@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "agent-feed"
 version = "0.1.1"
-description = "CLI for installing a reusable AI engineering protocol into software projects."
+description = "CLI for installing AGENTS.md, .agents rules, AI coding workflows, and client adapters into software projects."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
@@ -14,10 +14,29 @@ authors = [
 ]
 dependencies = [
   "InquirerPy>=0.3.4",
+  "httpx[socks]>=0.27",
   "rich>=13.9",
   "typer>=0.12",
 ]
-keywords = ["agents", "AGENTS.md", "AI coding", "developer tooling"]
+keywords = [
+  "agents",
+  "agents-md",
+  "ai-agents",
+  "ai-coding",
+  "ai-engineering",
+  "ai-development",
+  "ai-software-engineering",
+  "agentic-development",
+  "ai-assisted-development",
+  "claude-code",
+  "codex",
+  "cursor",
+  "developer-tools",
+  "context-management",
+  "verification",
+  "code-review",
+  "software-quality",
+]
 classifiers = [
   "Development Status :: 2 - Pre-Alpha",
   "Environment :: Console",

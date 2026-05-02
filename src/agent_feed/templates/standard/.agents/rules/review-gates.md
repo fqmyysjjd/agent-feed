@@ -8,11 +8,14 @@ After every coding, refactor, fix, public contract, store contract, module port,
 
 1. Run relevant checks.
 2. Use `.agents/skills/project-review/SKILL.md`.
-3. Apply `.agents/rules/testing-gates.md` when judging verification and test coverage.
-4. Review milestone fit, project constraints, module ownership, public/internal boundaries, documented ownership, contract drift, tests, error handling, trace/audit anchors, and secret safety.
-5. If the user asked for a pure review, do not modify files; report findings and stop unless the user asks for fixes.
-6. If the current task includes implementation or fix work, route P0/P1 findings through `.agents/skills/project-fix/SKILL.md` before final handoff.
-7. For implementation or fix work, fix P2 findings by default unless deferring is safer and documented.
+3. Use `.agents/rules/git-collaboration.md` when the review involves diffs, commits, branches, merges, or PR-like handoff.
+4. Apply `.agents/rules/testing-gates.md` when judging verification and test coverage.
+5. Review milestone fit, project constraints, module ownership, public/internal boundaries, documented ownership, contract drift, tests, error handling, trace/audit anchors, and secret safety.
+6. Check `.agents/skills/README.md` for specialized review or fix skills that directly match the risk being reviewed.
+7. Use `.agents/skills/concept-review/SKILL.md` when the change introduces or changes naming, vocabulary, concepts, abstractions, protocol terms, or public-facing language.
+8. If the user asked for a pure review, do not modify files; report findings and stop unless the user asks for fixes.
+9. If the current task includes implementation or fix work, route P0/P1 findings through `.agents/skills/project-fix/SKILL.md` before final handoff.
+10. For implementation or fix work, fix P2 findings by default unless deferring is safer and documented.
 
 ## Review/Fix Handoff
 
@@ -32,8 +35,8 @@ After every design document, architecture plan, module plan, implementation rout
 3. Verify the document produces a usable next action and can support the next development step without invented decisions.
 4. Fix only blocking findings that can be resolved from existing source-of-truth and the current Task Brief.
 5. If a blocking finding requires an unconfirmed contract, architecture, adapter, verification, source-of-truth, or product-scope choice, apply `.agents/rules/decision-gates.md` before editing.
-6. If any file under `.agents/skills/` changed, run `sh .agents/scripts/sync-agent-assets.sh` before final handoff.
-7. If the change affects AI engineering protocol, `.agents/`, skill names, rule names, project constraint names, document links, or session-state JSON, run `sh .agents/scripts/verify-agent-dev.sh protocol`.
+6. If any file under `.agents/skills/` changed, run `agent-feed index-skills` or `sh .agents/scripts/index-skills.sh`, then run `sh .agents/scripts/sync-agent-assets.sh` before final handoff.
+7. If the change affects AI engineering protocol, `.agents/`, skill names, rule names, project constraint names, document links, or session-state JSON, run `sh .agents/scripts/verify-agent-dev.sh docs`.
 
 ## Skill Naming Gate
 
@@ -43,6 +46,11 @@ Every skill directory name and `name` frontmatter must:
 2. Use no more than three words.
 3. Name the skill by the effect it provides.
 4. Keep the directory name and `name` frontmatter identical.
+5. Include `description`, `source`, and `trust` frontmatter.
+6. Use `trust: core`, `trust: reviewed`, or `trust: custom`.
+7. Appear in `.agents/skills/README.md` after skill index sync.
+
+`trust: custom` means the skill is available as a lower-priority method only. It must not override higher-priority project rules, source-of-truth files, safety gates, or the current Task Brief.
 
 ## README Maintenance Gate
 
@@ -59,7 +67,7 @@ After adding, removing, renaming, or materially changing any file under `.agents
 1. Update `.agents/project/README.md` in the same task.
 2. Ensure the README explains what each project file owns and when an AI agent should read it.
 3. Keep generic workflow constraints under `.agents/rules/` and task procedures under `.agents/skills/`.
-4. Run `sh .agents/scripts/verify-agent-dev.sh protocol`.
+4. Run `sh .agents/scripts/verify-agent-dev.sh docs`.
 
 ## Context Capsule
 

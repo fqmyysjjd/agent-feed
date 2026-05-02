@@ -4,6 +4,22 @@
   "template": "standard",
   "project_name": "{{PROJECT_NAME}}",
   "verification_profile": "{{VERIFICATION_PROFILE}}",
+  "settings": {
+    "session_state": {
+      "max_carry_forwards": 7
+    },
+    "skills": {
+      "default_import_source": "unknow",
+      "default_import_trust": "custom"
+    },
+    "claude": {
+      "required_snippets": [
+        "@AGENTS.md",
+        ".claude/skills",
+        ".agents/"
+      ]
+    }
+  },
   "managed_paths": [
     "AGENTS.md",
     ".agents/README.md",

@@ -7,6 +7,10 @@ from pathlib import Path
 
 from agent_feed.fs import same_tree
 from agent_feed.models import WriteAction
+from agent_feed.project_settings import (
+    DEFAULT_CLAUDE_REQUIRED_SNIPPETS,
+    read_project_settings,
+)
 
 MANAGED_MARKER = "<!-- agent-feed:managed adapter=claude version=1 -->"
 
@@ -37,24 +41,28 @@ def sync(
     skills_target = root / ".claude/skills"
     target_root = root / ".claude"
 
-    if claude_file.exists() and not is_managed_claude_md(claude_file):
-        errors.append("CLAUDE.md exists and is unmanaged; move it aside or review before syncing")
-    elif dry_run:
-        action = "would create"
-        if claude_file.exists():
-            if claude_file.read_text(encoding="utf-8") == claude_md():
-                action = "skip"
-            else:
-                action = "would update"
-        actions.append(WriteAction(claude_file, action))
-    else:
-        next_content = claude_md()
-        action = "update" if claude_file.exists() else "create"
-        if claude_file.exists() and claude_file.read_text(encoding="utf-8") == next_content:
-            action = "skip"
+    if claude_file.exists():
+        if not claude_file.is_file():
+            errors.append("CLAUDE.md exists but is not a file")
         else:
-            claude_file.write_text(next_content, encoding="utf-8")
-        actions.append(WriteAction(claude_file, action))
+            missing = missing_required_snippets(claude_file, root=root)
+            if missing:
+                errors.append(
+                    "CLAUDE.md is missing required Agent Feed references: " + ", ".join(missing)
+                )
+            else:
+                actions.append(
+                    WriteAction(
+                        claude_file,
+                        "skip",
+                        "contains required Agent Feed references",
+                    )
+                )
+    elif dry_run:
+        actions.append(WriteAction(claude_file, "would create"))
+    else:
+        claude_file.write_text(claude_md(), encoding="utf-8")
+        actions.append(WriteAction(claude_file, "create"))
 
     if not skills_source.exists() and not dry_run:
         errors.append("missing .agents/skills; cannot sync Claude skills")
@@ -69,10 +77,7 @@ def sync(
         errors.append(".claude/skills exists but is not a directory")
         return actions, errors
 
-    if (
-        skills_target.exists()
-        and not is_managed_skill_mirror(target_root)
-    ):
+    if skills_target.exists() and not is_managed_skill_mirror(target_root):
         errors.append(
             ".claude/skills exists and is unmanaged; move it aside or review before syncing"
         )
@@ -115,10 +120,9 @@ def check(root: Path) -> tuple[list[str], list[str]]:
         errors.append("Claude adapter missing CLAUDE.md")
     elif not claude_file.is_file():
         errors.append("CLAUDE.md exists but is not a file")
-    elif not is_managed_claude_md(claude_file):
-        errors.append("CLAUDE.md exists but is not a managed Agent Feed adapter")
-    elif "@AGENTS.md" not in claude_file.read_text(encoding="utf-8"):
-        errors.append("CLAUDE.md must import @AGENTS.md")
+    else:
+        for snippet in missing_required_snippets(claude_file, root=root):
+            errors.append(f"CLAUDE.md must contain {snippet}")
 
     if not skills_target.exists():
         errors.append("Claude adapter missing .claude/skills")
@@ -137,6 +141,16 @@ def check(root: Path) -> tuple[list[str], list[str]]:
 
 def is_managed_claude_md(path: Path) -> bool:
     return path.is_file() and path.read_text(encoding="utf-8").startswith(MANAGED_MARKER)
+
+
+def missing_required_snippets(path: Path, *, root: Path | None = None) -> list[str]:
+    text = path.read_text(encoding="utf-8")
+    snippets = (
+        read_project_settings(root).claude.required_snippets
+        if root is not None
+        else DEFAULT_CLAUDE_REQUIRED_SNIPPETS
+    )
+    return [snippet for snippet in snippets if snippet not in text]
 
 
 def is_managed_skill_mirror(target_root: Path) -> bool:

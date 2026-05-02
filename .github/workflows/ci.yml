@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    name: ${{ matrix.os }} / Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+        python-version:
+          - "3.11"
+          - "3.12"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: uv sync --all-extras --dev
+
+      - name: Run tests
+        run: uv run python -m pytest
+
+      - name: Run ruff
+        run: uv run python -m ruff check .
+
+      - name: Run mypy
+        run: uv run python -m mypy .
+
+      - name: Build package
+        run: uv build
+
+      - name: Smoke test built wheel (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          python3 -m venv "$RUNNER_TEMP/agent-feed-wheel-smoke"
+          "$RUNNER_TEMP/agent-feed-wheel-smoke/bin/python" -m pip install dist/*.whl
+          "$RUNNER_TEMP/agent-feed-wheel-smoke/bin/agent-feed" --version
+          "$RUNNER_TEMP/agent-feed-wheel-smoke/bin/agent-feed" --help
+          "$RUNNER_TEMP/agent-feed-wheel-smoke/bin/agent-feed" init --help
+
+      - name: Smoke test built wheel (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          python -m venv "$env:RUNNER_TEMP\agent-feed-wheel-smoke"
+          & "$env:RUNNER_TEMP\agent-feed-wheel-smoke\Scripts\python.exe" -m pip install dist/*.whl
+          & "$env:RUNNER_TEMP\agent-feed-wheel-smoke\Scripts\agent-feed.exe" --version
+          & "$env:RUNNER_TEMP\agent-feed-wheel-smoke\Scripts\agent-feed.exe" --help
+          & "$env:RUNNER_TEMP\agent-feed-wheel-smoke\Scripts\agent-feed.exe" init --help
+
+      - name: Smoke test CLI
+        run: |
+          uv run agent-feed --version
+          uv run agent-feed --help
+          uv run agent-feed init --help

@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
-import json
 from dataclasses import asdict
+import json
+from pathlib import Path
 
+from rich import box
 from rich.console import Console
+from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.table import Table
+from rich.text import Text
 
 from agent_feed import __version__
 from agent_feed.models import CheckReport, ProjectStatus, WriteAction
@@ -19,34 +23,98 @@ console = Console()
 def print_welcome() -> None:
     console.print(
         Panel.fit(
-            "[bold]Agent Feed[/bold]\n"
-            "Install and maintain a reusable AI engineering protocol.\n\n"
-            "[dim]Typical flow[/dim]\n"
-            "  agent-feed init\n"
-            "  agent-feed update\n"
-            "  agent-feed check\n"
-            "  agent-feed sync",
+            "[bold cyan]Agent Feed[/bold cyan]\n"
+            "Install, verify, and maintain AI development protocol assets.\n\n"
+            "[bold]Start[/bold]    agent-feed init --interactive\n"
+            "[bold]Verify[/bold]   agent-feed check\n"
+            "[bold]Inspect[/bold]  agent-feed status\n"
+            "[bold]Preview[/bold]  agent-feed preview",
             title=f"agent-feed {__version__}",
             border_style="cyan",
         )
     )
 
 
-def print_write_plan(actions: list[WriteAction]) -> None:
-    table = Table(title="Write Plan")
-    table.add_column("Action", style="cyan")
-    table.add_column("Path")
-    table.add_column("Detail", style="dim")
-    for action in actions:
-        table.add_row(action.action, str(action.path), action.detail)
-    console.print(table)
+def print_error_panel(title: str, errors: list[str]) -> None:
+    table = Table.grid(padding=(0, 1))
+    table.add_column(width=2, no_wrap=True)
+    table.add_column(ratio=1)
+    for error in errors:
+        table.add_row("[bold red]![/bold red]", error)
+    console.print(Panel(table, title=title, border_style="red", expand=False))
 
+
+def render_diff(diff: str) -> Text:
+    rendered = Text()
+    lines = diff.splitlines(keepends=True)
+    if not lines and diff:
+        lines = [diff]
+    for line in lines:
+        rendered.append(line, style=diff_line_style(line))
+    return rendered
+
+
+def diff_line_style(line: str) -> str | None:
+    if line.startswith("@@"):
+        return "bold cyan"
+    if line.startswith("--- "):
+        return "bold red"
+    if line.startswith("+++ "):
+        return "bold green"
+    if line.startswith("-"):
+        return "red"
+    if line.startswith("+"):
+        return "green"
+    if line.startswith("diff ") or line.startswith("index "):
+        return "bold"
+    if line.startswith("\\"):
+        return "dim"
+    return None
+
+
+def print_write_plan(actions: list[WriteAction], *, show_diffs: bool = False) -> None:
+    print_write_plan_with_title(actions, title=write_plan_title(actions), show_diffs=show_diffs)
+
+
+def print_write_plan_with_title(
+    actions: list[WriteAction],
+    *,
+    title: str,
+    show_diffs: bool = False,
+) -> None:
+    table = Table(
+        title=title,
+        box=box.SIMPLE_HEAVY,
+        show_lines=False,
+        header_style="bold",
+    )
+    table.add_column("", width=2, no_wrap=True)
+    table.add_column("Action", style="bold")
+    table.add_column("Path", overflow="fold")
+    table.add_column("Detail", style="dim", overflow="fold")
+    for action in actions:
+        table.add_row(
+            action_icon(action),
+            styled_action(action),
+            display_path(action.path),
+            action.detail,
+        )
+    console.print(table)
+    if show_diffs:
+        print_diff_details(actions)
+
+
+def has_diff_details(actions: list[WriteAction]) -> bool:
+    return any(action.diff for action in actions)
+
+
+def print_diff_details(actions: list[WriteAction]) -> None:
     for action in actions:
         if action.diff:
             console.print(
                 Panel(
-                    action.diff,
-                    title=f"Diff: {action.path}",
+                    render_diff(action.diff),
+                    title=f"Diff: {display_path(action.path)}",
                     border_style="yellow",
                     expand=False,
                 )
@@ -68,21 +136,24 @@ def print_check_report(report: CheckReport, *, as_json: bool) -> None:
     if report.ok:
         console.print(
             Panel.fit(
-                f"[green]Checks passed[/green]\n"
-                f"Target: {report.target}\n"
-                f"Scope: {', '.join(check.value for check in report.checks)}",
+                f"[bold green]Checks passed[/bold green]\n"
+                f"[dim]Target[/dim] {report.target}\n"
+                f"[dim]Scope[/dim]  {', '.join(check.value for check in report.checks)}",
+                title="Agent Feed",
                 border_style="green",
             )
         )
     else:
-        table = Table(title="Check Failures")
-        table.add_column("Type", style="red")
-        table.add_column("Message")
+        table = Table(title="Checks blocked", box=box.SIMPLE_HEAVY, header_style="bold red")
+        table.add_column("", width=2)
+        table.add_column("Type")
+        table.add_column("Message", overflow="fold")
         for error in report.errors:
-            table.add_row("error", error)
+            table.add_row("!", "[red]error[/red]", error)
         for warning in report.warnings:
-            table.add_row("warning", warning)
+            table.add_row("?", "[yellow]warning[/yellow]", warning)
         console.print(table)
+        print_next_step("Fix the diagnostics above, then rerun `agent-feed check`.")
 
 
 def print_status(status: ProjectStatus, *, as_json: bool) -> None:
@@ -92,7 +163,11 @@ def print_status(status: ProjectStatus, *, as_json: bool) -> None:
         print(json.dumps(payload, indent=2, ensure_ascii=False))
         return
 
-    table = Table(title=f"Agent Feed Status: {status.target}")
+    table = Table(
+        title=f"Agent Feed Status: {status.target}",
+        box=box.SIMPLE_HEAVY,
+        header_style="bold",
+    )
     table.add_column("Area")
     table.add_column("Source")
     table.add_column("State")
@@ -115,15 +190,101 @@ def print_status(status: ProjectStatus, *, as_json: bool) -> None:
     console.print(table)
 
     if status.errors or status.warnings:
-        report = Table(title="Diagnostics")
+        report = Table(title="Diagnostics", box=box.SIMPLE_HEAVY)
+        report.add_column("", width=2)
         report.add_column("Type")
-        report.add_column("Message")
+        report.add_column("Message", overflow="fold")
         for error in status.errors:
-            report.add_row("error", error)
+            report.add_row("!", "[red]error[/red]", error)
         for warning in status.warnings:
-            report.add_row("warning", warning)
+            report.add_row("?", "[yellow]warning[/yellow]", warning)
         console.print(report)
+
+    print_next_step(status_next_step(status))
 
 
 def _state(ok: bool) -> str:
-    return "[green]ready[/green]" if ok else "[red]missing/stale[/red]"
+    return "[green]ready[/green]" if ok else "[red]blocked[/red]"
+
+
+def write_plan_title(actions: list[WriteAction]) -> str:
+    if not actions:
+        return "No Changes"
+    if any(action.severity == "warning" for action in actions):
+        return "Review Required"
+    if any(action.severity == "preview" for action in actions):
+        return "Preview"
+    return "Changes"
+
+
+def action_icon(action: WriteAction) -> str:
+    return {
+        "warning": "!",
+        "preview": "~",
+        "neutral": "-",
+        "success": "+",
+    }[action.severity]
+
+
+def styled_action(action: WriteAction) -> Text:
+    styles = {
+        "warning": "bold yellow",
+        "preview": "cyan",
+        "neutral": "dim",
+        "success": "green",
+    }
+    return Text(action.action, style=styles[action.severity])
+
+
+def display_path(path: Path) -> str:
+    try:
+        return str(path.relative_to(Path.cwd()))
+    except ValueError:
+        return str(path)
+
+
+def print_next_step(message: str) -> None:
+    console.print(f"[bold cyan]Next:[/bold cyan] [bold white]{message}[/bold white]")
+
+
+def print_recommended_command(message: str, command: str) -> None:
+    console.print(
+        Panel.fit(
+            f"[bold cyan]{message}[/bold cyan]\n[bold green]{command}[/bold green]",
+            border_style="cyan",
+        )
+    )
+
+
+def print_markdown_panel(title: str, body: str, *, border_style: str = "blue") -> None:
+    console.print(Panel(Markdown(body), title=title, border_style=border_style, expand=False))
+
+
+def status_next_step(status: ProjectStatus) -> str:
+    if not status.canonical_installed:
+        return "Run `agent-feed init --interactive` in this project."
+    if status.errors:
+        return "Run `agent-feed check --checks all` for the full failure list."
+    if status.warnings:
+        return "Review the warnings above, then run `agent-feed preview` before updating."
+    return "Run `agent-feed preview` to inspect managed drift before updating."
+
+
+def print_diff_hint(
+    *,
+    command: str,
+    interactive: bool,
+    append_diff_flag: bool = True,
+) -> None:
+    script_command = f"{command} --diff" if append_diff_flag else command
+    if interactive:
+        message = (
+            f"[bold cyan]Diff details:[/bold cyan] press [bold green]v[/bold green] "
+            f"to show all diffs, or press any other key to exit. "
+            f"Script mode: [bold green]{script_command}[/bold green]."
+        )
+    else:
+        message = (
+            f"[bold cyan]Diff details:[/bold cyan] rerun [bold green]{script_command}[/bold green]."
+        )
+    console.print(message)

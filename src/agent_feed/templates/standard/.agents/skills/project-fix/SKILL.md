@@ -1,6 +1,8 @@
 ---
 name: project-fix
 description: Use when fixing bugs, review findings, regressions, failed tests, merge issues, contract drift, or behavior defects.
+source: agent-feed
+trust: core
 ---
 
 # Project Fix Skill

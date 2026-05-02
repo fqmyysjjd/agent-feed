@@ -6,6 +6,22 @@ Reusable rules under `.agents/rules/` may reference project constraints when the
 
 Agent Feed initializes this directory so AI agents always have a stable place to find project-specific guidance. The generated files are starting points, not final truth; users should edit them to match the real project.
 
+## Personalization Bootstrap
+
+If project-specific work starts while files in `.agents/project/` or `.agents/domain/` still contain scaffold placeholders, the AI assistant must infer project constraints from the repository's existing docs and code before continuing.
+
+Initialization flow:
+
+1. Read current docs, source layout, build/test config, public entrypoints, and durable contract owners.
+2. Draft concrete project/domain guidance in `.agents/project/` and `.agents/domain/`.
+3. Replace scaffold-only sections with repository-backed facts whenever the evidence is clear.
+4. Call out uncertain assumptions instead of presenting guesses as fact.
+5. Stop for user confirmation only when the missing decision could affect future development results under `.agents/rules/decision-gates.md`.
+
+After initialization, whenever a feature, architecture boundary, verification command, source layout, persistence model, security rule, or public contract changes, review the related `.agents/project/` and `.agents/domain/` files and update them when they no longer match the repository.
+
+For template-only repositories that are not yet tied to a concrete user project, keep the generic scaffold content. As soon as the repository has enough project-specific docs or code to support evidence-based inference, replace scaffold guidance with concrete project/domain facts.
+
 ## Boundary
 
 Use this directory for:
@@ -14,7 +30,7 @@ Use this directory for:
 2. Current repository source-tree ownership and placement rules.
 3. Current repository trace, logging, audit, and secret-safety constraints.
 4. Current repository milestone or delivery constraints.
-5. Current repository verification profile.
+5. Current repository custom verification commands.
 
 Do not use this directory for generic AI development workflow rules, session-local conclusions, or task-specific skills.
 
@@ -31,4 +47,4 @@ Do not use this directory for generic AI development workflow rules, session-loc
 1. `architecture-boundaries.md`: owns repository architecture boundaries and stop rules; read before module ownership, dependency, adapter, or template responsibility decisions.
 2. `project-structure.md`: owns source layout and placement rules; read before adding, moving, or importing files.
 3. `milestones.md`: owns implementation milestone or phase route; read before planning scope, sequencing, or release-facing work.
-4. `verification-profile.md`: owns the current repository verification profile and unsupported verification boundaries; read before selecting or reporting `code` or `full` verification.
+4. `verification-commands.sh`: owns project-specific custom code verification commands; read or edit only when `.agents/agent-feed.json` sets `verification_profile` to `custom`.

@@ -1,6 +1,8 @@
 ---
 name: project-review
 description: Use when reviewing modified code, git diffs, commits, merges, PR-like changes, or implementation output.
+source: agent-feed
+trust: core
 ---
 
 # Project Review Skill
@@ -31,10 +33,15 @@ If a finding requires an unconfirmed decision outside the current Task Brief, st
 5. `.agents/rules/testing-gates.md`
 6. `.agents/rules/review-gates.md`
 7. `.agents/domain/contracts.md`
+8. `.agents/skills/README.md`
 
 ## Review Scope
 
 Findings should prioritize correctness, contract drift, module ownership, tests, error handling, security/secret handling, and maintainability.
+
+Before finalizing findings, check `.agents/skills/README.md` for specialized review or fix skills that match the changed language, architecture, framework, persistence layer, or risk category. Use only the skills that directly serve the current review boundary.
+
+Use `.agents/skills/concept-review/SKILL.md` when the diff introduces or changes names, concepts, abstractions, protocol terms, user-facing language, or skill vocabulary.
 
 ## Severity Model
 

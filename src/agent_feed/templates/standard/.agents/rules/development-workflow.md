@@ -2,6 +2,8 @@
 
 Use this rule for implementation, refactor, test, and project-structure work.
 
+Do not begin implementation only from a user-proposed approach or partial solution. First recover the task boundary, inspect the relevant project context and code, and verify that the approach fits the desired result and project constraints.
+
 ## Implementation Addendum
 
 Before editing code, tests, package metadata, project structure, or implementation-facing docs, first complete the Task Brief in `.agents/rules/outcome-boundary.md`.

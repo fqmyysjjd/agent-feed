@@ -1,4 +1,4 @@
-"""Non-destructive update planning for installed Agent Feed assets."""
+"""Non-destructive upgrade planning for installed Agent Feed assets."""
 
 from __future__ import annotations
 
@@ -10,12 +10,17 @@ from typing import Any
 
 from agent_feed import __version__
 from agent_feed.models import VerificationProfile, WriteAction
+from agent_feed.skill_index import render_skill_index
 from agent_feed.templates import canonical_write_plan
 
 
 METADATA_PATH = Path(".agents/agent-feed.json")
 PROJECT_NAME_SUFFIX = " AI Development Instructions"
 PROFILE_PATTERN = re.compile(r"Verification profile:\s*([a-z0-9_-]+)", re.IGNORECASE)
+SETTINGS_MANAGED_PATHS = {
+    Path(".agents/agent-feed.json"),
+    Path(".agents/session-state/schema.json"),
+}
 
 
 def is_installed(root: Path) -> bool:
@@ -66,12 +71,8 @@ def infer_verification_profile(root: Path) -> VerificationProfile:
         if parsed is not None:
             return parsed
 
-    for path in [
-        root / ".agents/scripts/verify-agent-dev.sh",
-        root / ".agents/project/verification-profile.md",
-    ]:
-        if not path.is_file():
-            continue
+    path = root / ".agents/scripts/verify-agent-dev.sh"
+    if path.is_file():
         match = PROFILE_PATTERN.search(path.read_text(encoding="utf-8"))
         if match:
             parsed = parse_profile(match.group(1))
@@ -88,7 +89,7 @@ def parse_profile(value: str) -> VerificationProfile | None:
         return None
 
 
-def update_plan(
+def upgrade_plan(
     target: Path,
     *,
     project_name: str,
@@ -106,6 +107,58 @@ def update_plan(
         verification_profile,
     ):
         rel_path = path.relative_to(target)
+        if rel_path == Path(".agents/skills/README.md"):
+            expected = render_skill_index(target)
+        if path.exists() and not path.is_file():
+            errors.append(f"{rel_path} exists but is not a file")
+            continue
+        current = path.read_text(encoding="utf-8") if path.exists() and path.is_file() else None
+
+        if current == expected:
+            continue
+
+        if current is None:
+            actions.append(write_or_preview(path, expected, "create", dry_run=dry_run))
+            continue
+
+        if is_user_maintained_path(rel_path):
+            continue
+
+        diff = unified_diff(rel_path, current, expected)
+        actions.append(write_or_preview(path, expected, "update", dry_run=dry_run, diff=diff))
+
+    if not actions:
+        actions.append(
+            WriteAction(
+                path=target,
+                action="skip",
+                detail=f"canonical assets already match agent-feed {__version__}",
+            )
+        )
+
+    return actions, errors
+
+
+def settings_asset_plan(
+    target: Path,
+    *,
+    project_name: str,
+    verification_profile: VerificationProfile,
+    dry_run: bool,
+) -> tuple[list[WriteAction], list[str]]:
+    if not is_installed(target):
+        return [], ["missing Agent Feed installation; run agent-feed init first"]
+
+    actions: list[WriteAction] = []
+    errors: list[str] = []
+    for path, expected in canonical_write_plan(
+        target,
+        project_name,
+        verification_profile,
+    ):
+        rel_path = path.relative_to(target)
+        if rel_path not in SETTINGS_MANAGED_PATHS:
+            continue
         if path.exists() and not path.is_file():
             errors.append(f"{rel_path} exists but is not a file")
             continue
@@ -119,17 +172,6 @@ def update_plan(
             continue
 
         diff = unified_diff(rel_path, current, expected)
-        if is_user_maintained_path(rel_path):
-            actions.append(
-                WriteAction(
-                    path=path,
-                    action="skip",
-                    detail="user-maintained; differs from current template; not overwritten",
-                    diff=diff,
-                )
-            )
-            continue
-
         actions.append(write_or_preview(path, expected, "update", dry_run=dry_run, diff=diff))
 
     if not actions:
@@ -137,7 +179,7 @@ def update_plan(
             WriteAction(
                 path=target,
                 action="skip",
-                detail=f"canonical assets already match agent-feed {__version__}",
+                detail=f"settings-driven assets already match agent-feed {__version__}",
             )
         )
 

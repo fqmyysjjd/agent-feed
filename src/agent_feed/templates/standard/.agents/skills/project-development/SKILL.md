@@ -1,6 +1,8 @@
 ---
 name: project-development
 description: Use before implementation, refactor, tests, project-structure changes, or coding tasks.
+source: agent-feed
+trust: core
 ---
 
 # Project Development Skill

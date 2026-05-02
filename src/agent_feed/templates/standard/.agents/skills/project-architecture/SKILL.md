@@ -1,6 +1,8 @@
 ---
 name: project-architecture
 description: Use at the start of every project session, after context compression, and before architecture, module, runtime, or requirement decisions.
+source: agent-feed
+trust: core
 ---
 
 # Project Architecture Skill

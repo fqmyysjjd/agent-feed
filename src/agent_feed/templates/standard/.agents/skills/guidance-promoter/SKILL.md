@@ -1,6 +1,8 @@
 ---
 name: guidance-promoter
 description: Use when user corrections, repeated AI failures, or session-state conclusions should be promoted into stable AI development guidance.
+source: agent-feed
+trust: core
 ---
 
 # Guidance Promoter

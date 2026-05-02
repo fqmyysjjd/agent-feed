@@ -6,6 +6,7 @@ import shutil
 from pathlib import Path
 
 from agent_feed.adapters import claude, cursor
+from agent_feed.asset_trust import project_trust_uninstall_plan, remove_project_trust_state
 from agent_feed.fs import same_tree
 from agent_feed.models import WriteAction
 
@@ -60,7 +61,9 @@ def uninstall_plan(root: Path, *, dry_run: bool) -> list[WriteAction]:
         actions,
         codex_skills,
         action=action,
-        safe=agents_skills.is_dir() and codex_skills.is_dir() and same_tree(agents_skills, codex_skills),
+        safe=agents_skills.is_dir()
+        and codex_skills.is_dir()
+        and same_tree(agents_skills, codex_skills),
         unmanaged_detail="legacy .codex/skills is not a verified mirror; not removed",
         managed_detail="legacy Agent Feed Codex skill mirror",
     )
@@ -85,10 +88,11 @@ def uninstall_plan(root: Path, *, dry_run: bool) -> list[WriteAction]:
         managed_detail="Agent Feed protocol directory",
     )
 
+    actions.extend(project_trust_uninstall_plan(root, dry_run=dry_run))
     return actions
 
 
-def apply_uninstall_plan(actions: list[WriteAction]) -> list[WriteAction]:
+def apply_uninstall_plan(root: Path, actions: list[WriteAction]) -> list[WriteAction]:
     applied: list[WriteAction] = []
     for item in actions:
         if item.action != "delete":
@@ -105,15 +109,19 @@ def apply_uninstall_plan(actions: list[WriteAction]) -> list[WriteAction]:
     for directory in {
         action.path.parent
         for action in actions
-        if action.action == "delete" and action.path.name in {"agent-feed.mdc", "README.md", "skills"}
+        if action.action == "delete"
+        and action.path.name in {"agent-feed.mdc", "README.md", "skills"}
     }:
         remove_empty_parents(directory)
 
+    applied.extend(remove_project_trust_state(root))
     return applied
 
 
 def has_deletions(actions: list[WriteAction]) -> bool:
-    return any(action.action in {"delete", "would delete"} for action in actions)
+    return any(
+        action.action in {"delete", "would delete", "update", "would update"} for action in actions
+    )
 
 
 def is_agent_feed_agents_md(path: Path) -> bool:

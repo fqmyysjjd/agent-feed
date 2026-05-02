@@ -7,12 +7,22 @@ import re
 from pathlib import Path
 
 from agent_feed.adapters import claude, codex, cursor
+from agent_feed.asset_trust import asset_trust_errors
 from agent_feed.models import Check, CheckReport, ProjectStatus
+from agent_feed.project_settings import (
+    DEFAULT_SKILL_TRUST,
+    metadata_settings_errors,
+    read_project_settings,
+)
+from agent_feed.skill_index import (
+    VALID_SKILL_TRUST,
+    read_frontmatter,
+    skill_index_errors,
+)
 
 SKILL_NAME_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 AGENTS_PATH_PATTERN = re.compile(r"\.agents/[A-Za-z0-9_.*/<>-]+")
 SESSION_CARRY_FORWARD_TYPES = {"decision", "constraint", "blocker", "handoff"}
-SESSION_CARRY_FORWARD_LIMIT = 7
 
 
 def run_checks(root: Path, checks: tuple[Check, ...]) -> CheckReport:
@@ -45,21 +55,51 @@ def run_checks(root: Path, checks: tuple[Check, ...]) -> CheckReport:
 
 def collect_status(root: Path) -> ProjectStatus:
     canonical_errors = validate_structure(root)
+    trust_errors = asset_trust_errors(root)
+    skill_errors, skill_warnings = validate_skills_report(root, include_trust=False)
     codex_errors, codex_warnings = codex.check(root)
-    claude_errors, claude_warnings = claude.check(root)
-    cursor_errors, cursor_warnings = cursor.check(root)
-    warnings = [*codex_warnings, *claude_warnings, *cursor_warnings]
-    errors = [*canonical_errors, *codex_errors, *claude_errors, *cursor_errors]
+    configured = configured_clients(root)
+    if "claude" in configured:
+        claude_errors, claude_warnings = claude.check(root)
+    else:
+        claude_errors, claude_warnings = [], []
+    if "cursor" in configured:
+        cursor_errors, cursor_warnings = cursor.check(root)
+    else:
+        cursor_errors, cursor_warnings = [], []
+    warnings = [
+        *skill_warnings,
+        *codex_warnings,
+        *claude_warnings,
+        *cursor_warnings,
+    ]
+    errors = [
+        *canonical_errors,
+        *trust_errors,
+        *skill_errors,
+        *codex_errors,
+        *claude_errors,
+        *cursor_errors,
+    ]
     return ProjectStatus(
         target=root,
-        canonical_installed=not canonical_errors,
+        canonical_installed=not canonical_errors and not trust_errors,
         codex_ready=not codex_errors,
-        claude_ready=not claude_errors,
-        cursor_ready=not cursor_errors,
+        claude_ready="claude" in configured and not claude_errors,
+        cursor_ready="cursor" in configured and not cursor_errors,
         legacy_codex_mirror=(root / ".codex/skills").exists(),
         errors=tuple(errors),
         warnings=tuple(warnings),
     )
+
+
+def configured_clients(root: Path) -> set[str]:
+    configured = {"codex"}
+    if (root / "CLAUDE.md").exists() or (root / ".claude/skills").exists():
+        configured.add("claude")
+    if (root / ".cursor/rules/agent-feed.mdc").exists():
+        configured.add("cursor")
+    return configured
 
 
 def validate_structure(root: Path) -> list[str]:
@@ -75,10 +115,13 @@ def validate_structure(root: Path) -> list[str]:
         ".agents/rules/development-workflow.md",
         ".agents/rules/review-gates.md",
         ".agents/project/README.md",
-        ".agents/project/verification-profile.md",
+        ".agents/project/verification-commands.sh",
         ".agents/domain/README.md",
         ".agents/skills",
+        ".agents/skills/README.md",
         ".agents/scripts/check-agent-assets.sh",
+        ".agents/scripts/check-agent-trust.sh",
+        ".agents/scripts/index-skills.sh",
         ".agents/scripts/sync-agent-assets.sh",
         ".agents/scripts/verify-agent-dev.sh",
     ]
@@ -96,10 +139,7 @@ def validate_agent_feed_metadata(root: Path) -> list[str]:
     try:
         data = json.loads(metadata_file.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
-        return [
-            ".agents/agent-feed.json invalid JSON at "
-            f"line {exc.lineno}, column {exc.colno}"
-        ]
+        return [f".agents/agent-feed.json invalid JSON at line {exc.lineno}, column {exc.colno}"]
     if not isinstance(data, dict):
         return [".agents/agent-feed.json must be a JSON object"]
 
@@ -117,6 +157,15 @@ def validate_agent_feed_metadata(root: Path) -> list[str]:
         errors.append(".agents/agent-feed.json schema_version must be 1")
     if data.get("template") != "standard":
         errors.append(".agents/agent-feed.json template must be standard")
+    if "verification_profile" in data:
+        from agent_feed.models import VerificationProfile
+
+        try:
+            VerificationProfile(str(data["verification_profile"]).strip().lower())
+        except ValueError:
+            allowed = ", ".join(profile.value for profile in VerificationProfile)
+            errors.append(f".agents/agent-feed.json verification_profile must be one of {allowed}")
+    errors.extend(metadata_settings_errors(data, label=".agents/agent-feed.json"))
     return errors
 
 
@@ -124,6 +173,8 @@ def validate_scripts(root: Path) -> list[str]:
     errors: list[str] = []
     for rel_path in [
         ".agents/scripts/check-agent-assets.sh",
+        ".agents/scripts/check-agent-trust.sh",
+        ".agents/scripts/index-skills.sh",
         ".agents/scripts/sync-agent-assets.sh",
         ".agents/scripts/verify-agent-dev.sh",
     ]:
@@ -132,18 +183,28 @@ def validate_scripts(root: Path) -> list[str]:
             errors.append(f"missing script: {rel_path}")
         elif not path.stat().st_mode & 0o111:
             errors.append(f"script is not executable: {rel_path}")
+    errors.extend(asset_trust_errors(root, kinds={"script"}))
     return errors
 
 
 def validate_skills(root: Path) -> list[str]:
+    errors, _warnings = validate_skills_report(root)
+    return errors
+
+
+def validate_skills_report(
+    root: Path, *, include_trust: bool = True
+) -> tuple[list[str], list[str]]:
     errors: list[str] = []
+    warnings: list[str] = []
     skill_root = root / ".agents/skills"
     if not skill_root.exists():
-        return ["missing .agents/skills"]
+        return ["missing .agents/skills"], warnings
 
     for skill_file in sorted(skill_root.glob("*/SKILL.md")):
         skill_name = skill_file.parent.name
-        frontmatter_name = read_skill_name(skill_file)
+        frontmatter = read_frontmatter(skill_file)
+        frontmatter_name = frontmatter.get("name", "")
         if frontmatter_name != skill_name:
             errors.append(
                 f"{skill_file}: frontmatter name must match directory name "
@@ -153,14 +214,15 @@ def validate_skills(root: Path) -> list[str]:
             errors.append(f"{skill_file}: skill name must be lowercase kebab-case")
         if len(skill_name.split("-")) > 3:
             errors.append(f"{skill_file}: skill name must be at most three words")
-    return errors
-
-
-def read_skill_name(skill_file: Path) -> str:
-    for line in skill_file.read_text(encoding="utf-8").splitlines():
-        if line.startswith("name: "):
-            return line.removeprefix("name: ").strip()
-    return ""
+        for key in ("description", "source", "trust"):
+            if not frontmatter.get(key):
+                errors.append(f"{skill_file}: frontmatter missing {key}")
+        if frontmatter.get("trust", DEFAULT_SKILL_TRUST) not in VALID_SKILL_TRUST:
+            errors.append(f"{skill_file}: trust must be one of core, reviewed, custom")
+    if include_trust:
+        errors.extend(asset_trust_errors(root, kinds={"skill"}))
+    errors.extend(skill_index_errors(root))
+    return errors, warnings
 
 
 def validate_references_and_indexes(root: Path) -> list[str]:
@@ -282,10 +344,11 @@ def validate_session_state(path: Path, data: object, errors: list[str]) -> None:
         errors.append(f"{path}: carry_forwards must be a list")
         return
 
-    if len(carry_forwards) > SESSION_CARRY_FORWARD_LIMIT:
-        errors.append(
-            f"{path}: carry_forwards must contain at most {SESSION_CARRY_FORWARD_LIMIT} items"
-        )
+    max_carry_forwards = read_project_settings(
+        path.parent.parent.parent
+    ).session_state.max_carry_forwards
+    if len(carry_forwards) > max_carry_forwards:
+        errors.append(f"{path}: carry_forwards must contain at most {max_carry_forwards} items")
 
     carry_forward_ids: set[str] = set()
     for index, item in enumerate(carry_forwards):

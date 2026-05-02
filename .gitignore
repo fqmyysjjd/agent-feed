@@ -19,8 +19,5 @@ build/
 /.claude/
 /.cursor/
 
-# Local-only validation artifacts. The publishable package surface is limited by
-# pyproject.toml build targets.
-/tests/
-/docs/
+# Local lockfile is not part of the current package contract.
 /uv.lock

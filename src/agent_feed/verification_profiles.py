@@ -17,20 +17,19 @@ PROFILE_LABELS = {
 
 def verification_context(profile: VerificationProfile) -> dict[str, str]:
     return {
-        "VERIFY_AGENT_DEV_SH": verify_script(profile),
-        "VERIFICATION_PROFILE_DOC": verification_doc(profile),
+        "VERIFY_AGENT_DEV_SH": verify_script(),
+        "VERIFICATION_COMMANDS_SH": verification_commands_script(profile),
     }
 
 
-def verify_script(profile: VerificationProfile) -> str:
-    script = dedent(
+def verify_script() -> str:
+    return dedent(
         """\
         #!/usr/bin/env sh
         set -eu
 
         # Unified verification entry for AI-assisted development work.
-        # Verification profile: __PROFILE__
-        # Customize run_code for this repository's real test/lint/type/build commands.
+        # Reads .agents/agent-feed.json verification_profile at runtime.
 
         ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
         SCRIPT_NAME="verify-agent-dev"
@@ -50,6 +49,30 @@ def verify_script(profile: VerificationProfile) -> str:
           printf '%s\\n' "$SCRIPT_NAME: $*"
         }
 
+        config_value() {
+          key="$1"
+          python_code='import json,sys; data=json.load(open(".agents/agent-feed.json", encoding="utf-8")); value=data.get(sys.argv[1], ""); print(value if isinstance(value, str) else "")'
+          node_code='const fs=require("fs"); const data=JSON.parse(fs.readFileSync(".agents/agent-feed.json", "utf8")); const value=data[process.argv[1]]; if (typeof value === "string") console.log(value)'
+          if command -v python3 >/dev/null 2>&1 && python3 -c "$python_code" "$key"; then
+            return 0
+          fi
+          if command -v python >/dev/null 2>&1 && python -c "$python_code" "$key"; then
+            return 0
+          fi
+          if command -v node >/dev/null 2>&1 && node -e "$node_code" "$key"; then
+            return 0
+          fi
+          sed -n 's/.*"'"$key"'"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p' .agents/agent-feed.json | sed -n '1p'
+        }
+
+        verification_profile() {
+          profile=$(config_value verification_profile || true)
+          if [ -z "$profile" ]; then
+            fail "missing .agents/agent-feed.json verification_profile. Run agent-feed config set verification_profile <python|node|custom|none>."
+          fi
+          printf '%s\\n' "$profile"
+        }
+
         usage() {
           cat <<'USAGE'
         Usage: sh .agents/scripts/verify-agent-dev.sh <scope>
@@ -59,8 +82,8 @@ def verify_script(profile: VerificationProfile) -> str:
           code      Run the selected code verification gate.
           full      Run docs checks and the selected code verification gate.
 
-        Selected verification profile: __PROFILE__
-        Edit .agents/scripts/verify-agent-dev.sh if this project's real commands differ.
+        The code gate reads .agents/agent-feed.json verification_profile at runtime.
+        Change it with: agent-feed config set verification_profile <python|node|custom|none>
         USAGE
         }
 
@@ -73,10 +96,119 @@ def verify_script(profile: VerificationProfile) -> str:
         }
 
         run_docs() {
+          run_step "AI asset trust check" sh .agents/scripts/check-agent-trust.sh
           run_step "AI docs and asset consistency checks" sh .agents/scripts/check-agent-assets.sh
         }
 
-        __RUN_CODE__
+        run_optional_python_module() {
+          module_name="$1"
+          desc="$2"
+          shift 2
+          if [ "${PYTHON_RUNNER:-}" = "uv" ]; then
+            if uv run python -m "$module_name" --version >/dev/null 2>&1; then
+              run_step "$desc" env -u AGENT_FEED_HOME uv run python -m "$module_name" "$@"
+            else
+              say "Skipping $desc: $module_name is not installed in this project environment."
+            fi
+          elif env -u AGENT_FEED_HOME "$PYTHON_RUNNER" -m "$module_name" --version >/dev/null 2>&1; then
+            run_step "$desc" env -u AGENT_FEED_HOME "$PYTHON_RUNNER" -m "$module_name" "$@"
+          else
+            say "Skipping $desc: $module_name is not installed in this project environment."
+          fi
+        }
+
+        run_python_code() {
+          if [ ! -f "pyproject.toml" ] && [ ! -f "setup.py" ] && [ ! -f "requirements.txt" ] && [ ! -f "pytest.ini" ]; then
+            say "No common Python project marker found; continuing because the python profile was selected."
+          fi
+          if command -v uv >/dev/null 2>&1; then
+            PYTHON_RUNNER="uv"
+            run_step "pytest" env -u AGENT_FEED_HOME uv run python -m pytest
+          elif command -v python3 >/dev/null 2>&1; then
+            PYTHON_RUNNER="python3"
+            run_step "pytest" env -u AGENT_FEED_HOME python3 -m pytest
+          elif command -v python >/dev/null 2>&1; then
+            PYTHON_RUNNER="python"
+            run_step "pytest" env -u AGENT_FEED_HOME python -m pytest
+          else
+            fail "python profile requires uv, python3, or python. Install one or choose the custom profile."
+          fi
+
+          run_optional_python_module ruff "ruff check" check .
+          run_optional_python_module mypy "mypy" .
+        }
+
+        has_npm_script() {
+          script_name="$1"
+          node -e "const pkg=require('./package.json'); process.exit(pkg.scripts && pkg.scripts[process.argv[1]] ? 0 : 1)" "$script_name"
+        }
+
+        run_optional_npm_script() {
+          script_name="$1"
+          if has_npm_script "$script_name"; then
+            run_step "$NODE_PM run $script_name" "$NODE_PM" run "$script_name"
+          else
+            say "Skipping $NODE_PM run $script_name: package.json has no $script_name script."
+          fi
+        }
+
+        run_node_code() {
+          if [ ! -f "package.json" ]; then
+            fail "node profile requires package.json. Choose a Node project root or switch to custom."
+          fi
+          if ! command -v node >/dev/null 2>&1; then
+            fail "node profile requires node. Install node or switch to custom."
+          fi
+          if command -v pnpm >/dev/null 2>&1; then
+            NODE_PM="pnpm"
+          elif command -v npm >/dev/null 2>&1; then
+            NODE_PM="npm"
+          else
+            fail "node profile requires pnpm or npm. Install one or switch to custom."
+          fi
+
+          run_step "$NODE_PM test" "$NODE_PM" test
+          run_optional_npm_script lint
+          run_optional_npm_script typecheck
+          run_optional_npm_script build
+        }
+
+        run_custom_code() {
+          commands_file=".agents/project/verification-commands.sh"
+          if [ ! -f "$commands_file" ]; then
+            fail "custom profile selected but $commands_file is missing. Restore it or add run_project_code_checks()."
+          fi
+
+          . "$commands_file"
+
+          if ! command -v run_project_code_checks >/dev/null 2>&1; then
+            fail "custom profile requires run_project_code_checks() in $commands_file."
+          fi
+
+          run_step "custom code verification" run_project_code_checks
+        }
+
+        run_code() {
+          profile=$(verification_profile)
+          say "Verification profile: $profile"
+          case "$profile" in
+            python)
+              run_python_code
+              ;;
+            node)
+              run_node_code
+              ;;
+            custom)
+              run_custom_code
+              ;;
+            none)
+              fail "no code verification profile configured. Use docs scope, or choose/configure a project verification profile before claiming code verification passed."
+              ;;
+            *)
+              fail "unknown verification_profile in .agents/agent-feed.json: $profile"
+              ;;
+          esac
+        }
 
         if [ "$#" -ne 1 ]; then
           usage >&2
@@ -99,6 +231,7 @@ def verify_script(profile: VerificationProfile) -> str:
             ;;
           -h|--help|help)
             usage
+            exit 0
             ;;
           *)
             echo "$SCRIPT_NAME: ERROR: unknown scope: $1" >&2
@@ -109,188 +242,46 @@ def verify_script(profile: VerificationProfile) -> str:
 
         say "Verification passed for scope: $1"
         """
-    )
-    return script.replace("__PROFILE__", profile.value).replace(
-        "__RUN_CODE__", run_code_function(profile)
-    )
-
-
-def run_code_function(profile: VerificationProfile) -> str:
-    if profile == VerificationProfile.PYTHON:
-        return dedent(
-            """\
-            run_optional_python_module() {
-              module_name="$1"
-              desc="$2"
-              shift 2
-              if [ "${PYTHON_RUNNER:-}" = "uv" ]; then
-                if uv run python -m "$module_name" --version >/dev/null 2>&1; then
-                  run_step "$desc" uv run python -m "$module_name" "$@"
-                else
-                  say "Skipping $desc: $module_name is not installed in this project environment."
-                fi
-              elif "$PYTHON_RUNNER" -m "$module_name" --version >/dev/null 2>&1; then
-                run_step "$desc" "$PYTHON_RUNNER" -m "$module_name" "$@"
-              else
-                say "Skipping $desc: $module_name is not installed in this project environment."
-              fi
-            }
-
-            run_code() {
-              if [ ! -f "pyproject.toml" ] && [ ! -f "setup.py" ] && [ ! -f "requirements.txt" ] && [ ! -f "pytest.ini" ]; then
-                say "No common Python project marker found; continuing because the python profile was selected."
-              fi
-              if command -v uv >/dev/null 2>&1; then
-                PYTHON_RUNNER="uv"
-                run_step "pytest" uv run python -m pytest
-              elif command -v python3 >/dev/null 2>&1; then
-                PYTHON_RUNNER="python3"
-                run_step "pytest" python3 -m pytest
-              elif command -v python >/dev/null 2>&1; then
-                PYTHON_RUNNER="python"
-                run_step "pytest" python -m pytest
-              else
-                fail "python profile requires uv, python3, or python. Install one or customize run_code()."
-              fi
-
-              run_optional_python_module ruff "ruff check" check .
-              run_optional_python_module mypy "mypy" .
-            }
-            """
-        ).rstrip()
-    if profile == VerificationProfile.NODE:
-        return dedent(
-            """\
-            has_npm_script() {
-              script_name="$1"
-              node -e "const pkg=require('./package.json'); process.exit(pkg.scripts && pkg.scripts[process.argv[1]] ? 0 : 1)" "$script_name"
-            }
-
-            run_optional_npm_script() {
-              script_name="$1"
-              if has_npm_script "$script_name"; then
-                run_step "$NODE_PM run $script_name" "$NODE_PM" run "$script_name"
-              else
-                say "Skipping $NODE_PM run $script_name: package.json has no $script_name script."
-              fi
-            }
-
-            run_code() {
-              if [ ! -f "package.json" ]; then
-                fail "node profile requires package.json. Choose a Node project root or customize run_code()."
-              fi
-              if ! command -v node >/dev/null 2>&1; then
-                fail "node profile requires node. Install node or customize run_code()."
-              fi
-              if command -v pnpm >/dev/null 2>&1; then
-                NODE_PM="pnpm"
-              elif command -v npm >/dev/null 2>&1; then
-                NODE_PM="npm"
-              else
-                fail "node profile requires pnpm or npm. Install one or customize run_code()."
-              fi
-
-              run_step "$NODE_PM test" "$NODE_PM" test
-              run_optional_npm_script lint
-              run_optional_npm_script typecheck
-              run_optional_npm_script build
-            }
-            """
-        ).rstrip()
-    if profile == VerificationProfile.CUSTOM:
-        return dedent(
-            """\
-            run_code() {
-              fail "custom profile selected but code verification is not configured. Edit run_code() in .agents/scripts/verify-agent-dev.sh with this project's real test/lint/type/build commands."
-            }
-            """
-        ).rstrip()
-    return dedent(
-        """\
-        run_code() {
-          fail "no code verification profile configured. Use docs scope, or choose/configure a project verification profile before claiming code verification passed."
-        }
-        """
     ).rstrip()
 
 
-def verification_doc(profile: VerificationProfile) -> str:
-    if profile == VerificationProfile.PYTHON:
-        return dedent(
-            """\
-            This project uses the `python` verification profile.
-
-            ## Common Project Markers
-
-            The profile recognizes common Python markers such as `pyproject.toml`, `setup.py`,
-            `requirements.txt`, or `pytest.ini`, but it does not require a specific Python package
-            manager.
-
-            Required runtime: `uv`, `python3`, or `python` available in the shell.
-
-            ## Code Gate
-
-            ```sh
-            uv run python -m pytest  # preferred when uv is available
-            python3 -m pytest        # fallback when uv is unavailable
-            python -m pytest         # fallback when python3 is unavailable
-            python -m ruff check .   # when ruff is installed
-            python -m mypy .         # when mypy is installed
-            ```
-
-            If the repository uses a different Python test runner, package manager, or source
-            layout, update `.agents/scripts/verify-agent-dev.sh` before claiming the code gate is
-            configured.
-            """
-        ).rstrip()
-    if profile == VerificationProfile.NODE:
-        return dedent(
-            """\
-            This project uses the `node` verification profile.
-
-            ## Expected Project Markers
-
-            1. `package.json` at the project root.
-            2. `node` and either `pnpm` or `npm` available in the shell.
-
-            ## Code Gate
-
-            ```sh
-            pnpm test   # preferred when pnpm is available
-            npm test    # fallback when pnpm is unavailable
-            <pm> run lint       # when package.json defines lint
-            <pm> run typecheck  # when package.json defines typecheck
-            <pm> run build      # when package.json defines build
-            ```
-
-            If the repository uses yarn, vitest-only commands, turborepo, workspaces, or another
-            source layout, update `.agents/scripts/verify-agent-dev.sh` before claiming the code
-            gate is configured.
-            """
-        ).rstrip()
-    if profile == VerificationProfile.CUSTOM:
-        return dedent(
-            """\
-            This project uses the `custom` verification profile.
-
-            ## Required Setup
-
-            Edit `.agents/scripts/verify-agent-dev.sh` and replace `run_code()` with this
-            repository's real test, lint, type-check, build, or smoke-test commands.
-
-            Until `run_code()` is configured, `code` and `full` verification scopes must fail.
-            """
-        ).rstrip()
-    return dedent(
+def verification_commands_script(_profile: VerificationProfile) -> str:
+    body = dedent(
         """\
-        This project uses the `none` verification profile.
+        # Replace this function with this repository's real code verification commands
+        # when .agents/agent-feed.json sets verification_profile to "custom".
+        # Keep commands deterministic and local to the project. Do not put secrets here.
+        #
+        # Example for a Node/npm project:
+        #
+        # run_project_code_checks() {
+        #   npm test
+        #   npm run lint
+        #   npm run build
+        # }
+        #
+        # Remove this placeholder implementation after adding real project commands.
+        run_project_code_checks() {
+          echo "Custom code verification is not configured yet." >&2
+          echo "Edit .agents/project/verification-commands.sh and replace run_project_code_checks()." >&2
+          echo "Example:" >&2
+          echo "  run_project_code_checks() {" >&2
+          echo "    npm test" >&2
+          echo "    npm run lint" >&2
+          echo "    npm run build" >&2
+          echo "  }" >&2
+          return 1
+        }
+        """
+    ).rstrip()
+    return dedent(
+        f"""\
+        #!/usr/bin/env sh
 
-        ## Meaning
+        # Project-owned custom code verification hook.
+        # Source of active profile: .agents/agent-feed.json verification_profile
+        # Used by .agents/scripts/verify-agent-dev.sh when the selected profile is custom.
 
-        Agent Feed will validate AI engineering docs and assets with the `docs` scope, but no code
-        verification gate is configured.
-
-        Do not claim code verification passed until a real project-specific `run_code()` gate is
-        added to `.agents/scripts/verify-agent-dev.sh`.
+        {body}
         """
     ).rstrip()

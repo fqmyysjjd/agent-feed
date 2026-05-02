@@ -80,6 +80,20 @@ A design is ready for development only when it answers:
 
 If these are not answered, do not proceed to implementation.
 
+## User-Proposed Approach Gate
+
+When the user proposes a concrete implementation approach, environment layout, workflow, architecture, verification strategy, public behavior, or AI-protocol change, do not treat the proposal itself as permission to edit immediately.
+
+First:
+
+1. Restate the intended result in project terms.
+2. Read the relevant project context and code paths.
+3. Check whether the approach fits the existing architecture, source-of-truth boundaries, security model, verification model, and user-facing result.
+4. Identify gaps, risks, or simpler alternatives that would materially affect the outcome.
+5. Ask for confirmation before editing when `.agents/rules/decision-gates.md` says the choice affects future development results.
+
+Proceed without extra confirmation only when the user already confirmed the approach, or when the remaining issue is local, reversible, and has negligible impact on the final result, such as typo, spelling, formatting, or small clarity fixes.
+
 ## Anti-Drift Rules
 
 1. Do not expand from a concrete task into a broader platform vision unless the user asks.
