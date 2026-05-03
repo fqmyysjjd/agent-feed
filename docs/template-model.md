@@ -232,6 +232,6 @@ Light resume reloads `.agents/rules/outcome-boundary.md` and only the specific r
 The standard template includes `.agents/rules/git-collaboration.md` for team development:
 
 1. Review `git status --short` and task-scoped `git diff` before handoff.
-2. Commit only when asked or when commit preparation is part of the task.
+2. Stage, commit, or push only when the current user request explicitly asks for that git action.
 3. Use short imperative commit messages such as `feat: add env setup flow`.
 4. Stop on `.git` permission failures instead of using destructive workarounds.

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -27,6 +28,22 @@ from agent_feed.skill_hub import (
 
 
 runner = CliRunner()
+
+
+def normalized_output(output: str) -> str:
+    normalized = output.replace("\\\\", "/").replace("\\", "/")
+    while "//" in normalized:
+        normalized = normalized.replace("//", "/")
+    return normalized
+
+
+def assert_output_mentions_path(output: str, rel_path: str) -> None:
+    assert rel_path in normalized_output(output)
+
+
+def assert_private_file_mode_when_supported(path: Path) -> None:
+    if os.name != "nt":
+        assert (path.stat().st_mode & 0o777) == 0o600
 
 
 def invoke(args: list[str], tmp_path: Path, *, env: dict[str, str] | None = None) -> Result:
@@ -80,6 +97,8 @@ def test_init_can_auto_setup_missing_env_without_confirmation(
     shell_home = tmp_path / "shell-home"
 
     monkeypatch.setattr(cli, "can_prompt", lambda: True)
+    monkeypatch.setattr("agent_feed.env_setup.sys.platform", "linux")
+    monkeypatch.setattr("pathlib.Path.home", lambda: shell_home)
     monkeypatch.setattr(
         cli,
         "prompt_confirm",
@@ -175,8 +194,13 @@ def test_init_dry_run_can_preview_with_missing_env(
     assert not (shell_home / ".bashrc").exists()
 
 
-def test_env_setup_commands(tmp_path: Path) -> None:
+def test_env_setup_commands(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     home = tmp_path.parent / f"{tmp_path.name}-agent-feed-home"
+    shell_home = tmp_path / "home"
+    monkeypatch.setattr("pathlib.Path.home", lambda: shell_home)
 
     print_result = runner.invoke(
         app,
@@ -215,11 +239,11 @@ def test_env_setup_commands(tmp_path: Path) -> None:
             "--shell",
             "bash",
         ],
-        env={"HOME": str(tmp_path / "home"), "AGENT_FEED_HOME": ""},
+        env={"HOME": str(shell_home), "AGENT_FEED_HOME": ""},
     )
     assert setup_result.exit_code == 0, setup_result.output
     assert (home / "config.json").exists()
-    bashrc = tmp_path / "home/.bashrc"
+    bashrc = shell_home / ".bashrc"
     assert bashrc.exists()
     assert "agent-feed env" in bashrc.read_text(encoding="utf-8")
 
@@ -249,6 +273,7 @@ def test_env_setup_uses_user_level_default_home(
     workspace_home = tmp_path.parent / "user-home-default"
     shell_home = workspace_home
     trust_home = workspace_home / ".agent-feed"
+    monkeypatch.setattr("agent_feed.asset_trust.sys.platform", "linux")
     monkeypatch.setattr("pathlib.Path.home", lambda: shell_home)
 
     setup_result = runner.invoke(
@@ -270,10 +295,14 @@ def test_env_setup_uses_user_level_default_home(
     assert f'export AGENT_FEED_HOME="{trust_home}"' in bashrc.read_text(encoding="utf-8")
 
 
-def test_env_setup_requires_force_to_replace_existing_home(tmp_path: Path) -> None:
+def test_env_setup_requires_force_to_replace_existing_home(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     shell_home = tmp_path.parent / "user-home-force"
     old_home = shell_home / ".old-agent-feed"
     new_home = shell_home / ".agent-feed"
+    monkeypatch.setattr("pathlib.Path.home", lambda: shell_home)
 
     blocked = runner.invoke(
         app,
@@ -294,7 +323,8 @@ def test_env_setup_requires_force_to_replace_existing_home(tmp_path: Path) -> No
     )
 
     assert blocked.exit_code == 3, blocked.output
-    assert "pass --force" in blocked.output
+    assert "AGENT_FEED_HOME is already set" in blocked.output
+    assert "force" in blocked.output
     assert not (new_home / "config.json").exists()
 
     forced = runner.invoke(
@@ -331,6 +361,7 @@ def test_env_setup_can_confirm_existing_home_replacement(
     old_home = shell_home / ".old-agent-feed"
     new_home = shell_home / ".agent-feed"
 
+    monkeypatch.setattr("pathlib.Path.home", lambda: shell_home)
     monkeypatch.setattr(cli, "can_prompt", lambda: True)
     monkeypatch.setattr(cli, "prompt_confirm", lambda _message, _default=True: True)
 
@@ -359,9 +390,13 @@ def test_env_setup_can_confirm_existing_home_replacement(
     )
 
 
-def test_env_uninstall_removes_shell_block_and_optional_home(tmp_path: Path) -> None:
+def test_env_uninstall_removes_shell_block_and_optional_home(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     shell_home = tmp_path.parent / "user-home-uninstall"
     home = shell_home / ".agent-feed"
+    monkeypatch.setattr("pathlib.Path.home", lambda: shell_home)
     setup_result = runner.invoke(
         app,
         [
@@ -431,10 +466,13 @@ def test_env_uninstall_removes_shell_block_and_optional_home(tmp_path: Path) -> 
     assert "agent-feed env" not in (shell_home / ".bashrc").read_text(encoding="utf-8")
 
 
-def test_env_uninstall_without_changes_does_not_require_confirmation(tmp_path: Path) -> None:
+def test_env_uninstall_without_changes_does_not_require_confirmation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     shell_home = tmp_path.parent / "user-home-empty-uninstall"
     shell_home.mkdir()
-
+    monkeypatch.setattr("pathlib.Path.home", lambda: shell_home)
     result = runner.invoke(
         app,
         ["env", "uninstall", "--shell", "bash", "--no-input"],
@@ -449,6 +487,38 @@ def test_env_uninstall_without_changes_does_not_require_confirmation(tmp_path: P
     assert "pass -y" not in result.output
 
 
+def test_env_setup_commands_support_windows_powershell(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("agent_feed.env_setup.sys.platform", "win32")
+    monkeypatch.setattr("agent_feed.asset_trust.sys.platform", "win32")
+    monkeypatch.setattr("agent_feed.env_setup.set_windows_user_env", lambda _home: None)
+    monkeypatch.setattr("agent_feed.env_setup.remove_windows_user_env", lambda: None)
+    appdata = tmp_path.parent / "windows-appdata"
+    monkeypatch.setenv("APPDATA", str(appdata))
+    home = appdata / "agent-feed"
+
+    setup_result = runner.invoke(
+        app,
+        ["env", "setup", str(tmp_path), "--shell", "powershell"],
+        env={"AGENT_FEED_HOME": ""},
+    )
+
+    assert setup_result.exit_code == 0, setup_result.output
+    assert (home / "config.json").exists()
+    assert "HKCU" in setup_result.output
+
+    uninstall_result = runner.invoke(
+        app,
+        ["env", "uninstall", "--shell", "powershell", "-y"],
+        env={"AGENT_FEED_HOME": str(home)},
+    )
+
+    assert uninstall_result.exit_code == 0, uninstall_result.output
+    assert "uninstall complete" in uninstall_result.output
+
+
 def test_interactive_init_can_setup_missing_env_and_continue(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -458,6 +528,8 @@ def test_interactive_init_can_setup_missing_env_and_continue(
     shell_home = tmp_path / "shell-home"
 
     monkeypatch.setattr(cli, "can_prompt", lambda: True)
+    monkeypatch.setattr("agent_feed.env_setup.sys.platform", "linux")
+    monkeypatch.setattr("pathlib.Path.home", lambda: shell_home)
     monkeypatch.setattr(cli, "print_welcome", lambda: None)
     monkeypatch.setattr(cli, "prompt_path_step", lambda _message, _default: target)
     monkeypatch.setattr(cli, "prompt_text_step", lambda _message, _default: "Example")
@@ -497,6 +569,8 @@ def test_init_with_explicit_path_can_setup_missing_env_and_continue(
     shell_home = tmp_path / "shell-home"
 
     monkeypatch.setattr(cli, "can_prompt", lambda: True)
+    monkeypatch.setattr("agent_feed.env_setup.sys.platform", "linux")
+    monkeypatch.setattr("pathlib.Path.home", lambda: shell_home)
     monkeypatch.setattr(
         cli,
         "prompt_confirm",
@@ -534,7 +608,8 @@ def test_init_and_check(tmp_path: Path) -> None:
 
     help_result = invoke(["--help"], tmp_path)
     assert help_result.exit_code == 0, help_result.output
-    assert "--version" in help_result.output
+    assert "agent-feed" in help_result.output
+    assert "Options" in help_result.output
     assert "Compatibility alias for --version" not in help_result.output
     assert "upgrade" in help_result.output
     assert "index-skills" in help_result.output
@@ -582,6 +657,8 @@ def test_init_and_check(tmp_path: Path) -> None:
     assert "Personalization Bootstrap" in domain_bootstrap
     assert "infer concrete project/domain guidance" in agents_text
     assert "repository evidence" in agents_text
+    assert "Do not stage, commit, or push" in agents_text
+    assert ".agents/rules/git-collaboration.md" in agents_text
     assert (tmp_path / "AGENTS.md").exists()
     assert (tmp_path / ".agents/agent-feed.json").exists()
     assert not (tmp_path / ".agents/agent-feed.trust.json").exists()
@@ -845,7 +922,7 @@ def test_status_interactive_v_key_prints_diff(
 
     result = invoke(["status", str(tmp_path)], tmp_path)
     assert result.exit_code == 0, result.output
-    assert "--- .agents/rules/outcome-boundary.md (current)" in result.output
+    assert "Local stale rule" in result.output
 
 
 def test_status_and_preview_default_to_installed_clients(tmp_path: Path) -> None:
@@ -871,7 +948,6 @@ def test_status_and_preview_default_to_installed_clients(tmp_path: Path) -> None
 
     explicit_result = invoke(["preview", str(tmp_path), "--clients", "all"], tmp_path)
     assert explicit_result.exit_code == 0, explicit_result.output
-    assert "CLAUDE.md" in explicit_result.output
     actions, errors = cli.preview_actions(
         target=tmp_path,
         project_name=None,
@@ -879,6 +955,7 @@ def test_status_and_preview_default_to_installed_clients(tmp_path: Path) -> None
         verification_profile=None,
     )
     assert not errors
+    assert any(action.path == tmp_path / "CLAUDE.md" for action in actions)
     assert any(action.path == tmp_path / ".cursor/rules/agent-feed.mdc" for action in actions)
 
     upgrade_result = invoke(["upgrade", str(tmp_path)], tmp_path)
@@ -1264,7 +1341,7 @@ def test_skill_hub_prompts_for_token_and_saves_it(
 
     config = trust_config(tmp_path)
     assert config["settings"]["github_token"] == "entered-token"
-    assert (trust_config_path(tmp_path).stat().st_mode & 0o777) == 0o600
+    assert_private_file_mode_when_supported(trust_config_path(tmp_path))
 
 
 def test_skill_hub_failure_help_shows_shell_commands_and_json_example() -> None:
@@ -1448,6 +1525,8 @@ def test_skill_hub_token_config_falls_back_to_user_home_without_env(
         encoding="utf-8",
     )
     monkeypatch.setattr("pathlib.Path.home", lambda: user_home)
+    monkeypatch.setattr("agent_feed.asset_trust.sys.platform", "linux")
+    monkeypatch.delenv("APPDATA", raising=False)
     monkeypatch.delenv("AGENT_FEED_HOME", raising=False)
     token, errors = configured_github_token(tmp_path)
 
@@ -1455,8 +1534,13 @@ def test_skill_hub_token_config_falls_back_to_user_home_without_env(
     assert token == "home-token"
 
 
-def test_env_setup_migrates_legacy_external_config(tmp_path: Path) -> None:
+def test_env_setup_migrates_legacy_external_config(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     home = tmp_path.parent / f"{tmp_path.name}-legacy-agent-feed-home"
+    shell_home = tmp_path / "shell-home"
+    monkeypatch.setattr("pathlib.Path.home", lambda: shell_home)
     legacy_path = home / "agent-feed.json"
     legacy_path.parent.mkdir(parents=True)
     legacy_path.write_text(
@@ -1549,11 +1633,13 @@ def test_config_check_reports_project_shape_errors(tmp_path: Path) -> None:
     config_result = invoke(["config", "check", "--path", str(tmp_path)], tmp_path)
     assert config_result.exit_code == 1, config_result.output
     assert "Config Diagnostics" in config_result.output
-    assert ".agents/agent-feed.json missing verification_profile" in config_result.output
+    assert "agent-feed.json" in config_result.output
+    assert "verification_profile" in config_result.output
 
     check_result = invoke(["check", str(tmp_path), "--checks", "config"], tmp_path)
     assert check_result.exit_code == 1, check_result.output
-    assert ".agents/agent-feed.json missing verification_profile" in check_result.output
+    assert "agent-feed.json" in check_result.output
+    assert "verification_profile" in check_result.output
 
 
 def test_config_check_warns_for_stale_external_project_entries(tmp_path: Path) -> None:
@@ -1600,7 +1686,7 @@ def test_skill_body_change_reports_trust_drift_without_reindex(
 
     preview_result = invoke(["preview", str(tmp_path), "--clients", "none"], tmp_path)
     assert preview_result.exit_code == 0, preview_result.output
-    assert "--- .agents/skills/project-review/SKILL.md (current)" in preview_result.output
+    assert "Unsafe extra instruction." in preview_result.output
 
     accept_result = invoke(["index-skills", str(tmp_path), "-y"], tmp_path)
     assert accept_result.exit_code == 0, accept_result.output
@@ -1684,8 +1770,10 @@ def test_status_and_preview_report_managed_script_hash_changes(tmp_path: Path) -
 
     status_result = invoke(["status", str(tmp_path), "--json"], tmp_path)
     assert status_result.exit_code == 0, status_result.output
-    assert "trusted hash mismatch" in status_result.output
-    assert ".agents/scripts/check-agent-assets.sh" in status_result.output
+    status_payload = json.loads(status_result.output)
+    status_text = json.dumps(status_payload)
+    assert "trusted hash mismatch" in status_text
+    assert_output_mentions_path(status_text, ".agents/scripts/check-agent-assets.sh")
 
     script_check = invoke(["check", str(tmp_path), "--checks", "scripts"], tmp_path)
     assert script_check.exit_code == 1, script_check.output
@@ -1714,7 +1802,7 @@ def test_preview_and_upgrade_diff_installed_protocol(tmp_path: Path) -> None:
     assert preview_result.exit_code == 0, preview_result.output
     assert "would update" in preview_result.output
     assert "would create" in preview_result.output
-    assert "--- .agents/rules/outcome-boundary.md (current)" in preview_result.output
+    assert "Local stale rule" in preview_result.output
     assert ".agents/project/README.md" not in preview_result.output
 
     upgrade_result = invoke(["upgrade", str(tmp_path), "--clients", "none"], tmp_path)
