@@ -1,9 +1,5 @@
 <p align="center">
-  <a href="README_ZH.md">简体中文</a>
-</p>
-
-<p align="center">
-  <img src="docs/assets/agent-feed-banner.png" alt="Agent Feed workflow pipeline" width="920">
+  <a href="https://github.com/fqmyysjjd/agent-feed/blob/main/README_ZH.md">简体中文</a>
 </p>
 
 <h1 align="center">Agent Feed</h1>
@@ -16,11 +12,15 @@
 </p>
 
 <p align="center">
-  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
-  <a href="pyproject.toml"><img alt="Python 3.11+" src="https://img.shields.io/badge/python-3.11%2B-2563eb.svg"></a>
-  <a href="AGENTS.md"><img alt="AGENTS.md" src="https://img.shields.io/badge/AGENTS.md-ready-111827.svg"></a>
-  <a href="docs/ai-development-protocol-flow.md"><img alt="Protocol Flow" src="https://img.shields.io/badge/docs-protocol%20flow-7c3aed.svg"></a>
-  <a href="docs/template-model.md"><img alt="Template Model" src="https://img.shields.io/badge/docs-template%20model-059669.svg"></a>
+  <img src="https://raw.githubusercontent.com/fqmyysjjd/agent-feed/main/docs/assets/agent-feed-banner.png" alt="Agent Feed workflow pipeline" width="920">
+</p>
+
+<p align="center">
+  <a href="https://github.com/fqmyysjjd/agent-feed/blob/main/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
+  <a href="https://github.com/fqmyysjjd/agent-feed/blob/main/pyproject.toml"><img alt="Python 3.11+" src="https://img.shields.io/badge/python-3.11%2B-2563eb.svg"></a>
+  <a href="https://github.com/fqmyysjjd/agent-feed/blob/main/AGENTS.md"><img alt="AGENTS.md" src="https://img.shields.io/badge/AGENTS.md-ready-111827.svg"></a>
+  <a href="https://github.com/fqmyysjjd/agent-feed/blob/main/docs/ai-development-protocol-flow.md"><img alt="Protocol Flow" src="https://img.shields.io/badge/docs-protocol%20flow-7c3aed.svg"></a>
+  <a href="https://github.com/fqmyysjjd/agent-feed/blob/main/docs/template-model.md"><img alt="Template Model" src="https://img.shields.io/badge/docs-template%20model-059669.svg"></a>
 </p>
 
 <p align="center">
@@ -83,6 +83,11 @@ agent-feed check     # validate structure, references, scripts, skills, and adap
 agent-feed status    # see current state and the next recommended action
 ```
 
+If the project already has AI instructions, `init` backs them up into
+`.feed-backup/<timestamp>/` and installs Agent Feed without destroying the old
+workflow. The generated migration guide tells your AI assistant how to preserve
+decisive legacy rules into `.agents/project/` and `.agents/domain/`.
+
 For local development from this checkout:
 
 ```sh
@@ -95,7 +100,7 @@ uv run agent-feed
 
 The core workflow enforces a strict, linear pipeline instead of an open-ended chat:
 
-[![Agent Feed Workflow Pipeline](docs/assets/agent-feed-workflow.svg)](docs/assets/agent-feed-workflow.mp4)
+[![Agent Feed Workflow Pipeline](https://raw.githubusercontent.com/fqmyysjjd/agent-feed/main/docs/assets/agent-feed-workflow.svg)](https://github.com/fqmyysjjd/agent-feed/blob/main/docs/assets/agent-feed-workflow.mp4)
 
 The protocol is intentionally split by responsibility while remaining customizable:
 
@@ -110,7 +115,7 @@ The protocol is intentionally split by responsibility while remaining customizab
 | `.agents/scripts/` | Protocol checks, skill indexing, adapter sync, trust checks, and verification entrypoints. |
 | Client adapters | `CLAUDE.md`, `.claude/skills/`, and `.cursor/rules/agent-feed.mdc` point tools back to the canonical protocol. |
 
-![Agent Feed generated assets](docs/assets/agent-feed-terminal.svg)
+![Agent Feed generated assets](https://raw.githubusercontent.com/fqmyysjjd/agent-feed/main/docs/assets/agent-feed-terminal.svg)
 
 **The Bottom Line:**
 Agent Feed adds workflow governance without becoming a heavy runtime service. It is **tool-neutral** (Codex, Claude Code, Cursor), **safe and auditable** (external hash storage), and **extensible without forking** (import skills via `skill-hub`). Reusable protocol rules stay strictly separated from your project-specific constraints.
@@ -131,7 +136,7 @@ Agent Feed sits beside the AI coding tools and rule formats developers already u
 
 ```sh
 agent-feed                 # interactive menu in a TTY
-agent-feed init            # initialize the current project
+agent-feed init            # initialize the current project; backs up old AI instructions
 agent-feed status          # compact health and drift summary
 agent-feed check -a        # run every protocol and adapter check
 agent-feed sync -a         # update all supported client adapters
@@ -145,10 +150,10 @@ All path arguments are optional. When omitted, commands operate on the current d
 
 ## 📚 Documentation
 
-- **[AI Development Protocol Flow](docs/ai-development-protocol-flow.md)**: the full governance loop, trigger points, file responsibilities, and pain points solved.
-- **[Template Model](docs/template-model.md)**: canonical structure, adapters, skill index, project settings, and trust-state ownership.
-- [Basic Generated Output](examples/basic-output.md): the directory layout created by `agent-feed init`.
-- [Live Protocol Example](examples/live-protocol/README.md): the real `AGENTS.md`, `CLAUDE.md`, `.agents/project/`, `.agents/domain/`, and skill index used to develop this repository.
+- **[AI Development Protocol Flow](https://github.com/fqmyysjjd/agent-feed/blob/main/docs/ai-development-protocol-flow.md)**: the full governance loop, trigger points, file responsibilities, and pain points solved.
+- **[Template Model](https://github.com/fqmyysjjd/agent-feed/blob/main/docs/template-model.md)**: canonical structure, adapters, skill index, project settings, and trust-state ownership.
+- [Basic Generated Output](https://github.com/fqmyysjjd/agent-feed/blob/main/examples/basic-output.md): the directory layout created by `agent-feed init`.
+- [Live Protocol Example](https://github.com/fqmyysjjd/agent-feed/blob/main/examples/live-protocol/README.md): the real `AGENTS.md`, `CLAUDE.md`, `.agents/project/`, `.agents/domain/`, and skill index used to develop this repository.
 
 ## 📂 Repository Tour
 

@@ -10,11 +10,18 @@ build/
 .DS_Store
 .idea/
 
+# Local credentials or deploy keys must never be committed.
+github_common
+github_common.pub
+*.pem
+*.key
+
 # Local AI-agent workspace assets. The distributable template source lives under
 # src/agent_feed/templates/standard/.
 /AGENTS.local.md
 /.agents/session-state/*.json
 /.codex/
+/.feed-backup/
 
 # Keep the repository's published protocol and adapters tracked.
 !/.agents/

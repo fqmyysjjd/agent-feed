@@ -2,10 +2,6 @@
   <a href="README.md">English</a>
 </p>
 
-<p align="center">
-  <img src="docs/assets/agent-feed-banner.png" alt="Agent Feed workflow pipeline" width="920">
-</p>
-
 <h1 align="center">Agent Feed</h1>
 
 <h3 align="center">面向 AI 编程 Agent 的仓库级工作流治理层。</h3>
@@ -13,6 +9,10 @@
 <p align="center">
   <strong>让 AI 编程不再跑偏。</strong><br>
   将零散提示词指令转化为面向 Codex、Claude Code、Cursor、验证、审查和交接的可靠工作流管道。
+</p>
+
+<p align="center">
+  <img src="docs/assets/agent-feed-banner.png" alt="Agent Feed workflow pipeline" width="920">
 </p>
 
 <p align="center">
@@ -83,6 +83,11 @@ agent-feed check     # 验证目录结构、引用、脚本、技能以及适配
 agent-feed status    # 查看当前状态及下一步推荐操作
 ```
 
+如果项目里已经存在 AI 规范，`init` 会先把旧规范按原目录结构备份到
+`.feed-backup/<timestamp>/`，再安装 Agent Feed，避免直接覆盖旧工作流。
+生成的迁移说明会要求 AI 把决定性的旧规则迁移到 `.agents/project/` 和
+`.agents/domain/`，遇到冲突或无法判断时必须询问用户。
+
 从源码本地开发运行:
 
 ```sh
@@ -131,7 +136,7 @@ Agent Feed 与开发者已在使用的 AI 编程工具和规则格式完美并�
 
 ```sh
 agent-feed                 # 在终端中打开交互式菜单
-agent-feed init            # 初始化当前项目
+agent-feed init            # 初始化当前项目；自动备份旧 AI 规范
 agent-feed status          # 查看精简的健康度与偏移状态摘要
 agent-feed check -a        # 运行所有的协议及适配器检查
 agent-feed sync -a         # 更新所有支持的客户端适配器

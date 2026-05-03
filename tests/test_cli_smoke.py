@@ -2104,16 +2104,83 @@ def test_config_set_updates_claude_required_snippets(tmp_path: Path) -> None:
     assert check_after_set.exit_code == 0, check_after_set.output
 
 
-def test_init_refuses_existing_agents_content(tmp_path: Path) -> None:
+def test_init_backs_up_existing_ai_instruction_content(tmp_path: Path) -> None:
     existing_skill = tmp_path / ".agents/skills/old-skill/SKILL.md"
     existing_skill.parent.mkdir(parents=True)
     existing_skill.write_text("---\nname: old-skill\n---\n", encoding="utf-8")
+    (tmp_path / "AGENTS.md").write_text("# Old AI rules\n", encoding="utf-8")
 
     result = invoke(
-        ["init", str(tmp_path), "--project-name", "Example", "--profile", "python", "--force-generated"], tmp_path
+        [
+            "init",
+            str(tmp_path),
+            "--project-name",
+            "Example",
+            "--profile",
+            "python",
+            "--force-generated",
+        ],
+        tmp_path,
     )
-    assert result.exit_code == 3, result.output
-    assert not (tmp_path / "AGENTS.md").exists()
+    assert result.exit_code == 0, result.output
+    assert "backup" in result.output
+    assert (tmp_path / "AGENTS.md").exists()
+    assert "Example AI Development Instructions" in (tmp_path / "AGENTS.md").read_text(
+        encoding="utf-8"
+    )
+    backup_dirs = list((tmp_path / ".feed-backup").iterdir())
+    assert len(backup_dirs) == 1
+    backup_dir = backup_dirs[0]
+    assert (backup_dir / "AGENTS.md").read_text(encoding="utf-8") == "# Old AI rules\n"
+    assert (backup_dir / ".agents/skills/old-skill/SKILL.md").exists()
+    manifest = json.loads((backup_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["purpose"] == "legacy-ai-instruction-backup"
+    assert manifest["project_domain_scaffolded"] is True
+    guide = (backup_dir / "AI_MIGRATION_GUIDE.md").read_text(encoding="utf-8")
+    assert "must follow these rules" in guide
+    assert "Stop and ask the user" in guide
+
+
+def test_init_dry_run_previews_legacy_adapter_backup_without_conflict(tmp_path: Path) -> None:
+    (tmp_path / "CLAUDE.md").write_text("# Old Claude rules\n", encoding="utf-8")
+    cursor_rule = tmp_path / ".cursor/rules/custom.mdc"
+    cursor_rule.parent.mkdir(parents=True)
+    cursor_rule.write_text("# Old Cursor rules\n", encoding="utf-8")
+
+    result = invoke(
+        [
+            "init",
+            str(tmp_path),
+            "--project-name",
+            "Example",
+            "--profile",
+            "python",
+            "--dry-run",
+        ],
+        tmp_path,
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "would backup" in result.output
+    assert "CLAUDE.md is missing required Agent Feed references" not in result.output
+    assert ".cursor/rules/agent-feed.mdc is not a managed Agent Feed adapter" not in result.output
+    assert (tmp_path / "CLAUDE.md").exists()
+    assert cursor_rule.exists()
+    assert not (tmp_path / ".feed-backup").exists()
+
+
+def test_init_refuses_already_installed_project(tmp_path: Path) -> None:
+    init_result = invoke(["init", str(tmp_path), "--clients", "codex", "--profile", "python", "-y"], tmp_path)
+    assert init_result.exit_code == 0, init_result.output
+
+    project_readme = tmp_path / ".agents/project/README.md"
+    project_readme.write_text("# User maintained project rules\n", encoding="utf-8")
+
+    second_result = invoke(["init", str(tmp_path), "--profile", "python", "-y"], tmp_path)
+    assert second_result.exit_code == 3, second_result.output
+    assert "already installed" in second_result.output
+    assert not (tmp_path / ".feed-backup").exists()
+    assert project_readme.read_text(encoding="utf-8") == "# User maintained project rules\n"
 
 
 def test_sync_refuses_claude_md_without_required_agent_feed_references(tmp_path: Path) -> None:

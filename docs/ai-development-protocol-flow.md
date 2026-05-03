@@ -439,7 +439,12 @@ Handling:
    supports concrete guidance. When evidence is clear, replace scaffold-only
    sections with project-specific facts; ask the user only when the missing
    decision could affect future development results.
-6. After feature, architecture, source layout, verification, persistence,
+6. If `.feed-backup/` exists, read the newest backup's migration guide and
+   manifest before project-specific development. Preserve decisive legacy AI
+   workflows and project rules by migrating supported facts into project/domain
+   files. Stop for the user when a legacy rule conflicts with Agent Feed,
+   overlaps but could change the AI-development loop, or lacks enough evidence.
+7. After feature, architecture, source layout, verification, persistence,
    security, public contract, domain, or ownership changes, review related
    project/domain files and update stale guidance in the same task.
 

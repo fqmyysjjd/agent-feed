@@ -51,6 +51,7 @@ from agent_feed.console import (
     print_write_plan_with_title,
 )
 from agent_feed.fs import has_existing_content
+from agent_feed.legacy_migration import backup_actions_include, backup_legacy_ai_assets
 from agent_feed.models import (
     DEFAULT_CHECKS,
     DEFAULT_CLIENTS,
@@ -1304,6 +1305,16 @@ def init_project(
         return [], errors
 
     actions: list[WriteAction] = []
+    backup_actions, backup_errors = backup_legacy_ai_assets(
+        target,
+        project_name=project_name,
+        verification_profile=verification_profile,
+        dry_run=dry_run,
+    )
+    if backup_errors:
+        return backup_actions, backup_errors
+    actions.extend(backup_actions)
+
     plan = canonical_write_plan(
         target,
         project_name,
@@ -1338,6 +1349,12 @@ def init_project(
         dry_run=dry_run,
         force_generated=force_generated,
     )
+    if dry_run and backup_actions:
+        adapter_errors = [
+            error
+            for error in adapter_errors
+            if not planned_backup_resolves_init_adapter_error(error, backup_actions, target=target)
+        ]
     trust_actions, trust_errors = sync_asset_trust(
         target,
         dry_run=dry_run,
@@ -1489,32 +1506,50 @@ def installed_clients(root: Path) -> tuple[Client, ...]:
     return tuple(clients)
 
 
+def planned_backup_resolves_init_adapter_error(
+    error: str,
+    backup_actions: list[WriteAction],
+    *,
+    target: Path,
+) -> bool:
+    if "CLAUDE.md" in error and backup_actions_include(
+        backup_actions, Path("CLAUDE.md"), target=target
+    ):
+        return True
+    if ".claude/skills" in error and backup_actions_include(
+        backup_actions, Path(".claude/skills"), target=target
+    ):
+        return True
+    if ".cursor/rules/agent-feed.mdc" in error and backup_actions_include(
+        backup_actions, Path(".cursor/rules"), target=target
+    ):
+        return True
+    return False
+
+
 def find_init_conflicts(target: Path, clients: tuple[Client, ...]) -> list[str]:
     errors: list[str] = []
-    if (target / "AGENTS.md").exists():
-        errors.append("AGENTS.md already exists")
-    if has_existing_content(target / ".agents"):
-        errors.append(".agents already exists and is not empty")
+    if is_installed(target) and (target / ".agents/agent-feed.json").is_file():
+        errors.append("Agent Feed is already installed; use agent-feed status or upgrade")
+    if (target / "AGENTS.md").exists() and not (target / "AGENTS.md").is_file():
+        errors.append("AGENTS.md exists but is not a file")
+    if (target / ".agents").exists() and not (target / ".agents").is_dir():
+        errors.append(".agents exists but is not a directory")
     if Client.CLAUDE in clients:
         claude_file = target / "CLAUDE.md"
         if claude_file.exists():
             if not claude_file.is_file():
                 errors.append("CLAUDE.md exists but is not a file")
-            else:
-                missing = claude.missing_required_snippets(claude_file, root=target)
-                if missing:
-                    errors.append(
-                        "CLAUDE.md already exists but is missing required Agent Feed "
-                        f"references: {', '.join(missing)}"
-                    )
         if has_existing_content(target / ".claude/skills") and not claude.is_managed_skill_mirror(
             target / ".claude"
         ):
-            errors.append(".claude/skills already exists and is unmanaged")
+            skills_path = target / ".claude/skills"
+            if not skills_path.is_dir():
+                errors.append(".claude/skills exists but is not a directory")
     if Client.CURSOR in clients:
         cursor_file = target / ".cursor/rules/agent-feed.mdc"
-        if cursor_file.exists() and not cursor.is_managed_cursor_rule(cursor_file):
-            errors.append(".cursor/rules/agent-feed.mdc already exists and is unmanaged")
+        if cursor_file.exists() and not cursor_file.is_file():
+            errors.append(".cursor/rules/agent-feed.mdc exists but is not a file")
     return errors
 
 

@@ -50,7 +50,8 @@ The standard template must generate:
 16. `.agents/scripts/sync-agent-assets.sh`
 17. `.agents/scripts/verify-agent-dev.sh`
 18. `.agents/project/README.md` as the required project customization index
-19. Existing `.agents` collision protection during `init`
+19. Existing AI instruction asset backup during `init` into `.feed-backup/<timestamp>/`
+20. `.feed-backup/<timestamp>/manifest.json` and `AI_MIGRATION_GUIDE.md` when legacy assets were backed up
 
 ## Upgrade Contract
 

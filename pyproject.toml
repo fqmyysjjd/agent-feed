@@ -50,6 +50,12 @@ classifiers = [
 [project.scripts]
 agent-feed = "agent_feed.cli:main"
 
+[project.urls]
+Homepage = "https://github.com/fqmyysjjd/agent-feed"
+Repository = "https://github.com/fqmyysjjd/agent-feed"
+Issues = "https://github.com/fqmyysjjd/agent-feed/issues"
+Changelog = "https://github.com/fqmyysjjd/agent-feed/blob/main/CHANGELOG.md"
+
 [dependency-groups]
 dev = [
   "mypy>=1.10",

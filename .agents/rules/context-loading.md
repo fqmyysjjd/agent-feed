@@ -49,6 +49,8 @@ During full startup, read:
 
 If `AGENTS.local.md` exists, read it before project-wide rules and let it override local workflow details that do not violate project boundaries.
 
+If `.feed-backup/` exists, inspect the newest backup's `AI_MIGRATION_GUIDE.md` and `manifest.json` before project-specific development. Treat it as preserved legacy AI-instruction evidence, not as active rules. Migrate only repository-backed facts into `.agents/project/` and `.agents/domain/`, and stop for user confirmation when a legacy rule is decisive, conflicting, redundant-but-effectful, or unsupported by current repository evidence.
+
 Before continuing, recover the current task result boundary and Task Brief from `.agents/rules/outcome-boundary.md`.
 
 If the conversation is long-running, has been context-compressed, or contains session-specific conclusions not yet promoted to stable docs, read `.agents/session-state/current.json` when no stable conversation id is available. Treat it as a multi-session registry, match the entry for this conversation, then read or update `.agents/session-state/<session_id>.json` according to `.agents/rules/session-state.md`.

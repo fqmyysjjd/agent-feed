@@ -164,6 +164,22 @@ Project customization layer:
 
 The generated `.agents/project/README.md` is mandatory. It must explain the directory boundary, list every project constraint file, and be updated whenever `.agents/project/*` changes.
 
+## Brownfield Migration
+
+When `agent-feed init` finds existing AI instruction assets, it moves them into
+`.feed-backup/<timestamp>/` before installing the canonical protocol. The backup
+keeps the original directory structure and includes:
+
+1. `manifest.json`: backed-up paths and migration policy.
+2. `AI_MIGRATION_GUIDE.md`: instructions for AI-assisted migration.
+
+The CLI does not try to semantically merge old instructions by itself. It only
+preserves the evidence and creates a clear migration checkpoint. AI assistants
+must inspect the backup before project-specific development, migrate supported
+facts into `.agents/project/` or `.agents/domain/`, and stop for user
+confirmation when a legacy rule is decisive, conflicting, redundant but
+behavior-changing, or unsupported by repository evidence.
+
 ## Session-State Policy
 
 Session-state is ignored by git by default. It is meant for active AI development sessions, not shared product memory.
