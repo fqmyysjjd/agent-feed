@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/assets/agent-feed-workflow-pipeline.png" alt="Agent Feed workflow pipeline" width="920">
+  <img src="docs/assets/agent-feed-banner.png" alt="Agent Feed workflow pipeline" width="920">
 </p>
 
 <h1 align="center">Agent Feed</h1>
@@ -95,7 +95,7 @@ uv run agent-feed
 
 核心工作流强制执行严格的线性管道，而非开放式的闲聊：
 
-![Agent Feed protocol flow](docs/assets/agent-feed-protocol-flow.svg)
+[![Agent Feed Workflow Pipeline](docs/assets/agent-feed-workflow.svg)](docs/assets/agent-feed-workflow.mp4)
 
 该协议在保持高度可定制性的同时，在职责上进行了明确的拆分：
 

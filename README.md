@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/assets/agent-feed-workflow-pipeline.png" alt="Agent Feed workflow pipeline" width="920">
+  <img src="docs/assets/agent-feed-banner.png" alt="Agent Feed workflow pipeline" width="920">
 </p>
 
 <h1 align="center">Agent Feed</h1>
@@ -95,7 +95,7 @@ uv run agent-feed
 
 The core workflow enforces a strict, linear pipeline instead of an open-ended chat:
 
-![Agent Feed protocol flow](docs/assets/agent-feed-protocol-flow.svg)
+[![Agent Feed Workflow Pipeline](docs/assets/agent-feed-workflow.svg)](docs/assets/agent-feed-workflow.mp4)
 
 The protocol is intentionally split by responsibility while remaining customizable:
 

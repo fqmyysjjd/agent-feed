@@ -13,7 +13,9 @@ Before claiming work is ready for review:
 
 ## Commit Boundary
 
-Commit only when the user asks for a commit or the task explicitly includes preparing one.
+Commit only when the user explicitly asks for a commit in the current request.
+
+Do not treat "finish", "summarize", "ready", "release", "review", "prepare", or a completed verification gate as permission to stage, commit, or push. Staging, committing, and pushing are separate user-controlled actions.
 
 Before committing:
 
@@ -23,6 +25,20 @@ Before committing:
 4. Confirm the staged files match the current task and exclude unrelated work.
 
 If `.git` writes fail, stop and report the exact command and error. Do not work around git permission failures with destructive commands.
+
+## Push Boundary
+
+Push only when the user explicitly asks to upload, push, or publish the current branch to a remote in the current request.
+
+Before pushing:
+
+1. Confirm the target remote and branch.
+2. Confirm the local commit intended for upload.
+3. Check `git status --short` and report any untracked, ignored, or uncommitted files that will not be pushed.
+4. If the remote rejects the push, inspect the cause before retrying.
+5. Do not force push unless the user explicitly asks for force push, or the user already authorized resolving a new-repository initialization conflict and the remote contains only disposable initialization files. Prefer `--force-with-lease` over `--force`.
+
+Never chain staging, committing, and pushing into a single automatic action unless the user explicitly requested every step in the current request.
 
 ## Commit Message Format
 
