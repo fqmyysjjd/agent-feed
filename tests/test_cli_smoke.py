@@ -684,6 +684,9 @@ def test_init_and_check(tmp_path: Path) -> None:
     preview_help = invoke(["preview", "--help"], tmp_path)
     assert preview_help.exit_code == 0, preview_help.output
     assert "--diff" not in preview_help.output
+    upgrade_help = invoke(["upgrade", "--help"], tmp_path)
+    assert upgrade_help.exit_code == 0, upgrade_help.output
+    assert "--diff" not in upgrade_help.output
 
     init_result = invoke(["init", str(tmp_path), "--project-name", "Example", "--profile", "python"], tmp_path)
     assert init_result.exit_code == 0, init_result.output
@@ -761,6 +764,8 @@ def test_init_and_check(tmp_path: Path) -> None:
     status_result = invoke(["status", str(tmp_path)], tmp_path)
     assert status_result.exit_code == 0, status_result.output
     assert "Agent Feed Inspection" in status_result.output
+    assert "ok" in status_result.output
+    assert "check-only" not in status_result.output
     assert "Legacy .codex/skills" not in status_result.output
 
     removed_command_result = invoke(["sync-skill-index", str(tmp_path)], tmp_path)

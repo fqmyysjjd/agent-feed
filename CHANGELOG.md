@@ -2,9 +2,9 @@
 
 All notable changes to Agent Feed are tracked here.
 
-This project is pre-1.0. Minor versions may still adjust command behavior, generated template structure, and verification gates while the protocol stabilizes.
+This project uses semantic versioning. Patch releases preserve the public command surface and generated-template contracts unless the changelog calls out a migration.
 
-## 0.1.2 - 2026-05-03
+## 1.0.0 - 2026-05-03
 
 ### Added
 

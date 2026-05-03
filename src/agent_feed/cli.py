@@ -1046,10 +1046,6 @@ def upgrade_cmd(
     dry_run: Annotated[
         bool, typer.Option("--dry-run", help="Preview upgrade diff without changing files.")
     ] = False,
-    show_diff: Annotated[
-        bool,
-        typer.Option("--diff", help="Print full red/green unified diffs after the Changes table."),
-    ] = False,
 ) -> None:
     """Upgrade installed Agent Feed assets without deleting local files."""
     target = (path or Path(".")).resolve()
@@ -1099,7 +1095,9 @@ def upgrade_cmd(
         actions.extend(trust_preview_actions(target))
     if actions:
         print_upgrade_plan(
-            actions, target=target, command="agent-feed upgrade", show_diff=show_diff
+            actions,
+            target=target,
+            command="agent-feed preview",
         )
     if errors:
         _print_errors("Upgrade blocked", errors)
@@ -2065,10 +2063,9 @@ def print_upgrade_plan(
     *,
     target: Path,
     command: str,
-    show_diff: bool,
 ) -> None:
-    print_write_plan(actions, show_diffs=show_diff)
-    if show_diff or not has_diff_details(actions):
+    print_write_plan(actions)
+    if not has_diff_details(actions):
         return
     interactive = can_prompt()
     print_diff_hint(command=f"{command} {target}", interactive=interactive)
@@ -2084,7 +2081,6 @@ def print_inspection_plan(actions: list[WriteAction], *, target: Path) -> None:
     print_diff_hint(
         command=f"agent-feed preview {target}",
         interactive=interactive,
-        append_diff_flag=False,
     )
     if interactive and prompt_view_diff_key():
         preview_cmd(path=target)

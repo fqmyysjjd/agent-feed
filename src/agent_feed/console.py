@@ -402,17 +402,15 @@ def print_diff_hint(
     *,
     command: str,
     interactive: bool,
-    append_diff_flag: bool = True,
 ) -> None:
-    script_command = f"{command} --diff" if append_diff_flag else command
     if interactive:
         message = (
             f"[bold cyan]Diff details:[/bold cyan] press [bold green]v[/bold green] "
             f"to show all diffs, or press any other key to exit. "
-            f"Script mode: [bold green]{script_command}[/bold green]."
+            f"Script mode: [bold green]{command}[/bold green]."
         )
     else:
         message = (
-            f"[bold cyan]Diff details:[/bold cyan] rerun [bold green]{script_command}[/bold green]."
+            f"[bold cyan]Diff details:[/bold cyan] rerun [bold green]{command}[/bold green]."
         )
     console.print(message)

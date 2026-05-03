@@ -44,7 +44,7 @@ pending publisher.
 
 6. Commit and push to `main`.
 7. Confirm GitHub CI is green.
-8. Create a GitHub Release with a tag matching the version, for example `v0.1.2`.
+8. Create a GitHub Release with a tag matching the version, for example `v1.0.0`.
 9. Publishing starts automatically when the GitHub Release is published.
 10. Confirm the publish workflow succeeds.
 11. Verify the install after PyPI updates:

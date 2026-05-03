@@ -35,7 +35,7 @@ When a test or verification command fails:
 Use `sh .agents/scripts/verify-agent-dev.sh <scope>` when it matches the current Task Brief:
 
 1. `docs`: AI engineering docs, `.agents/` links, session-state JSON, and skill mirrors.
-2. `code`: project-specific code gate. Configure commands in `.agents/scripts/verify-agent-dev.sh`.
+2. `code`: project-specific code gate. The stable entrypoint is `.agents/scripts/verify-agent-dev.sh`; configure custom project commands in `.agents/project/verification-commands.sh`.
 3. `full`: docs checks plus code gate.
 
 The script does not choose scope for the AI. Select the narrowest sufficient scope and report any skipped broader checks.

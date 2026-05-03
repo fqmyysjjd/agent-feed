@@ -12,9 +12,7 @@ from agent_feed.models import WriteAction
 
 def sync(root: Path, *, dry_run: bool) -> list[WriteAction]:
     detail = "Codex uses AGENTS.md and .agents/skills directly; no .codex/skills mirror is written."
-    return [
-        WriteAction(path=root, action="check-only" if not dry_run else "would check", detail=detail)
-    ]
+    return [WriteAction(path=root, action="ok", detail=detail)]
 
 
 def check(root: Path) -> tuple[list[str], list[str]]:

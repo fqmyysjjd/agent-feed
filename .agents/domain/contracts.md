@@ -4,29 +4,18 @@ Contracts are the strongest anti-hallucination boundary in AI-assisted developme
 
 ## Public CLI Contract
 
-The current public commands are:
+The public command families are:
 
-1. `agent-feed init [path] [--project-name NAME] [--clients CLIENTS] [--profile PROFILE] [--env-home PATH] [--force-generated] [--dry-run]`
-2. `agent-feed check [path] [--checks CHECKS] [--clients CLIENTS] [--json]`
-3. `agent-feed sync [path] [--clients CLIENTS] [--force-generated] [--dry-run]`
-4. `agent-feed upgrade [path] [--project-name NAME] [--clients CLIENTS] [--dry-run]`
-5. `agent-feed status [path]`
-6. `agent-feed preview [path] [--project-name NAME] [--clients CLIENTS] [--profile PROFILE]`
-7. `agent-feed uninstall [path] [--dry-run] [-y]`
-8. `agent-feed index-skills [path] [--dry-run] [-y]`
-9. `agent-feed config get [KEY] [--path PATH] [--json]`
-10. `agent-feed config check [--path PATH] [--json]`
-11. `agent-feed config set KEY VALUE [--path PATH] [--dry-run]`
-12. `agent-feed skill-hub [path] [--keyword KEYWORD] [--dry-run]`
-13. `agent-feed env status [path]`
-14. `agent-feed env setup [path] [--home PATH] [--shell SHELL] [--force] [--dry-run]`
-15. `agent-feed env print [--home PATH] [--shell SHELL]`
-16. `agent-feed env uninstall [--home PATH] [--shell SHELL] [--remove-home] [--dry-run] [-y]`
-17. `agent-feed --version`
+1. Project lifecycle: `init`, `upgrade`, `uninstall`.
+2. Inspection and validation: `status`, `preview`, `check`.
+3. Client and skill maintenance: `sync`, `index-skills`, `skill-hub`.
+4. Configuration: `config get`, `config set`, `config check`.
+5. Environment setup: `env status`, `env setup`, `env print`, `env uninstall`.
+6. Version/help: `--version`, `--help`.
+
+Do not duplicate full option lists here. Treat `agent-feed --help`, command-specific help output, and tests as the authoritative option-level contract.
 
 `agent-feed version` may exist only as a hidden compatibility alias and should not be documented as the public command.
-
-`agent-feed doctor` and short aliases may exist as hidden helper commands but should not be documented as the primary public command set.
 
 ## Template Contract
 
