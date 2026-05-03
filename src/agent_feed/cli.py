@@ -21,6 +21,7 @@ from agent_feed.asset_trust import (
     configured_github_token,
     legacy_config_path,
     project_local_config_errors,
+    missing_project_entries,
     recommended_agent_feed_home,
     save_github_token,
     settings_config_path,
@@ -31,17 +32,20 @@ from agent_feed.asset_trust import (
 )
 from agent_feed.checks import collect_status, run_checks
 from agent_feed.choices import parse_choice_csv
-from agent_feed.config import get_config_value, set_config_value
+from agent_feed.config import check_config, get_config_value, set_config_value
 from agent_feed.console import (
     console,
     has_diff_details,
     print_diff_details,
     print_diff_hint,
     print_check_report,
+    print_config_check_report,
     print_error_panel,
     print_markdown_panel,
+    print_action_result,
     print_recommended_command,
     print_status,
+    print_stale_project_cleanup,
     print_welcome,
     print_write_plan,
     print_write_plan_with_title,
@@ -162,13 +166,6 @@ def main_callback(
     console.print(ctx.get_help())
     raise typer.Exit(0)
 
-
-@app.command("welcome", hidden=True)
-def welcome_cmd() -> None:
-    """Show the Agent Feed welcome screen."""
-    print_welcome()
-
-
 def print_version() -> None:
     console.print(f"agent-feed {__version__}")
     console.print(f"executable: {Path(sys.argv[0]).resolve()}")
@@ -192,9 +189,17 @@ def env_status_cmd(
     """Show Agent Feed environment configuration status."""
     status = get_env_status((path or Path(".")).resolve())
     if status.ok:
-        console.print("[green]Agent Feed environment is ready[/green]")
+        print_action_result(
+            title="Environment Status",
+            message="Agent Feed environment is ready",
+            kind="success",
+        )
     else:
-        console.print("[yellow]Agent Feed environment needs setup[/yellow]")
+        print_action_result(
+            title="Environment Status",
+            message="Agent Feed environment needs setup",
+            kind="warning",
+        )
     console.print(f"{AGENT_FEED_HOME_ENV}: {status.home or '<not set>'}")
     console.print(f"recommended: {status.recommendation}")
     if status.config_file:
@@ -274,9 +279,19 @@ def env_setup_cmd(
         _print_errors("Environment setup blocked", list(result.errors))
         raise typer.Exit(3)
     if dry_run:
-        console.print("[cyan]agent-feed: environment setup preview complete[/cyan]")
+        print_action_result(
+            title="Environment Setup",
+            message="Preview complete",
+            kind="info",
+            detail="No files or shell settings were changed.",
+        )
         return
-    console.print("[green]agent-feed: environment configured[/green]")
+    print_action_result(
+        title="Environment Setup",
+        message="Environment configured",
+        kind="success",
+        detail="The user-level Agent Feed home and shell binding are ready.",
+    )
     console.print(f"{AGENT_FEED_HOME_ENV}: {result.home}")
 
 
@@ -332,30 +347,58 @@ def env_uninstall_cmd(
         _print_errors("Environment uninstall blocked", errors)
         raise typer.Exit(3)
     if not actions:
-        console.print("[green]agent-feed: no Agent Feed environment changes found[/green]")
+        print_action_result(
+            title="Environment Cleanup",
+            message="Nothing to remove",
+            kind="info",
+            detail="No Agent Feed environment changes were found.",
+        )
         return
     if not has_deletions(actions):
-        console.print("[green]agent-feed: no Agent Feed environment changes found[/green]")
+        print_action_result(
+            title="Environment Cleanup",
+            message="Nothing to remove",
+            kind="info",
+            detail="No Agent Feed environment changes were found.",
+        )
         return
     if dry_run:
-        console.print("Next: rerun with -y to apply the environment cleanup plan.")
+        print_action_result(
+            title="Environment Cleanup",
+            message="Preview complete",
+            kind="info",
+            detail="Rerun with -y to apply the environment cleanup plan.",
+        )
         return
     if not yes:
         if no_input or not can_prompt():
-            console.print("[red]Environment uninstall blocked[/red]")
-            console.print("- pass -y to apply the environment cleanup plan")
-            console.print("- pass --dry-run to preview changes")
+            print_action_result(
+                title="Environment Cleanup Blocked",
+                message="Confirmation is required before removing the environment setup",
+                kind="error",
+                detail="Pass -y to apply the plan, or pass --dry-run to preview it first.",
+            )
             raise typer.Exit(3)
         prompt_text = "Remove Agent Feed environment variable"
         if remove_home:
             prompt_text += " and delete the user-level Agent Feed home"
         if not prompt_confirm(f"{prompt_text}?", False):
-            console.print("agent-feed: environment uninstall canceled")
+            print_action_result(
+                title="Environment Cleanup",
+                message="Canceled",
+                kind="warning",
+                detail="The Agent Feed environment setup was left unchanged.",
+            )
             return
     applied = apply_env_uninstall_plan(actions, shell=shell)
     if applied:
         print_write_plan(applied)
-    console.print("[green]agent-feed: environment uninstall complete[/green]")
+    print_action_result(
+        title="Environment Cleanup",
+        message="Environment uninstall complete",
+        kind="success",
+        detail="The managed shell binding and optional user-level home were cleaned up.",
+    )
 
 
 @app.command("init")
@@ -384,14 +427,16 @@ def init_cmd(
             ),
         ),
     ] = None,
-    interactive: Annotated[
-        bool,
+    env_home: Annotated[
+        Path | None,
         typer.Option(
-            "-i",
-            "--interactive",
-            help="Prompt for path, project name, clients, and verification profile.",
+            "--env-home",
+            help=(
+                "External Agent Feed home to create when AGENT_FEED_HOME is missing. "
+                "Defaults to ~/.agent-feed or %APPDATA%\\agent-feed."
+            ),
         ),
-    ] = False,
+    ] = None,
     yes: Annotated[
         bool,
         typer.Option(
@@ -421,11 +466,7 @@ def init_cmd(
         verification_profile, default=DEFAULT_VERIFICATION_PROFILE
     )
 
-    prompt_for_init = _should_prompt(
-        interactive=interactive,
-        no_input=no_input or yes,
-        explicit=path is not None,
-    )
+    prompt_for_init = (not no_input and not yes and path is None and can_prompt())
     if prompt_for_init:
         print_welcome()
         wizard_result = prompt_init_wizard(
@@ -435,7 +476,11 @@ def init_cmd(
             verification_profile=selected_verification_profile,
         )
         if wizard_result is None:
-            console.print("agent-feed: init canceled")
+            print_action_result(
+                title="Initialization",
+                message="Canceled",
+                kind="warning",
+            )
             return
         target, project_name, selected_clients, selected_verification_profile = wizard_result
     else:
@@ -445,13 +490,18 @@ def init_cmd(
             no_input=no_input or yes,
         )
         if resolved_profile is None:
-            console.print("agent-feed: init canceled")
+            print_action_result(
+                title="Initialization",
+                message="Canceled",
+                kind="warning",
+            )
             return
         selected_verification_profile = resolved_profile
 
     if not ensure_trust_home_for_init(
         target=target,
-        interactive=prompt_for_init,
+        home=env_home,
+        dry_run=dry_run,
         no_input=no_input,
     ):
         raise typer.Exit(3)
@@ -480,7 +530,8 @@ def init_cmd(
         if selected_verification_profile == VerificationProfile.CUSTOM:
             print_recommended_command(
                 "Custom verification needs project commands",
-                "Edit .agents/project/verification-commands.sh, then run sh .agents/scripts/verify-agent-dev.sh code",
+                "sh .agents/scripts/verify-agent-dev.sh code",
+                path=".agents/project/verification-commands.sh",
             )
         console.print("Next: agent-feed check")
 
@@ -492,6 +543,7 @@ def init_alias(
     ] = None,
     clients: Annotated[str | None, typer.Option("--clients")] = None,
     verification_profile: Annotated[str | None, typer.Option("--profile")] = None,
+    env_home: Annotated[Path | None, typer.Option("--env-home")] = None,
     yes: Annotated[bool, typer.Option("-y")] = False,
 ) -> None:
     """Shortcut for init."""
@@ -499,6 +551,7 @@ def init_alias(
         path=path,
         clients=clients,
         verification_profile=verification_profile,
+        env_home=env_home,
         yes=yes,
     )
 
@@ -515,8 +568,13 @@ def sync_cmd(
             help="Comma-separated clients: codex,claude,cursor,all,none. Defaults to all.",
         ),
     ] = None,
-    interactive: Annotated[
-        bool, typer.Option("-i", "--interactive", help="Open a client-selection prompt.")
+    all_clients: Annotated[
+        bool,
+        typer.Option(
+            "--all",
+            "-a",
+            help="Sync every supported client adapter without opening the client prompt.",
+        ),
     ] = False,
     no_input: Annotated[
         bool,
@@ -531,9 +589,11 @@ def sync_cmd(
     ] = False,
 ) -> None:
     """Sync selected client adapters from canonical Agent Feed assets."""
+    if all_clients and clients is not None:
+        raise typer.BadParameter("use either -a/--all or --clients, not both")
     target = (path or Path(".")).resolve()
-    selected_clients = _parse_clients(clients, default=DEFAULT_CLIENTS)
-    if (interactive or (clients is None and can_prompt() and not no_input)) and not no_input:
+    selected_clients = tuple(Client) if all_clients else _parse_clients(clients, default=DEFAULT_CLIENTS)
+    if not all_clients and clients is None and can_prompt() and not no_input:
         selected_clients = prompt_clients(selected_clients)
 
     actions, errors = sync_clients(
@@ -559,24 +619,6 @@ def sync_alias(
 ) -> None:
     """Shortcut for sync."""
     sync_cmd(path=path, clients=clients, no_input=True)
-
-
-@app.command("sync-skills", hidden=True)
-def sync_skills_alias(
-    path: Annotated[
-        Path | None, typer.Argument(help="Target project path. Defaults to cwd.")
-    ] = None,
-    dry_run: Annotated[bool, typer.Option("--dry-run")] = False,
-    force_generated: Annotated[bool, typer.Option("--force-generated")] = False,
-) -> None:
-    """Compatibility alias. Sync Claude skills and adapters from .agents."""
-    sync_cmd(
-        path=path,
-        clients="claude",
-        no_input=True,
-        dry_run=dry_run,
-        force_generated=force_generated,
-    )
 
 
 @app.command("index-skills")
@@ -664,6 +706,24 @@ def config_get_cmd(
         console.print(str(value))
 
 
+@config_app.command("check")
+def config_check_cmd(
+    path: Annotated[
+        Path | None,
+        typer.Option("--path", help="Target project path. Defaults to cwd."),
+    ] = None,
+    json_output: Annotated[
+        bool, typer.Option("--json", help="Print machine-readable JSON.")
+    ] = False,
+) -> None:
+    """Validate project config and user-level Agent Feed trust config."""
+    target = (path or Path(".")).resolve()
+    report = check_config(target)
+    print_config_check_report(report, as_json=json_output)
+    if not report.ok:
+        raise typer.Exit(1)
+
+
 @config_app.command("set")
 def config_set_cmd(
     key: Annotated[
@@ -710,6 +770,10 @@ def config_set_cmd(
     if dry_run:
         console.print("[cyan]agent-feed: config preview complete; no files changed[/cyan]")
         return
+    config_report = check_config(target)
+    print_config_check_report(config_report, as_json=False)
+    if not config_report.ok:
+        raise typer.Exit(3)
     console.print("[green]agent-feed: config updated[/green]")
 
 
@@ -801,7 +865,12 @@ def skill_hub_cmd(
         if keyword_from_prompt and not current_keyword:
             keyword_value = prompt_skill_hub_keyword(current_keyword)
             if keyword_value is None:
-                console.print("agent-feed: skill hub search canceled")
+                print_action_result(
+                    title="Skill Hub",
+                    message="Canceled",
+                    kind="warning",
+                    detail="No skill search was started.",
+                )
                 return
             current_keyword = keyword_value
             if not current_keyword:
@@ -824,7 +893,12 @@ def skill_hub_cmd(
                 raise typer.Exit(3) from exc
             skills, token = retry
         if not skills:
-            console.print("[yellow]agent-feed: no curated skills matched that keyword[/yellow]")
+            print_action_result(
+                title="Skill Hub",
+                message="No curated skills matched that keyword",
+                kind="warning",
+                detail="Try another keyword or check the curated hubs below.",
+            )
             console.print("Hubs searched:")
             for hub in CURATED_HUBS:
                 console.print(f"- [bold]{hub.name}[/bold]: {hub.url}")
@@ -866,7 +940,12 @@ def skill_hub_cmd(
                     current_keyword = ""
                     console.print("[dim]Returned to keyword search.[/dim]")
                     continue
-                console.print("agent-feed: skill hub install canceled")
+                print_action_result(
+                    title="Skill Hub",
+                    message="Canceled",
+                    kind="warning",
+                    detail="No skills were installed.",
+                )
                 return
             selected_keys = result
         else:
@@ -922,7 +1001,12 @@ def skill_hub_cmd(
     if index_errors or trust_errors:
         _print_errors("Skill indexing blocked", [*index_errors, *trust_errors])
         raise typer.Exit(3)
-    console.print("[green]agent-feed: selected skills installed[/green]")
+    print_action_result(
+        title="Skill Hub",
+        message="Selected skills installed",
+        kind="success",
+        detail="The skill index and trust state were refreshed automatically.",
+    )
 
 
 @app.command("upgrade")
@@ -947,10 +1031,6 @@ def upgrade_cmd(
             ),
         ),
     ] = None,
-    interactive: Annotated[
-        bool,
-        typer.Option("-i", "--interactive", help="Open prompts for path and clients."),
-    ] = False,
     no_input: Annotated[
         bool,
         typer.Option("--no-input", help="Never prompt; fail instead of asking for input."),
@@ -979,11 +1059,7 @@ def upgrade_cmd(
         else installed_clients(target)
     )
 
-    if _should_prompt(
-        interactive=interactive,
-        no_input=no_input or yes,
-        explicit=path is not None,
-    ):
+    if not no_input and not yes and path is None and can_prompt():
         print_welcome()
         wizard_result = prompt_upgrade_wizard(
             target=target,
@@ -1044,7 +1120,7 @@ def check_cmd(
         typer.Option(
             "--checks",
             "--only",
-            help="Comma-separated checks: structure,skills,references,session,scripts,codex,claude,cursor,all.",
+            help="Comma-separated checks: structure,config,skills,references,session,scripts,codex,claude,cursor,all.",
         ),
     ] = None,
     clients: Annotated[
@@ -1058,10 +1134,6 @@ def check_cmd(
             "-a",
             help="Run every protocol and client check without opening the checkbox prompt.",
         ),
-    ] = False,
-    interactive: Annotated[
-        bool,
-        typer.Option("-i", "--interactive", help="Open a checkbox prompt for check categories."),
     ] = False,
     no_input: Annotated[
         bool,
@@ -1079,7 +1151,8 @@ def check_cmd(
 
     if (
         not all_checks
-        and (interactive or (checks is None and can_prompt() and not no_input))
+        and checks is None
+        and can_prompt()
         and not no_input
     ):
         selected_checks = prompt_checks(selected_checks)
@@ -1523,12 +1596,6 @@ def _with_client_checks(
     return tuple(dict.fromkeys((*checks, *(mapped[client] for client in clients))))
 
 
-def _should_prompt(*, interactive: bool, no_input: bool, explicit: bool) -> bool:
-    if no_input:
-        return False
-    return interactive or (can_prompt() and not explicit)
-
-
 def _should_offer_env_replace(
     errors: tuple[str, ...],
     *,
@@ -1761,7 +1828,98 @@ def _skill_hub_failure_help(error: str) -> str:
     )
 
 
-def ensure_trust_home_for_init(*, target: Path, interactive: bool, no_input: bool) -> bool:
+def ensure_trust_home_for_init(
+    *,
+    target: Path,
+    home: Path | None = None,
+    dry_run: bool = False,
+    no_input: bool,
+) -> bool:
+    config_file, errors = trust_config_path()
+    if not errors:
+        return True
+    missing_env = any(f"{AGENT_FEED_HOME_ENV} is required" in error for error in errors)
+    if not missing_env:
+        return True
+
+    recommended = home or suggested_agent_feed_home(target)
+    detail = (
+        f"Will use {recommended}. "
+        f"To choose another path, rerun init with --env-home PATH or run agent-feed env setup --home PATH."
+    )
+    print_action_result(
+        title="Environment Setup",
+        message="Preparing external Agent Feed home",
+        kind="info",
+        detail=detail,
+    )
+
+    if (no_input or (not can_prompt() and not dry_run)) and home is None:
+        _print_errors(
+            "Environment setup blocked",
+            [
+                f"{AGENT_FEED_HOME_ENV} is required before init can record AI asset trust.",
+                f"Run: agent-feed env setup {target}",
+                "Or rerun init with --env-home PATH.",
+            ],
+        )
+        return False
+
+    result = setup_agent_feed_home(
+        home=recommended,
+        target=target,
+        shell=SHELL_AUTO,
+        dry_run=dry_run,
+    )
+    if _should_offer_env_replace(result.errors, force=False, dry_run=dry_run):
+        current_home = current_agent_feed_home()
+        if no_input:
+            _print_errors(
+                "Environment setup blocked",
+                [
+                    f"{AGENT_FEED_HOME_ENV} is already set to {current_home}.",
+                    f"Run: agent-feed env setup {target} --home {recommended} --force",
+                ],
+            )
+            return False
+        if prompt_confirm(
+            f"Replace existing {AGENT_FEED_HOME_ENV} ({current_home}) with {recommended}?",
+            False,
+        ):
+            result = setup_agent_feed_home(
+                home=recommended,
+                target=target,
+                shell=SHELL_AUTO,
+                dry_run=dry_run,
+                force=True,
+            )
+    if result.actions:
+        print_write_plan(list(result.actions))
+    if dry_run:
+        os.environ[AGENT_FEED_HOME_ENV] = str(result.home)
+        return True
+    if result.errors:
+        remediation_home = f" --home {recommended}" if home is not None else ""
+        _print_errors(
+            "Environment setup blocked",
+            [
+                *list(result.errors),
+                f"Run: agent-feed env setup {target}{remediation_home}",
+                "If shell detection failed, add --shell zsh, bash, fish, or powershell.",
+            ],
+        )
+        return False
+    print_action_result(
+        title="Environment Setup",
+        message="Environment configured",
+        kind="success",
+        detail="The user-level Agent Feed home and shell binding are ready for this session.",
+    )
+    console.print(f"{AGENT_FEED_HOME_ENV}: {result.home}")
+    return True
+
+
+def ensure_trust_home_for_upgrade(*, target: Path, interactive: bool, no_input: bool) -> bool:
     config_file, errors = trust_config_path()
     if not errors:
         return True
@@ -1770,11 +1928,14 @@ def ensure_trust_home_for_init(*, target: Path, interactive: bool, no_input: boo
         return True
 
     recommended = suggested_agent_feed_home(target)
-    console.print("[yellow]Agent Feed needs an external user config home.[/yellow]")
-    console.print(f"Recommended: {recommended}")
+    print_action_result(
+        title="Environment Setup Required",
+        message="Agent Feed needs an external user config home",
+        kind="warning",
+        detail=f"Recommended: {recommended}",
+    )
     if not prompt_confirm("Set up AGENT_FEED_HOME now and continue?", True):
         return True
-
     result = setup_agent_feed_home(
         home=recommended,
         target=target,
@@ -1786,13 +1947,14 @@ def ensure_trust_home_for_init(*, target: Path, interactive: bool, no_input: boo
     if result.errors:
         _print_errors("Environment setup blocked", list(result.errors))
         return False
-    console.print("[green]agent-feed: environment configured[/green]")
+    print_action_result(
+        title="Environment Setup",
+        message="Environment configured",
+        kind="success",
+        detail="The user-level Agent Feed home and shell binding are ready.",
+    )
     console.print(f"{AGENT_FEED_HOME_ENV}: {result.home}")
     return True
-
-
-def ensure_trust_home_for_upgrade(*, target: Path, interactive: bool, no_input: bool) -> bool:
-    return ensure_trust_home_for_init(target=target, interactive=interactive, no_input=no_input)
 
 
 def _trust_preflight_errors(root: Path) -> list[str]:
@@ -1810,21 +1972,29 @@ def _trust_preflight_errors(root: Path) -> list[str]:
 
 
 def maybe_cleanup_missing_project_entries(*, dry_run: bool) -> tuple[list[WriteAction], list[str]]:
+    stale_entries, errors = missing_project_entries()
+    if errors:
+        return [], errors
+    if stale_entries is None:
+        return [], []
     actions, errors = cleanup_missing_project_entries(dry_run=True)
-    if errors or not actions:
-        return actions, errors
+    if errors:
+        return [], errors
     if dry_run:
         return actions, []
-    stale_detail = actions[0].detail or "remove stale project entries"
     if not can_prompt():
         return [
             WriteAction(
-                path=actions[0].path,
+                path=stale_entries.config_file,
                 action="review",
-                detail=f"{stale_detail}; rerun in an interactive terminal to clean up",
+                detail=(
+                    f"{len(stale_entries.project_roots)} stale project "
+                    "entries found; rerun in an interactive terminal to clean them up"
+                ),
             )
         ], []
-    if not prompt_confirm(f"{stale_detail}?", True):
+    print_stale_project_cleanup(stale_entries.config_file, stale_entries.project_roots)
+    if not prompt_confirm("Remove these stale project records from the user-level config?", True):
         return [], []
     return cleanup_missing_project_entries(dry_run=False)
 
@@ -1834,13 +2004,13 @@ def _run_menu_action(action: str) -> int:
         if action == "exit":
             return 0
         if action == "init":
-            init_cmd(interactive=True)
+            init_cmd()
         elif action == "sync":
-            sync_cmd(interactive=True)
+            sync_cmd()
         elif action == "upgrade":
-            upgrade_cmd(interactive=True)
+            upgrade_cmd()
         elif action == "check":
-            check_cmd(interactive=True)
+            check_cmd()
         elif action == "status":
             status_cmd()
         elif action == "preview":

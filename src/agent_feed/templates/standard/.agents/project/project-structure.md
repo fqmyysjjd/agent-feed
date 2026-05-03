@@ -2,14 +2,20 @@
 
 This file defines repository-specific source layout and placement constraints for {{PROJECT_NAME}}.
 
-Replace this template with concrete source-tree ownership rules.
+Replace scaffold rows with concrete source-tree ownership rules. Use evidence paths so future AI turns can verify placement decisions quickly.
+
+## AI Maintenance
+
+Before adding, moving, importing, generating, or deleting files, read this file and confirm the target path has a documented owner. If the source tree changes, update the affected row in the same task.
 
 ## Placement Rules
 
-1. List production source directories and their responsibilities.
-2. List test directories and fixture/helper boundaries.
-3. Define public/internal separation.
-4. Define where adapters/integrations live.
-5. Define where generated files may be written.
-6. Define which directories must not be imported by production code.
-7. If this project adds custom skills, define whether they are project-local, imported, or reviewed standards.
+| Area | Path/module | Responsibility | Evidence | Placement rule |
+| --- | --- | --- | --- | --- |
+| Production source | TODO | TODO | TODO: package config, imports, README, source tree | Add production code only under the documented owner. |
+| Tests | TODO | TODO | TODO: test runner config, existing tests, fixtures | Match test location to owner module and behavior risk. |
+| Public interface | TODO | TODO | TODO: exports, CLI/API docs, schema files | Keep public contracts separate from internal helpers. |
+| Adapters/integrations | TODO | TODO | TODO: adapter modules, generated assets, integration tests | Place external-client glue under the adapter owner. |
+| Generated files | TODO | TODO | TODO: generation scripts, managed markers, config | Write generated files only through the owning generator. |
+| Forbidden imports | TODO | TODO | TODO: architecture docs, dependency graph, tests | Do not import against the documented direction. |
+| Project-local skills | TODO | TODO | TODO: `.agents/skills`, skill index, trust state | Mark custom/imported/reviewed status explicitly. |

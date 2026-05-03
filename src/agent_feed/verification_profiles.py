@@ -40,13 +40,46 @@ def verify_script() -> str:
           export UV_CACHE_DIR
         fi
 
+        if [ -t 1 ] || [ -t 2 ]; then
+          AF_RED=$(printf '\\033[31m')
+          AF_GREEN=$(printf '\\033[32m')
+          AF_YELLOW=$(printf '\\033[33m')
+          AF_BLUE=$(printf '\\033[34m')
+          AF_CYAN=$(printf '\\033[36m')
+          AF_BOLD=$(printf '\\033[1m')
+          AF_DIM=$(printf '\\033[2m')
+          AF_RESET=$(printf '\\033[0m')
+        else
+          AF_RED=""
+          AF_GREEN=""
+          AF_YELLOW=""
+          AF_BLUE=""
+          AF_CYAN=""
+          AF_BOLD=""
+          AF_DIM=""
+          AF_RESET=""
+        fi
+
         fail() {
-          echo "$SCRIPT_NAME: ERROR: $*" >&2
+          printf '%s%s: %sERROR:%s %s\\n' "$AF_RED" "$SCRIPT_NAME" "$AF_BOLD" "$AF_RESET$AF_RED" "$*" >&2
+          printf '%s' "$AF_RESET" >&2
           exit 1
         }
 
         say() {
-          printf '%s\\n' "$SCRIPT_NAME: $*"
+          printf '%s%s:%s %s\\n' "$AF_CYAN" "$SCRIPT_NAME" "$AF_RESET" "$*"
+        }
+
+        path_text() {
+          printf '%s%s%s' "$AF_BLUE" "$1" "$AF_RESET"
+        }
+
+        command_text() {
+          printf '%s%s%s%s' "$AF_GREEN" "$AF_BOLD" "$1" "$AF_RESET"
+        }
+
+        warn() {
+          printf '%s%s: WARNING:%s %s\\n' "$AF_YELLOW" "$SCRIPT_NAME" "$AF_RESET" "$*" >&2
         }
 
         config_value() {
@@ -68,22 +101,27 @@ def verify_script() -> str:
         verification_profile() {
           profile=$(config_value verification_profile || true)
           if [ -z "$profile" ]; then
-            fail "missing .agents/agent-feed.json verification_profile. Run agent-feed config set verification_profile <python|node|custom|none>."
+            config_path=$(path_text ".agents/agent-feed.json")
+            command=$(command_text "agent-feed config set verification_profile <python|node|custom|none>")
+            fail "missing $config_path verification_profile. Run $command."
           fi
           printf '%s\\n' "$profile"
         }
 
         usage() {
-          cat <<'USAGE'
-        Usage: sh .agents/scripts/verify-agent-dev.sh <scope>
+          verify_command=$(command_text "sh .agents/scripts/verify-agent-dev.sh <scope>")
+          config_path=$(path_text ".agents/agent-feed.json")
+          config_command=$(command_text "agent-feed config set verification_profile <python|node|custom|none>")
+          cat <<USAGE
+        Usage: $verify_command
 
         Scopes:
           docs      Check AI engineering docs, links, session-state JSON, and skill mirrors.
           code      Run the selected code verification gate.
           full      Run docs checks and the selected code verification gate.
 
-        The code gate reads .agents/agent-feed.json verification_profile at runtime.
-        Change it with: agent-feed config set verification_profile <python|node|custom|none>
+        The code gate reads $config_path verification_profile at runtime.
+        Change it with: $config_command
         USAGE
         }
 
@@ -108,12 +146,12 @@ def verify_script() -> str:
             if uv run python -m "$module_name" --version >/dev/null 2>&1; then
               run_step "$desc" env -u AGENT_FEED_HOME uv run python -m "$module_name" "$@"
             else
-              say "Skipping $desc: $module_name is not installed in this project environment."
+              warn "Skipping $desc: $module_name is not installed in this project environment."
             fi
           elif env -u AGENT_FEED_HOME "$PYTHON_RUNNER" -m "$module_name" --version >/dev/null 2>&1; then
             run_step "$desc" env -u AGENT_FEED_HOME "$PYTHON_RUNNER" -m "$module_name" "$@"
           else
-            say "Skipping $desc: $module_name is not installed in this project environment."
+            warn "Skipping $desc: $module_name is not installed in this project environment."
           fi
         }
 
@@ -148,7 +186,8 @@ def verify_script() -> str:
           if has_npm_script "$script_name"; then
             run_step "$NODE_PM run $script_name" "$NODE_PM" run "$script_name"
           else
-            say "Skipping $NODE_PM run $script_name: package.json has no $script_name script."
+            package_path=$(path_text "package.json")
+            warn "Skipping $(command_text "$NODE_PM run $script_name"): $package_path has no $script_name script."
           fi
         }
 
@@ -176,13 +215,15 @@ def verify_script() -> str:
         run_custom_code() {
           commands_file=".agents/project/verification-commands.sh"
           if [ ! -f "$commands_file" ]; then
-            fail "custom profile selected but $commands_file is missing. Restore it or add run_project_code_checks()."
+            commands_path=$(path_text "$commands_file")
+            fail "custom profile selected but $commands_path is missing. Restore it or add run_project_code_checks()."
           fi
 
           . "$commands_file"
 
           if ! command -v run_project_code_checks >/dev/null 2>&1; then
-            fail "custom profile requires run_project_code_checks() in $commands_file."
+            commands_path=$(path_text "$commands_file")
+            fail "custom profile requires run_project_code_checks() in $commands_path."
           fi
 
           run_step "custom code verification" run_project_code_checks
@@ -205,7 +246,8 @@ def verify_script() -> str:
               fail "no code verification profile configured. Use docs scope, or choose/configure a project verification profile before claiming code verification passed."
               ;;
             *)
-              fail "unknown verification_profile in .agents/agent-feed.json: $profile"
+              config_path=$(path_text ".agents/agent-feed.json")
+              fail "unknown verification_profile in $config_path: $profile"
               ;;
           esac
         }
@@ -234,7 +276,7 @@ def verify_script() -> str:
             exit 0
             ;;
           *)
-            echo "$SCRIPT_NAME: ERROR: unknown scope: $1" >&2
+            printf '%s%s: %sERROR:%s unknown scope: %s%s\\n' "$AF_RED" "$SCRIPT_NAME" "$AF_BOLD" "$AF_RESET$AF_RED" "$1" "$AF_RESET" >&2
             usage >&2
             exit 2
             ;;
@@ -262,26 +304,40 @@ def verification_commands_script(_profile: VerificationProfile) -> str:
         #
         # Remove this placeholder implementation after adding real project commands.
         run_project_code_checks() {
-          echo "Custom code verification is not configured yet." >&2
-          echo "Edit .agents/project/verification-commands.sh and replace run_project_code_checks()." >&2
-          echo "Example:" >&2
-          echo "  run_project_code_checks() {" >&2
-          echo "    npm test" >&2
-          echo "    npm run lint" >&2
-          echo "    npm run build" >&2
-          echo "  }" >&2
+          red=$(printf '\\033[31m')
+          yellow=$(printf '\\033[33m')
+          blue=$(printf '\\033[34m')
+          green=$(printf '\\033[32m')
+          bold=$(printf '\\033[1m')
+          reset=$(printf '\\033[0m')
+          if [ ! -t 2 ]; then
+            red=""
+            yellow=""
+            blue=""
+            green=""
+            bold=""
+            reset=""
+          fi
+          printf '%s%sError:%s Custom code verification is not configured yet.%s\\n' "$red" "$bold" "$reset$red" "$reset" >&2
+          printf '%sEdit %s.agents/project/verification-commands.sh%s and replace %srun_project_code_checks()%s.%s\\n' "$yellow" "$blue" "$reset$yellow" "$green$bold" "$reset$yellow" "$reset" >&2
+          printf '%sExample:%s\\n' "$yellow" "$reset" >&2
+          printf '  %srun_project_code_checks() {%s\\n' "$green$bold" "$reset" >&2
+          printf '    %snpm test%s\\n' "$green" "$reset" >&2
+          printf '    %snpm run lint%s\\n' "$green" "$reset" >&2
+          printf '    %snpm run build%s\\n' "$green" "$reset" >&2
+          printf '  %s}%s\\n' "$green$bold" "$reset" >&2
           return 1
         }
         """
     ).rstrip()
-    return dedent(
-        f"""\
-        #!/usr/bin/env sh
-
-        # Project-owned custom code verification hook.
-        # Source of active profile: .agents/agent-feed.json verification_profile
-        # Used by .agents/scripts/verify-agent-dev.sh when the selected profile is custom.
-
-        {body}
-        """
+    return "\n".join(
+        [
+            "#!/usr/bin/env sh",
+            "",
+            "# Project-owned custom code verification hook.",
+            "# Source of active profile: .agents/agent-feed.json verification_profile",
+            "# Used by .agents/scripts/verify-agent-dev.sh when the selected profile is custom.",
+            "",
+            body,
+        ]
     ).rstrip()

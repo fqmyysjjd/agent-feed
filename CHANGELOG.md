@@ -4,7 +4,7 @@ All notable changes to Agent Feed are tracked here.
 
 This project is pre-1.0. Minor versions may still adjust command behavior, generated template structure, and verification gates while the protocol stabilizes.
 
-## Unreleased
+## 0.1.2 - 2026-05-03
 
 ### Added
 

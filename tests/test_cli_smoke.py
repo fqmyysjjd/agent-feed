@@ -11,9 +11,10 @@ from click.testing import Result
 from typer.testing import CliRunner
 
 import agent_feed.cli as cli
-from agent_feed.asset_trust import recommended_agent_feed_home
+from agent_feed.asset_trust import configured_github_token, recommended_agent_feed_home
 from agent_feed.cli import app
 from agent_feed.console import diff_line_style, render_diff
+from agent_feed.models import DEFAULT_CLIENTS, Client
 from agent_feed.skill_hub import (
     RemoteSkill,
     RemoteSkillFile,
@@ -50,13 +51,14 @@ def legacy_trust_config_path(tmp_path: Path) -> Path:
 
 
 def test_trust_home_is_required_and_external(tmp_path: Path) -> None:
-    missing_env = runner.invoke(
+    missing_env_non_interactive = runner.invoke(
         app,
-        ["init", str(tmp_path), "--clients", "none", "--profile", "python"],
+        ["init", str(tmp_path), "--clients", "none", "--profile", "python", "--no-input"],
         env={"AGENT_FEED_HOME": ""},
     )
-    assert missing_env.exit_code == 3, missing_env.output
-    assert "AGENT_FEED_HOME is required" in missing_env.output
+    assert missing_env_non_interactive.exit_code == 3, missing_env_non_interactive.output
+    assert "AGENT_FEED_HOME is required" in missing_env_non_interactive.output
+    assert "agent-feed env setup" in missing_env_non_interactive.output
 
     local_env = {"AGENT_FEED_HOME": str(tmp_path / ".agents")}
     local_result = runner.invoke(
@@ -67,6 +69,110 @@ def test_trust_home_is_required_and_external(tmp_path: Path) -> None:
     assert local_result.exit_code == 3, local_result.output
     assert "points inside the current project" in local_result.output
     assert not (tmp_path / "AGENTS.md").exists()
+
+
+def test_init_can_auto_setup_missing_env_without_confirmation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    target = tmp_path / "project"
+    trust_home = tmp_path / "agent-feed-home"
+    shell_home = tmp_path / "shell-home"
+
+    monkeypatch.setattr(cli, "can_prompt", lambda: True)
+    monkeypatch.setattr(
+        cli,
+        "prompt_confirm",
+        lambda _message, _default=True: pytest.fail("init should auto-setup missing env"),
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "init",
+            str(target),
+            "--project-name",
+            "Example",
+            "--clients",
+            "none",
+            "--profile",
+            "python",
+            "--env-home",
+            str(trust_home),
+        ],
+        env={
+            "AGENT_FEED_HOME": "",
+            "HOME": str(shell_home),
+            "SHELL": "/bin/bash",
+        },
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Preparing external Agent Feed home" in result.output
+    assert "Environment configured" in result.output
+    assert (target / "AGENTS.md").exists()
+    assert (trust_home / "config.json").exists()
+    assert f'export AGENT_FEED_HOME="{trust_home}"' in (shell_home / ".bashrc").read_text(
+        encoding="utf-8"
+    )
+
+
+def test_init_non_tty_requires_env_home_when_env_is_missing(tmp_path: Path) -> None:
+    target = tmp_path / "project"
+
+    result = runner.invoke(
+        app,
+        ["init", str(target), "--project-name", "Example", "--clients", "none", "--profile", "python"],
+        env={
+            "AGENT_FEED_HOME": "",
+            "HOME": str(tmp_path / "shell-home"),
+            "SHELL": "/bin/bash",
+        },
+    )
+
+    assert result.exit_code == 3, result.output
+    assert "AGENT_FEED_HOME is required" in result.output
+    assert "Or rerun init with --env-home PATH" in result.output
+    assert not (target / "AGENTS.md").exists()
+
+
+def test_init_dry_run_can_preview_with_missing_env(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    target = tmp_path / "project"
+    trust_home = tmp_path / "agent-feed-home"
+    shell_home = tmp_path / "shell-home"
+
+    monkeypatch.setattr(cli, "can_prompt", lambda: True)
+
+    result = runner.invoke(
+        app,
+        [
+            "init",
+            str(target),
+            "--project-name",
+            "Example",
+            "--clients",
+            "none",
+            "--profile",
+            "python",
+            "--env-home",
+            str(trust_home),
+            "--dry-run",
+        ],
+        env={
+            "AGENT_FEED_HOME": "",
+            "HOME": str(shell_home),
+            "SHELL": "/bin/bash",
+        },
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "would create" in result.output
+    assert not (target / "AGENTS.md").exists()
+    assert not (trust_home / "config.json").exists()
+    assert not (shell_home / ".bashrc").exists()
 
 
 def test_env_setup_commands(tmp_path: Path) -> None:
@@ -287,7 +393,7 @@ def test_env_uninstall_removes_shell_block_and_optional_home(tmp_path: Path) -> 
         env={"HOME": str(shell_home), "SHELL": "/bin/bash", "AGENT_FEED_HOME": str(home)},
     )
     assert blocked.exit_code == 3, blocked.output
-    assert "pass -y" in blocked.output
+    assert "Pass -y" in blocked.output
 
     dry_run = runner.invoke(
         app,
@@ -339,7 +445,7 @@ def test_env_uninstall_without_changes_does_not_require_confirmation(tmp_path: P
     )
 
     assert result.exit_code == 0, result.output
-    assert "no Agent Feed environment changes found" in result.output
+    assert "No Agent Feed environment changes were found" in result.output
     assert "pass -y" not in result.output
 
 
@@ -357,7 +463,11 @@ def test_interactive_init_can_setup_missing_env_and_continue(
     monkeypatch.setattr(cli, "prompt_text_step", lambda _message, _default: "Example")
     monkeypatch.setattr(cli, "prompt_clients_step", lambda _default: ())
     monkeypatch.setattr(cli, "prompt_verification_profile_step", lambda default: default)
-    monkeypatch.setattr(cli, "prompt_confirm", lambda _message, _default=True: True)
+    monkeypatch.setattr(
+        cli,
+        "prompt_confirm",
+        lambda _message, _default=True: pytest.fail("init should auto-setup missing env"),
+    )
     monkeypatch.setattr(cli, "suggested_agent_feed_home", lambda _target=None: trust_home)
 
     result = runner.invoke(
@@ -371,7 +481,41 @@ def test_interactive_init_can_setup_missing_env_and_continue(
     )
 
     assert result.exit_code == 0, result.output
-    assert "environment configured" in result.output
+    assert "Environment configured" in result.output
+    assert "init complete" in result.output
+    assert (target / "AGENTS.md").exists()
+    assert (trust_home / "config.json").exists()
+    assert "AGENT_FEED_HOME" in (shell_home / ".bashrc").read_text(encoding="utf-8")
+
+
+def test_init_with_explicit_path_can_setup_missing_env_and_continue(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    target = tmp_path / "project"
+    trust_home = tmp_path / "agent-feed-home"
+    shell_home = tmp_path / "shell-home"
+
+    monkeypatch.setattr(cli, "can_prompt", lambda: True)
+    monkeypatch.setattr(
+        cli,
+        "prompt_confirm",
+        lambda _message, _default=True: pytest.fail("init should auto-setup missing env"),
+    )
+    monkeypatch.setattr(cli, "suggested_agent_feed_home", lambda _target=None: trust_home)
+
+    result = runner.invoke(
+        app,
+        ["init", str(target), "--profile", "python"],
+        env={
+            "AGENT_FEED_HOME": "",
+            "HOME": str(shell_home),
+            "SHELL": "/bin/bash",
+        },
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Environment configured" in result.output
     assert "init complete" in result.output
     assert (target / "AGENTS.md").exists()
     assert (trust_home / "config.json").exists()
@@ -420,6 +564,10 @@ def test_init_and_check(tmp_path: Path) -> None:
     assert env_setup_help.exit_code == 0, env_setup_help.output
     assert "--force" in env_setup_help.output
 
+    init_help = invoke(["init", "--help"], tmp_path)
+    assert init_help.exit_code == 0, init_help.output
+    assert "--env-home" in init_help.output
+
     preview_help = invoke(["preview", "--help"], tmp_path)
     assert preview_help.exit_code == 0, preview_help.output
     assert "--diff" not in preview_help.output
@@ -467,12 +615,22 @@ def test_init_and_check(tmp_path: Path) -> None:
     assert (tmp_path / "CLAUDE.md").exists()
     assert (tmp_path / ".claude/skills/project-development/SKILL.md").exists()
     assert (tmp_path / ".cursor/rules/agent-feed.mdc").exists()
+    cursor_rule = (tmp_path / ".cursor/rules/agent-feed.mdc").read_text(encoding="utf-8")
+    assert "@AGENTS.md" in cursor_rule
+    assert "alwaysApply: true" in cursor_rule
 
     check_result = invoke(["check", str(tmp_path), "--no-input"], tmp_path)
     assert check_result.exit_code == 0, check_result.output
 
     check_all_result = invoke(["check", str(tmp_path), "-a"], tmp_path)
     assert check_all_result.exit_code == 0, check_all_result.output
+
+    sync_conflict_result = invoke(
+        ["sync", str(tmp_path), "-a", "--clients", "codex"],
+        tmp_path,
+    )
+    assert sync_conflict_result.exit_code != 0
+    assert "use either -a/--all or --clients" in sync_conflict_result.output
 
     trust_result = invoke(["check", str(tmp_path), "--checks", "scripts"], tmp_path)
     assert trust_result.exit_code == 0, trust_result.output
@@ -484,6 +642,14 @@ def test_init_and_check(tmp_path: Path) -> None:
 
     removed_command_result = invoke(["sync-skill-index", str(tmp_path)], tmp_path)
     assert removed_command_result.exit_code != 0
+    removed_sync_skills_result = invoke(["sync-skills", str(tmp_path)], tmp_path)
+    assert removed_sync_skills_result.exit_code != 0
+    removed_welcome_result = invoke(["welcome"], tmp_path)
+    assert removed_welcome_result.exit_code != 0
+    for command in ("sync", "upgrade", "check"):
+        result = invoke([command, str(tmp_path), "--interactive"], tmp_path)
+        assert result.exit_code != 0
+        assert "No such option: --interactive" in result.output
 
 
 def test_yes_requires_explicit_profile_when_path_is_implicit(
@@ -555,11 +721,113 @@ def test_check_requires_selection_when_prompt_returns_empty(
     monkeypatch.setattr(cli, "prompt_checks", lambda _default: ())
     result = runner.invoke(
         app,
-        ["check", str(tmp_path), "--interactive"],
+        ["check", str(tmp_path)],
         env={"AGENT_FEED_HOME": str(tmp_path.parent / f"{tmp_path.name}-agent-feed-home")},
     )
     assert result.exit_code == 3, result.output
     assert "select at least one check" in result.output
+
+
+def test_sync_with_explicit_path_prompts_for_missing_clients(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    init_result = invoke(
+        ["init", str(tmp_path), "--project-name", "Example", "--clients", "none", "--profile", "python"],
+        tmp_path,
+    )
+    assert init_result.exit_code == 0, init_result.output
+
+    selected: dict[str, tuple[Client, ...]] = {}
+    monkeypatch.setattr(cli, "can_prompt", lambda: True)
+
+    def choose_clients(default: tuple[Client, ...]) -> tuple[Client, ...]:
+        selected["default"] = default
+        return (Client.CURSOR,)
+
+    monkeypatch.setattr(cli, "prompt_clients", choose_clients)
+    captured: dict[str, object] = {}
+
+    def fake_sync_clients(
+        _target: Path,
+        *,
+        clients: tuple[Client, ...],
+        dry_run: bool,
+        force_generated: bool,
+        prune_generated: bool = False,
+    ) -> tuple[list[object], list[str]]:
+        captured["clients"] = clients
+        captured["flags"] = (dry_run, force_generated, prune_generated)
+        return [], []
+
+    monkeypatch.setattr(cli, "sync_clients", fake_sync_clients)
+
+    result = invoke(["sync", str(tmp_path), "--dry-run"], tmp_path)
+
+    assert result.exit_code == 0, result.output
+    assert selected["default"] == tuple(DEFAULT_CLIENTS)
+    assert captured["clients"] == (Client.CURSOR,)
+    assert captured["flags"] == (True, False, False)
+
+
+def test_sync_all_shortcut_selects_every_client(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    init_result = invoke(
+        ["init", str(tmp_path), "--project-name", "Example", "--clients", "none", "--profile", "python"],
+        tmp_path,
+    )
+    assert init_result.exit_code == 0, init_result.output
+
+    monkeypatch.setattr(cli, "can_prompt", lambda: True)
+    monkeypatch.setattr(
+        cli,
+        "prompt_clients",
+        lambda _default: pytest.fail("sync -a should skip the client prompt"),
+    )
+    captured: dict[str, object] = {}
+
+    def fake_sync_clients(
+        _target: Path,
+        *,
+        clients: tuple[Client, ...],
+        dry_run: bool,
+        force_generated: bool,
+        prune_generated: bool = False,
+    ) -> tuple[list[object], list[str]]:
+        captured["clients"] = clients
+        captured["flags"] = (dry_run, force_generated, prune_generated)
+        return [], []
+
+    monkeypatch.setattr(cli, "sync_clients", fake_sync_clients)
+
+    result = invoke(["sync", str(tmp_path), "-a", "--dry-run"], tmp_path)
+
+    assert result.exit_code == 0, result.output
+    assert captured["clients"] == tuple(Client)
+    assert captured["flags"] == (True, False, False)
+
+
+def test_recommended_command_reads_like_a_sentence(tmp_path: Path) -> None:
+    result = invoke(
+        [
+            "init",
+            str(tmp_path),
+            "--project-name",
+            "Example",
+            "--clients",
+            "none",
+            "--profile",
+            "custom",
+        ],
+        tmp_path,
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Custom verification needs project commands Edit" in result.output
+    assert ".agents/project/verification-commands.sh, then run" in result.output
+    assert ".agents/scripts/verify-agent-dev.sh code." in result.output
 
 
 def test_status_interactive_v_key_prints_diff(
@@ -607,7 +875,7 @@ def test_status_and_preview_default_to_installed_clients(tmp_path: Path) -> None
     actions, errors = cli.preview_actions(
         target=tmp_path,
         project_name=None,
-        clients=tuple(cli.Client),
+        clients=tuple(Client),
         verification_profile=None,
     )
     assert not errors
@@ -1181,7 +1449,7 @@ def test_skill_hub_token_config_falls_back_to_user_home_without_env(
     )
     monkeypatch.setattr("pathlib.Path.home", lambda: user_home)
     monkeypatch.delenv("AGENT_FEED_HOME", raising=False)
-    token, errors = cli.configured_github_token(tmp_path)
+    token, errors = configured_github_token(tmp_path)
 
     assert errors == []
     assert token == "home-token"
@@ -1234,8 +1502,14 @@ def test_config_set_can_remove_stale_external_project_entries(
     }
     config_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
 
+    prompt_messages: list[str] = []
     monkeypatch.setattr(cli, "can_prompt", lambda: True)
-    monkeypatch.setattr(cli, "prompt_confirm", lambda _message, _default=True: True)
+
+    def confirm_cleanup(message: str, _default: bool = True) -> bool:
+        prompt_messages.append(message)
+        return True
+
+    monkeypatch.setattr(cli, "prompt_confirm", confirm_cleanup)
 
     result = invoke(
         [
@@ -1250,8 +1524,58 @@ def test_config_set_can_remove_stale_external_project_entries(
     )
 
     assert result.exit_code == 0, result.output
+    assert "Stale Project Entries" in result.output
+    assert "Config checks passed" in result.output
+    assert "no longer exist" in result.output
+    assert "stale trust metadata" in result.output
+    assert "user-level config" in result.output
+    assert "touch project files" in result.output
+    assert prompt_messages == [
+        "Remove these stale project records from the user-level config?"
+    ]
     updated = json.loads(config_path.read_text(encoding="utf-8"))
     assert str(stale_root) not in updated["projects"]
+
+
+def test_config_check_reports_project_shape_errors(tmp_path: Path) -> None:
+    init_result = invoke(["init", str(tmp_path), "--project-name", "Example", "--profile", "python"], tmp_path)
+    assert init_result.exit_code == 0, init_result.output
+
+    metadata_path = tmp_path / ".agents/agent-feed.json"
+    data = json.loads(metadata_path.read_text(encoding="utf-8"))
+    del data["verification_profile"]
+    metadata_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+    config_result = invoke(["config", "check", "--path", str(tmp_path)], tmp_path)
+    assert config_result.exit_code == 1, config_result.output
+    assert "Config Diagnostics" in config_result.output
+    assert ".agents/agent-feed.json missing verification_profile" in config_result.output
+
+    check_result = invoke(["check", str(tmp_path), "--checks", "config"], tmp_path)
+    assert check_result.exit_code == 1, check_result.output
+    assert ".agents/agent-feed.json missing verification_profile" in check_result.output
+
+
+def test_config_check_warns_for_stale_external_project_entries(tmp_path: Path) -> None:
+    init_result = invoke(["init", str(tmp_path), "--project-name", "Example", "--profile", "python"], tmp_path)
+    assert init_result.exit_code == 0, init_result.output
+
+    config_path = trust_config_path(tmp_path)
+    state = json.loads(config_path.read_text(encoding="utf-8"))
+    stale_root = tmp_path.parent / "deleted-project"
+    state["projects"][str(stale_root)] = {
+        "project_root": str(stale_root),
+        "project_name": "Deleted Project",
+        "assets": {},
+    }
+    config_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+
+    result = invoke(["config", "check", "--path", str(tmp_path)], tmp_path)
+    assert result.exit_code == 0, result.output
+    assert "Config Diagnostics" in result.output
+    assert "stale project entry" in result.output
+    assert "directory" in result.output
+    assert "deleted-project" in result.output
 
 
 def test_skill_body_change_reports_trust_drift_without_reindex(
@@ -1452,7 +1776,19 @@ def test_custom_verification_profile_uses_project_owned_command_hook(tmp_path: P
     assert metadata["verification_profile"] == "custom"
     assert ".agents/project/verification-commands.sh" in verify_script.read_text(encoding="utf-8")
     assert hook_file.exists()
-    assert "run_project_code_checks" in hook_file.read_text(encoding="utf-8")
+    hook_text = hook_file.read_text(encoding="utf-8")
+    verify_text = verify_script.read_text(encoding="utf-8")
+    assert "AF_RED" in verify_text
+    assert 'path_text ".agents/agent-feed.json"' in verify_text
+    assert 'command_text "agent-feed config set verification_profile' in verify_text
+    assert "run_project_code_checks" in hook_text
+    assert hook_text.startswith("#!/usr/bin/env sh\n")
+    assert "\n# Project-owned custom code verification hook.\n" in hook_text
+    assert (
+        '# when .agents/agent-feed.json sets verification_profile to "custom".\n' in hook_text
+    )
+    assert "red=$(printf '\\033[31m')" in hook_text
+    assert "Edit %s.agents/project/verification-commands.sh" in hook_text
 
     failing_code_gate = subprocess.run(
         ["sh", str(verify_script), "code"],
@@ -1571,6 +1907,54 @@ def test_session_state_check_validates_handoff_cards(tmp_path: Path) -> None:
     assert invalid_result.exit_code == 1, invalid_result.output
     assert "carry_forwards must contain at most 7 items" in invalid_result.output
     assert "missing carry_forwards[0].why_keep" in invalid_result.output
+
+
+def test_session_state_check_warns_on_expired_iso_topics(tmp_path: Path) -> None:
+    init_result = invoke(["init", str(tmp_path), "--project-name", "Example", "--profile", "python"], tmp_path)
+    assert init_result.exit_code == 0, init_result.output
+
+    state_dir = tmp_path / ".agents/session-state"
+    session_file = state_dir / "codex-expired.json"
+    session_file.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "session": {
+                    "id": "codex-expired",
+                    "label": "Expired session",
+                    "updated_at": "2026-05-01T02:10:33+0800",
+                },
+                "current_task": {
+                    "goal": "Keep handoff state compact.",
+                    "current_step": "Detect expired carry-forward topics.",
+                    "stop_condition": "Session check warns when an ISO expiry is already past.",
+                    "next_action": "Clean stale carry-forwards before the next handoff.",
+                },
+                "carry_forwards": [
+                    {
+                        "id": "stale-topic",
+                        "type": "handoff",
+                        "content": "Old temporary topic that should have been cleaned already.",
+                        "why_keep": "This should now be a warning, not hidden stale state.",
+                        "expires_when": "2020-01-01",
+                        "updated_at": "2026-05-01T02:10:33+0800",
+                    }
+                ],
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+    result = invoke(["check", str(tmp_path), "--checks", "session", "--json"], tmp_path)
+    assert result.exit_code == 0, result.output
+    assert '"ok": true' in result.output
+    assert "appears expired by expires_when (2020-01-01)" in result.output
+
+    text_result = invoke(["check", str(tmp_path), "--checks", "session"], tmp_path)
+    assert text_result.exit_code == 0, text_result.output
+    assert "Checks Passed With Warnings" in text_result.output
+    assert "Review the warnings above before the final handoff" in text_result.output
 
 
 def test_config_set_updates_session_schema_and_check_limit(tmp_path: Path) -> None:
@@ -1832,6 +2216,21 @@ def test_sync_refuses_unmanaged_cursor_adapter_even_with_force(tmp_path: Path) -
     assert cursor_result.exit_code == 3, cursor_result.output
     assert "unmanaged" in cursor_result.output
     assert cursor_file.read_text(encoding="utf-8") == "user-owned cursor rule\n"
+
+
+def test_check_requires_cursor_rule_to_import_agents_md(tmp_path: Path) -> None:
+    init_result = invoke(["init", str(tmp_path), "--profile", "python", "-y"], tmp_path)
+    assert init_result.exit_code == 0, init_result.output
+
+    cursor_file = tmp_path / ".cursor/rules/agent-feed.mdc"
+    cursor_file.write_text(
+        cursor_file.read_text(encoding="utf-8").replace("@AGENTS.md\n\n", ""),
+        encoding="utf-8",
+    )
+
+    result = invoke(["check", str(tmp_path), "--checks", "cursor"], tmp_path)
+    assert result.exit_code == 1, result.output
+    assert "Cursor adapter must import @AGENTS.md" in result.output
 
 
 def test_uninstall_removes_only_managed_assets(tmp_path: Path) -> None:

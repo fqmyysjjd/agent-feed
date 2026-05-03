@@ -12,7 +12,7 @@ class PromptWithEager:
     def __init__(self) -> None:
         self.calls: list[tuple[Any, dict[str, Any]]] = []
 
-    def register_kb(self, *keys: Any, **kwargs: Any):  # noqa: ANN002
+    def register_kb(self, *keys: Any, **kwargs: Any) -> Any:  # noqa: ANN002
         self.calls.append((keys, kwargs))
 
         def decorator(func: Any) -> Any:
@@ -24,8 +24,9 @@ class PromptWithEager:
 class PromptWithoutEager:
     def __init__(self) -> None:
         self.calls: list[tuple[Any, dict[str, Any]]] = []
+        self.application: Any = None
 
-    def register_kb(self, *keys: Any, filter: bool = True):  # noqa: ANN002
+    def register_kb(self, *keys: Any, filter: bool = True) -> Any:  # noqa: ANN002
         self.calls.append((keys, {"filter": filter}))
 
         def decorator(func: Any) -> Any:

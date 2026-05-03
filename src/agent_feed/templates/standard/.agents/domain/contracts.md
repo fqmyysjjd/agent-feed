@@ -10,6 +10,16 @@ Set that document here:
 
 `TODO: path/to/contract-index.md`
 
+## Project Contract Map
+
+| Contract area | Canonical owner | Evidence | Change rule |
+| --- | --- | --- | --- |
+| Public API / CLI / SDK | TODO | TODO | Stop before changing user-visible behavior without owner evidence. |
+| Persistence / records / schema | TODO | TODO | Stop before changing durable semantics, migrations, recovery, or finalization. |
+| Module ports / adapters | TODO | TODO | Keep public/internal boundaries explicit before adding integration glue. |
+| Status / event / audit vocabulary | TODO | TODO | Do not introduce new status/event terms without a canonical owner. |
+| Verification contract | TODO | TODO | Keep test evidence tied to the changed public or durable surface. |
+
 ## Contract Change Rule
 
 If a task requires a contract not present in the canonical index, stop and ask unless it is purely local implementation detail with no public, persistence, source-of-truth, or externally visible impact.

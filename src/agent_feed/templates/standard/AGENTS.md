@@ -26,7 +26,7 @@ During full startup, read:
 
 Before continuing any design, implementation, review, or fix task, recover the current task result boundary and Task Brief from `.agents/rules/outcome-boundary.md`.
 
-For long-running or multi-turn work, read or update `.agents/session-state/<session_id>.json` according to `.agents/rules/session-state.md` when active conclusions could be diluted by context compression.
+For long-running or multi-turn work, read or update `.agents/session-state/<session_id>.json` according to `.agents/rules/session-state.md` when losing active conclusions could dilute direction, constraints, or next actions after context compression.
 
 ## Rule Priority
 
@@ -73,7 +73,7 @@ These gates are always active, but their details live in the owning rule files:
 4. Apply the testing gate before implementation, after failures, and before final verification claims.
 5. Follow the development workflow, including comment/docstring discipline, before implementation.
 6. Run the code/design review gate after code or document changes.
-7. Record, clean, or promote session-state conclusions when context compression could dilute them.
+7. Before every final handoff, decide whether session state must be updated, cleaned, promoted, or left unchanged according to `.agents/rules/session-state.md`.
 8. Maintain `README.md` when a human project reader needs to know a changed capability, workflow, command, directory, entry point, or design location.
 9. Read `.agents/project/README.md` before applying repository-specific constraints, and maintain it as the index for every file under `.agents/project/`.
 10. Maintain related indexes and README files when changing `.agents/`, `AGENTS.md`, `.agents/scripts/`, design entrypoints, or repository structure.

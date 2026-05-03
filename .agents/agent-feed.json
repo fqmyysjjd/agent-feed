@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "agent_feed_version": "0.1.2",
+  "template": "standard",
+  "project_name": "Agent Feed",
+  "verification_profile": "python",
+  "settings": {
+    "session_state": {
+      "max_carry_forwards": 7
+    },
+    "skills": {
+      "default_import_source": "unknow",
+      "default_import_trust": "custom"
+    },
+    "claude": {
+      "required_snippets": [
+        "@AGENTS.md",
+        ".claude/skills",
+        ".agents/"
+      ]
+    }
+  },
+  "managed_paths": [
+    "AGENTS.md",
+    ".agents/README.md",
+    ".agents/agent-feed.json",
+    ".agents/rules/",
+    ".agents/skills/",
+    ".agents/scripts/",
+    ".agents/agents/README.md",
+    ".agents/session-state/README.md",
+    ".agents/session-state/schema.json",
+    ".agents/session-state/.gitignore"
+  ],
+  "user_maintained_paths": [
+    ".agents/project/",
+    ".agents/domain/"
+  ]
+}

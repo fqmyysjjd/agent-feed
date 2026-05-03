@@ -70,7 +70,14 @@ def render_session_schema(root: Path) -> str:
                         },
                         "content": {"type": "string", "minLength": 1},
                         "why_keep": {"type": "string", "minLength": 1},
-                        "expires_when": {"type": "string", "minLength": 1},
+                        "expires_when": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": (
+                                "Natural-language expiry condition. Include an ISO date "
+                                "or timestamp when the expiry can be machine-checked."
+                            ),
+                        },
                         "updated_at": {"type": "string", "minLength": 1},
                     },
                 },

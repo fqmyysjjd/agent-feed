@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="548" viewBox="0 0 1120 548" role="img" aria-labelledby="title desc">
+  <title id="title">Agent Feed terminal workflow</title>
+  <desc id="desc">A terminal-style overview of Agent Feed installing, checking, and previewing AI development protocol assets and client adapters.</desc>
+  <defs>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#22d3ee"/>
+      <stop offset="52%" stop-color="#a78bfa"/>
+      <stop offset="100%" stop-color="#34d399"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#020617" flood-opacity="0.24"/>
+    </filter>
+  </defs>
+  <g filter="url(#shadow)">
+    <rect x="70" y="44" width="980" height="456" rx="18" fill="#020617" stroke="#334155" stroke-width="1.5"/>
+    <rect x="70" y="44" width="980" height="52" rx="18" fill="#111827"/>
+    <rect x="70" y="78" width="980" height="18" fill="#111827"/>
+    <circle cx="101" cy="70" r="7" fill="#fb7185"/>
+    <circle cx="126" cy="70" r="7" fill="#facc15"/>
+    <circle cx="151" cy="70" r="7" fill="#4ade80"/>
+    <text x="190" y="76" fill="#cbd5e1" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="16">agent-feed</text>
+    <text x="96" y="130" fill="#67e8f9" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="18">$ agent-feed init</text>
+    <text x="96" y="164" fill="#e2e8f0" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="16">Start    creates AGENTS.md and .agents/ protocol assets</text>
+    <text x="96" y="194" fill="#e2e8f0" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="16">Verify   runs structure, skill, session, script, and adapter checks</text>
+    <text x="96" y="224" fill="#e2e8f0" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="16">Inspect  shows compact changes; press v for red/green diffs</text>
+    <rect x="96" y="258" width="928" height="1" fill="url(#accent)" opacity="0.85"/>
+    <g font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="14">
+      <text x="96" y="294" fill="#94a3b8">Path</text>
+      <text x="304" y="294" fill="#94a3b8">Purpose</text>
+      <text x="96" y="326" fill="#38bdf8">AGENTS.md</text>
+      <text x="304" y="326" fill="#e2e8f0">canonical entry contract and mandatory gates</text>
+      <text x="96" y="354" fill="#c4b5fd">CLAUDE.md</text>
+      <text x="304" y="354" fill="#e2e8f0">Claude entrypoint importing AGENTS.md and .agents/</text>
+      <text x="96" y="382" fill="#a78bfa">.agents/</text>
+      <text x="304" y="382" fill="#e2e8f0">rules, skills, project/domain context, scripts</text>
+      <text x="96" y="410" fill="#34d399">.claude/</text>
+      <text x="304" y="410" fill="#e2e8f0">Claude skill mirror generated from .agents/skills</text>
+      <text x="96" y="438" fill="#facc15">.cursor/</text>
+      <text x="304" y="438" fill="#e2e8f0">Cursor rule importing the canonical protocol</text>
+      <text x="96" y="466" fill="#67e8f9">.codex/</text>
+      <text x="304" y="466" fill="#e2e8f0">legacy mirror check only</text>
+    </g>
+  </g>
+</svg>

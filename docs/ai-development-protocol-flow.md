@@ -16,10 +16,11 @@ Scope:
 4. Out of scope: CLI implementation details, command internals, release
    packaging, and runtime product behavior.
 
-The protocol is not a product specification and not an AI agent. It is a
-governance layer that constrains AI-assisted development so work starts from the
-right context, stays inside the current result boundary, stops at unconfirmed
-decisions, verifies claims, and hands off state cleanly.
+The protocol is not a product specification and not an AI agent. It is the
+governance layer that turns interactive AI development from an open-ended chat
+into a repeatable workflow pipeline: work starts from the right context, stays
+inside the current result boundary, stops at unconfirmed decisions, verifies
+claims, and hands off state cleanly.
 
 ## Core Closed Loop
 
@@ -31,21 +32,23 @@ AGENTS.md entry contract
   -> task classification
   -> minimal context loading
   -> trusted AI asset check before using built-in/reviewed skills
-  -> project/domain source-of-truth lookup
   -> skill workflow routing
+  -> project/domain source-of-truth lookup
   -> user-proposed approach assessment when the user suggests a concrete plan
   -> decision gate when future behavior is affected
   -> scoped development/fix/review/design work
   -> testing and verification evidence
   -> code or design review gate
-  -> Context Capsule handoff
-  -> session-state cleanup or promotion to stable docs
+  -> final handoff gate
+  -> Context Capsule summary
+  -> session-state update, cleanup, promotion, or no action
 ```
 
-This loop solves one recurring AI-development problem: without explicit
-boundaries, an AI assistant tends to read too much or too little, invent missing
-decisions, expand scope, overbuild, skip verification, and lose important
-conclusions after context compression.
+This loop solves one recurring AI-development problem: without a workflow,
+interactive AI development behaves like a drifting conversation. The assistant
+tends to read too much or too little, invent missing decisions, expand scope,
+overbuild, skip verification, and lose important conclusions after context
+compression.
 
 ## File Responsibility Map
 
@@ -56,10 +59,10 @@ conclusions after context compression.
 | `.agents/rules/outcome-boundary.md` | same | Highest-priority working rule: current task boundary, Task Brief, task class gate, design readiness, anti-drift. |
 | `.agents/rules/decision-gates.md` | same | Human confirmation gate for choices that affect future development results. |
 | `.agents/rules/context-loading.md` | same | Startup loading order, task routing, mixed-task sequencing, context budget. |
-| `.agents/rules/session-state.md` | same | Compact handoff-card policy for long-running sessions and context compression. |
+| `.agents/rules/session-state.md` | same | Final handoff gate, Context Capsule format, and compact handoff-card policy for long-running sessions and context compression. |
 | `.agents/rules/testing-gates.md` | same | Test and verification selection, failure classification, verification evidence rules. |
 | `.agents/rules/development-workflow.md` | same | Implementation addendum, reuse-before-build, scoped implementation, comments, gap handling. |
-| `.agents/rules/review-gates.md` | same | Code review gate, design review gate, README/project index maintenance, Context Capsule. |
+| `.agents/rules/review-gates.md` | same | Code review gate, design review gate, README/project index maintenance, and final handoff routing. |
 | `.agents/rules/evidence-gates.md` | same | Source priority and adoption filter for external facts and research. |
 | `.agents/rules/change-risk-gates.md` | same | Risk classes for local edits, environment changes, destructive/security-sensitive actions. |
 | `.agents/rules/git-collaboration.md` | same | Diff, commit, merge, and PR handoff rules. |
@@ -143,8 +146,9 @@ Effect:
 Pain point solved:
 
 AI tools often enter a repo through different instruction files and silently
-apply different rules. The template makes `AGENTS.md` the common entry contract
-and keeps detailed behavior in indexed layers.
+apply different rules. The template makes `AGENTS.md` the common entry contract,
+keeps detailed behavior in indexed layers, and turns tool-specific entrypoints
+into one workflow pipeline instead of parallel chat behaviors.
 
 ### 1.1. Verify Trusted AI Assets
 
@@ -188,7 +192,7 @@ Pain point solved:
 
 External skill extension is useful, but it creates a new instruction-injection
 surface. The external Agent Feed home and custom-skill boundary let Agent Feed remain a
-lightweight规范底座 while making changed trusted assets visible and interruptive.
+lightweight protocol foundation while making changed trusted assets visible and interruptive.
 
 ### 2. Recover The Current Outcome Boundary
 
@@ -652,7 +656,7 @@ Effect:
 1. The assistant reviews its own changes before final handoff.
 2. Review findings are severity-classified and routed.
 3. Design documents must be development-ready, not just polished.
-4. Handoff includes a Context Capsule with completed work, verification,
+4. Final handoff includes a Context Capsule with completed work, verification,
    session-state action, known gaps, next action, next reading, and constraints
    not to break.
 
@@ -691,8 +695,8 @@ Handling:
 5. Promote durable cross-session conclusions into rules, project constraints,
    domain docs, skills, README, or design docs.
 6. Remove session-state entries once they expire or are promoted.
-7. Final handoff must say whether session state was updated, cleaned, promoted,
-   or not needed, and why.
+7. Final handoff must always decide whether session state was updated, cleaned,
+   promoted, or not needed, and why.
 
 Effect:
 
@@ -755,7 +759,7 @@ responsibility.
 | Work changes AI protocol assets | `testing-gates`, `review-gates` | Verify links, names, mirrors, indexes, session JSON | Protocol health is evidence-backed |
 | Work involves git review or commit handoff | `git-collaboration` | Review diff, keep commit scope clean, use concise imperative messages | Supports team development without mixing unrelated changes |
 | User correction should persist | `guidance-promoter` | Decide stable asset versus session-state | Repeated failures become stable guidance |
-| Final handoff | `review-gates` Context Capsule | State completion, verification, session state, gaps, next action | Next turn can resume cleanly |
+| Final handoff | `session-state` Final Handoff Gate | State completion, verification, session state, gaps, next action | Next turn can resume cleanly |
 
 ## Pain Point Coverage
 
@@ -774,49 +778,17 @@ responsibility.
 | AI rebuilds existing helpers | `development-workflow` reuse-before-build | Existing owners, dependencies, and patterns are checked first. |
 | Verification is vague | `testing-gates` | Tests are selected by task boundary and failures must be classified. |
 | Review is skipped | `review-gates` and review skills | Code and design changes have mandatory post-change review. |
-| Context compression loses decisions | `session-state` | Active handoff facts are compactly preserved and later cleaned. |
+| Context compression loses decisions | `session-state` | Every final handoff decides whether active facts must be preserved and later cleaned. |
 | Session state becomes noisy memory | Carry-forward limits and promotion rules | Only active facts survive; durable guidance moves to stable docs. |
 | User corrections disappear | `guidance-promoter` | Corrections are classified and promoted into the right asset. |
 
-## Current Docs Review
+## Related Reading
 
-This section records the cleanup decision for the repository-level `docs/`
-directory after adding this document.
+This document explains the workflow loop itself. The adjacent public docs are:
 
-| Document | Status | Reason |
-| --- | --- | --- |
-| `docs/ai-development-protocol-flow.md` | New primary protocol-flow document | Owns the concrete explanation of AI规范流程, trigger points, handling, effects, and solved pain points. |
-| `docs/product-design.md` | Keep | Owns product goal, positioning, canonical model, MVP contract, and product gaps. It answers what Agent Feed is. |
-| `docs/cli-product-plan.md` | Keep | Owns implementation-facing CLI/product plan and command boundary notes. It is broader than the AI protocol flow and still useful as a planning artifact. |
-| `docs/template-model.md` | Keep | Owns canonical source model and client adapter boundaries. It overlaps slightly with this document but remains useful for template/adaptation design. |
-| `docs/market-research.md` | Keep | Owns external market and adjacent-product evidence. It should remain separate from protocol mechanics. |
-| `docs/prompt-protocol-hardening.md` | Delete after merge | It was a transition review of protocol gaps. The useful content has already been absorbed by the current template rules and by this flow document; keeping it would create a stale second authority. |
-
-No existing kept document should be treated as the authority for the full AI
-development workflow. That authority is the template itself; this document is the
-readable walkthrough of that template.
-
-## Current Template Gaps To Watch
-
-These are not blockers for the current MVP loop, but they matter when the
-template or product surface is next edited:
-
-1. Some generated project/domain files are intentionally scaffold-like. They are
-   useful lanes, not complete project truth until repository docs/code provide
-   enough evidence for the AI to initialize or update them.
-2. Workflow authority lives in template files, not in this explanatory document.
-   If behavior changes, update the template first, then refresh this document.
-3. Verification wording should stay consistent across `testing-gates.md`,
-   `review-gates.md`, `.agents/README.md`, and skill maintenance guidance so the
-   same scope names are not described differently.
-4. Public skill-hub discovery and remote skill import now exist, but they are
-   intentionally constrained: Agent Feed searches a built-in allowlist, previews
-   file trees before install, uses `GITHUB_TOKEN` or the user-level
-   `settings.github_token` only for GitHub API access, imports skills as
-   lower-priority `trust: custom`, and auto-runs `index-skills`.
-5. `doctor` was removed because it duplicated `check` without owning sync or
-   canonical refresh. Public usage should prefer `check`, `status`, `preview`,
-   `upgrade`, `sync`, `index-skills`, `skill-hub`, and `env`.
+1. `docs/template-model.md`: canonical structure, adapters, settings, trust ownership, and skill import boundaries.
+2. `examples/basic-output.md`: the generated repository shape after `agent-feed init`.
+3. `examples/live-protocol/README.md`: the actual protocol files used to build Agent Feed itself.
 
 ## Practical Reading Order
 

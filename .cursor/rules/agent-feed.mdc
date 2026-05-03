@@ -1,0 +1,13 @@
+---
+description: Agent Feed AI development protocol
+alwaysApply: true
+---
+<!-- agent-feed:managed adapter=cursor version=1 -->
+
+@AGENTS.md
+
+Start with `AGENTS.md`, then follow the referenced `.agents/` rules, project
+constraints, domain docs, and skills.
+
+Treat this Cursor rule as an adapter pointer. Do not duplicate `.agents/rules/`
+inside `.cursor/rules/`.

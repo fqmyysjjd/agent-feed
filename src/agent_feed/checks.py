@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 
 from agent_feed.adapters import claude, codex, cursor
 from agent_feed.asset_trust import asset_trust_errors
+from agent_feed.config import check_config
 from agent_feed.models import Check, CheckReport, ProjectStatus
 from agent_feed.project_settings import (
     DEFAULT_SKILL_TRUST,
@@ -23,6 +25,9 @@ from agent_feed.skill_index import (
 SKILL_NAME_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 AGENTS_PATH_PATTERN = re.compile(r"\.agents/[A-Za-z0-9_.*/<>-]+")
 SESSION_CARRY_FORWARD_TYPES = {"decision", "constraint", "blocker", "handoff"}
+SESSION_EXPIRY_PATTERN = re.compile(
+    r"\b\d{4}-\d{2}-\d{2}(?:[T ][0-9]{2}:[0-9]{2}(?::[0-9]{2})?(?:Z|[+-][0-9]{2}:?[0-9]{2})?)?\b"
+)
 
 
 def run_checks(root: Path, checks: tuple[Check, ...]) -> CheckReport:
@@ -30,12 +35,18 @@ def run_checks(root: Path, checks: tuple[Check, ...]) -> CheckReport:
     for check in checks:
         if check == Check.STRUCTURE:
             report.errors.extend(validate_structure(root))
+        elif check == Check.CONFIG:
+            config_report = check_config(root)
+            report.errors.extend(config_report.errors)
+            report.warnings.extend(config_report.warnings)
         elif check == Check.SKILLS:
             report.errors.extend(validate_skills(root))
         elif check == Check.REFERENCES:
             report.errors.extend(validate_references_and_indexes(root))
         elif check == Check.SESSION:
-            report.errors.extend(validate_session_state_files(root))
+            errors, warnings = validate_session_state_report(root)
+            report.errors.extend(errors)
+            report.warnings.extend(warnings)
         elif check == Check.SCRIPTS:
             report.errors.extend(validate_scripts(root))
         elif check == Check.CODEX:
@@ -246,7 +257,7 @@ def validate_references_and_indexes(root: Path) -> list[str]:
             continue
         text = markdown_file.read_text(encoding="utf-8")
         for match in AGENTS_PATH_PATTERN.findall(text):
-            path_text = match.rstrip(".,。)，):")
+            path_text = match.rstrip(".,):")
             if any(token in path_text for token in ("*", "<", ">", "{{", "}}", "YYYYMMDD")):
                 continue
             if path_text in optional_paths:
@@ -292,10 +303,16 @@ def validate_references_and_indexes(root: Path) -> list[str]:
 
 
 def validate_session_state_files(root: Path) -> list[str]:
+    errors, _warnings = validate_session_state_report(root)
+    return errors
+
+
+def validate_session_state_report(root: Path) -> tuple[list[str], list[str]]:
     errors: list[str] = []
+    warnings: list[str] = []
     state_root = root / ".agents/session-state"
     if not state_root.exists():
-        return errors
+        return errors, warnings
 
     for state_file in sorted(state_root.glob("*.json")):
         if state_file.name == "schema.json":
@@ -309,12 +326,14 @@ def validate_session_state_files(root: Path) -> list[str]:
         if state_file.name == "current.json":
             validate_current_session_registry(state_file, data, errors, root)
         else:
-            validate_session_state(state_file, data, errors)
+            validate_session_state(state_file, data, errors, warnings)
 
-    return errors
+    return errors, warnings
 
 
-def validate_session_state(path: Path, data: object, errors: list[str]) -> None:
+def validate_session_state(
+    path: Path, data: object, errors: list[str], warnings: list[str]
+) -> None:
     obj = require_object(path, data, errors)
     if obj is None:
         return
@@ -374,6 +393,34 @@ def validate_session_state(path: Path, data: object, errors: list[str]) -> None:
             if item_id in carry_forward_ids:
                 errors.append(f"{path}: duplicate carry_forwards id {item_id}")
             carry_forward_ids.add(item_id)
+        expires_when = item.get("expires_when")
+        if isinstance(expires_when, str) and session_expiry_is_past(expires_when):
+            item_label = item_id if isinstance(item_id, str) and item_id else str(index)
+            warnings.append(
+                f"{path}: carry_forwards[{index}] {item_label!r} appears expired "
+                f"by expires_when ({expires_when}); clean it or promote it before final handoff"
+            )
+
+
+def session_expiry_is_past(value: str) -> bool:
+    match = SESSION_EXPIRY_PATTERN.search(value)
+    if match is None:
+        return False
+    token = match.group(0).replace(" ", "T")
+    if len(token) == 10:
+        try:
+            expiry_date = datetime.fromisoformat(token).date()
+        except ValueError:
+            return False
+        return expiry_date < datetime.now().date()
+
+    try:
+        expiry = datetime.fromisoformat(token.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if expiry.tzinfo is None:
+        return expiry < datetime.now()
+    return expiry.astimezone(timezone.utc) < datetime.now(timezone.utc)
 
 
 def validate_current_session_registry(

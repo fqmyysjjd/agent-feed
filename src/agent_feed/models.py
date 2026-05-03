@@ -15,6 +15,7 @@ class Client(StrEnum):
 
 class Check(StrEnum):
     STRUCTURE = "structure"
+    CONFIG = "config"
     SKILLS = "skills"
     REFERENCES = "references"
     SESSION = "session"

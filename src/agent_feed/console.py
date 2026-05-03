@@ -14,6 +14,7 @@ from rich.table import Table
 from rich.text import Text
 
 from agent_feed import __version__
+from agent_feed.config import ConfigCheckReport
 from agent_feed.models import CheckReport, ProjectStatus, WriteAction
 
 
@@ -21,16 +22,28 @@ console = Console()
 
 
 def print_welcome() -> None:
+    logo = Text()
+    logo.append("AGENT\n", style="bold cyan")
+    logo.append("FEED", style="bold green")
+
+    body = Table.grid(padding=(0, 2))
+    body.add_column(no_wrap=True)
+    body.add_column(ratio=1)
+    body.add_row(
+        logo,
+        "[bold white]Agent Feed[/bold white]\n"
+        "[dim]A source-controlled workflow pipeline for AI coding agents.[/dim]\n\n"
+        "[bold]Start[/bold]    agent-feed init\n"
+        "[bold]Verify[/bold]   agent-feed check\n"
+        "[bold]Inspect[/bold]  agent-feed status\n"
+        "[bold]Preview[/bold]  agent-feed preview",
+    )
     console.print(
         Panel.fit(
-            "[bold cyan]Agent Feed[/bold cyan]\n"
-            "Install, verify, and maintain AI development protocol assets.\n\n"
-            "[bold]Start[/bold]    agent-feed init --interactive\n"
-            "[bold]Verify[/bold]   agent-feed check\n"
-            "[bold]Inspect[/bold]  agent-feed status\n"
-            "[bold]Preview[/bold]  agent-feed preview",
+            body,
             title=f"agent-feed {__version__}",
             border_style="cyan",
+            padding=(1, 2),
         )
     )
 
@@ -133,7 +146,7 @@ def print_check_report(report: CheckReport, *, as_json: bool) -> None:
         print(json.dumps(payload, indent=2, ensure_ascii=False))
         return
 
-    if report.ok:
+    if report.ok and not report.warnings:
         console.print(
             Panel.fit(
                 f"[bold green]Checks passed[/bold green]\n"
@@ -143,6 +156,15 @@ def print_check_report(report: CheckReport, *, as_json: bool) -> None:
                 border_style="green",
             )
         )
+    elif report.ok:
+        table = Table(title="Checks Passed With Warnings", box=box.SIMPLE_HEAVY)
+        table.add_column("", width=2)
+        table.add_column("Type")
+        table.add_column("Message", overflow="fold")
+        for warning in report.warnings:
+            table.add_row("?", "[yellow]warning[/yellow]", warning)
+        console.print(table)
+        print_next_step("Review the warnings above before the final handoff.")
     else:
         table = Table(title="Checks blocked", box=box.SIMPLE_HEAVY, header_style="bold red")
         table.add_column("", width=2)
@@ -154,6 +176,46 @@ def print_check_report(report: CheckReport, *, as_json: bool) -> None:
             table.add_row("?", "[yellow]warning[/yellow]", warning)
         console.print(table)
         print_next_step("Fix the diagnostics above, then rerun `agent-feed check`.")
+
+
+def print_config_check_report(report: ConfigCheckReport, *, as_json: bool) -> None:
+    if as_json:
+        payload = {
+            "target": str(report.target),
+            "project_config": str(report.project_config),
+            "user_config": str(report.user_config) if report.user_config else None,
+            "ok": report.ok,
+            "errors": list(report.errors),
+            "warnings": list(report.warnings),
+        }
+        print(json.dumps(payload, indent=2, ensure_ascii=False))
+        return
+
+    if report.ok and not report.warnings:
+        console.print(
+            Panel.fit(
+                "[bold green]Config checks passed[/bold green]\n"
+                f"[dim]Project[/dim] {report.project_config}\n"
+                f"[dim]User[/dim]    {report.user_config or 'not configured'}",
+                title="Agent Feed",
+                border_style="green",
+            )
+        )
+        return
+
+    table = Table(title="Config Diagnostics", box=box.SIMPLE_HEAVY, header_style="bold")
+    table.add_column("", width=2)
+    table.add_column("Type")
+    table.add_column("Message", overflow="fold")
+    for error in report.errors:
+        table.add_row("!", "[red]error[/red]", error)
+    for warning in report.warnings:
+        table.add_row("?", "[yellow]warning[/yellow]", warning)
+    console.print(table)
+    if report.errors:
+        print_next_step("Fix the config diagnostics above, then rerun `agent-feed config check`.")
+    else:
+        print_next_step("Review stale entries or rerun `agent-feed config set` to clean them.")
 
 
 def print_status(status: ProjectStatus, *, as_json: bool) -> None:
@@ -247,22 +309,88 @@ def print_next_step(message: str) -> None:
     console.print(f"[bold cyan]Next:[/bold cyan] [bold white]{message}[/bold white]")
 
 
-def print_recommended_command(message: str, command: str) -> None:
-    console.print(
-        Panel.fit(
-            f"[bold cyan]{message}[/bold cyan]\n[bold green]{command}[/bold green]",
-            border_style="cyan",
-        )
-    )
+def print_action_result(
+    *,
+    title: str,
+    message: str,
+    kind: str = "info",
+    detail: str | None = None,
+) -> None:
+    styles = {
+        "success": ("green", "bold green"),
+        "warning": ("yellow", "bold yellow"),
+        "error": ("red", "bold red"),
+        "info": ("cyan", "bold cyan"),
+    }
+    border_style, heading_style = styles.get(kind, styles["info"])
+    body = f"[{heading_style}]{message}[/{heading_style}]"
+    if detail:
+        body += f"\n[dim]{detail}[/dim]"
+    console.print(Panel.fit(body, title=title, border_style=border_style))
+
+
+def print_recommended_command(message: str, command: str, *, path: str | None = None) -> None:
+    text = Text()
+    text.append(message, style="bold cyan")
+    if path:
+        text.append(" Edit ")
+        text.append(path, style="blue italic")
+        text.append(", then run ")
+    else:
+        text.append(" Run ")
+    text.append(command, style="bold green")
+    text.append(".")
+    console.print(text)
 
 
 def print_markdown_panel(title: str, body: str, *, border_style: str = "blue") -> None:
     console.print(Panel(Markdown(body), title=title, border_style=border_style, expand=False))
 
 
+def print_stale_project_cleanup(config_file: Path, project_roots: tuple[Path, ...]) -> None:
+    metadata = Table(
+        box=None,
+        show_header=False,
+        expand=True,
+        padding=(0, 1),
+    )
+    metadata.add_column("Field", style="dim", no_wrap=True)
+    metadata.add_column("Value", overflow="fold", ratio=1)
+    metadata.add_row("Config", str(config_file))
+
+    table = Table(
+        box=box.SIMPLE,
+        show_header=True,
+        header_style="bold",
+        expand=True,
+    )
+    table.add_column("#", justify="right", style="dim", width=3)
+    table.add_column("Missing project root", overflow="fold", ratio=1)
+    for index, project_root in enumerate(project_roots, start=1):
+        table.add_row(str(index), str(project_root))
+
+    body = Table.grid(expand=True, padding=(0, 1))
+    body.add_column(ratio=1)
+    body.add_row(
+        "Agent Feed found project records in the user-level config whose directories no "
+        "longer exist. Removing them only cleans stale trust metadata; it does not touch "
+        "project files."
+    )
+    body.add_row(metadata)
+    body.add_row(table)
+    console.print(
+        Panel(
+            body,
+            title="Stale Project Entries",
+            border_style="yellow",
+            expand=False,
+        )
+    )
+
+
 def status_next_step(status: ProjectStatus) -> str:
     if not status.canonical_installed:
-        return "Run `agent-feed init --interactive` in this project."
+        return "Run `agent-feed init` in this project."
     if status.errors:
         return "Run `agent-feed check --checks all` for the full failure list."
     if status.warnings:

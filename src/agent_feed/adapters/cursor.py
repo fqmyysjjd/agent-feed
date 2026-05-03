@@ -16,6 +16,8 @@ alwaysApply: true
 ---
 {MANAGED_MARKER}
 
+@AGENTS.md
+
 Start with `AGENTS.md`, then follow the referenced `.agents/` rules, project
 constraints, domain docs, and skills.
 
@@ -59,6 +61,8 @@ def check(root: Path) -> tuple[list[str], list[str]]:
         text = target.read_text(encoding="utf-8")
         if "alwaysApply: true" not in text:
             errors.append("Cursor adapter must set alwaysApply: true")
+        if "@AGENTS.md" not in text:
+            errors.append("Cursor adapter must import @AGENTS.md")
         if "AGENTS.md" not in text or ".agents/" not in text:
             errors.append("Cursor adapter must point to AGENTS.md and .agents/")
 

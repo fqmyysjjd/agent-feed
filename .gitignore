@@ -12,12 +12,20 @@ build/
 
 # Local AI-agent workspace assets. The distributable template source lives under
 # src/agent_feed/templates/standard/.
-/AGENTS.md
-/CLAUDE.md
-/.agents/
+/AGENTS.local.md
+/.agents/session-state/*.json
 /.codex/
-/.claude/
-/.cursor/
+
+# Keep the repository's published protocol and adapters tracked.
+!/.agents/
+!/.claude/
+!/.cursor/
+!AGENTS.md
+!CLAUDE.md
+
+# Local release/readiness notes that should not be published.
+/docs/.internal/
+/README_ZH.md
 
 # Local lockfile is not part of the current package contract.
 /uv.lock

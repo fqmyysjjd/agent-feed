@@ -62,6 +62,12 @@ class TrustReport:
         return not self.errors and not self.missing_state and not self.issues
 
 
+@dataclass(frozen=True)
+class StaleProjectEntries:
+    config_file: Path
+    project_roots: tuple[Path, ...]
+
+
 def check_asset_trust(root: Path, *, kinds: set[str] | None = None) -> TrustReport:
     config_file, errors = trust_config_path()
     if errors:
@@ -407,43 +413,65 @@ def remove_project_trust_state(root: Path) -> list[WriteAction]:
     ]
 
 
+def missing_project_entries() -> tuple[StaleProjectEntries | None, list[str]]:
+    config_file, errors = trust_config_path()
+    if errors or config_file is None:
+        return None, []
+
+    state, state_errors, _used_legacy = read_existing_or_legacy_config(config_file)
+    if state_errors:
+        return None, state_errors
+
+    projects = state.get("projects")
+    if not isinstance(projects, dict):
+        return None, [f"{config_file} projects must be a JSON object"]
+
+    missing_roots = tuple(
+        sorted(
+            Path(key)
+            for key, value in projects.items()
+            if isinstance(key, str) and isinstance(value, dict) and not Path(key).exists()
+        )
+    )
+    if not missing_roots:
+        return None, []
+    return StaleProjectEntries(config_file=config_file, project_roots=missing_roots), []
+
+
 def cleanup_missing_project_entries(
     *,
     dry_run: bool,
 ) -> tuple[list[WriteAction], list[str]]:
-    config_file, errors = trust_config_path()
-    if errors or config_file is None:
+    stale_entries, errors = missing_project_entries()
+    if errors:
+        return [], errors
+    if stale_entries is None:
         return [], []
 
-    state, state_errors, _used_legacy = read_existing_or_legacy_config(config_file)
+    missing_keys = tuple(str(path) for path in stale_entries.project_roots)
+    detail = f"remove {len(missing_keys)} stale project entr"
+    detail += "y" if len(missing_keys) == 1 else "ies"
+    if dry_run:
+        return [
+            WriteAction(path=stale_entries.config_file, action="would update", detail=detail)
+        ], []
+
+    state, state_errors, _used_legacy = read_existing_or_legacy_config(stale_entries.config_file)
     if state_errors:
         return [], state_errors
-
     projects = state.get("projects")
     if not isinstance(projects, dict):
-        return [], [f"{config_file} projects must be a JSON object"]
-
-    missing_keys = [
-        key
-        for key, value in projects.items()
-        if isinstance(key, str) and isinstance(value, dict) and not Path(key).exists()
-    ]
-    if not missing_keys:
-        return [], []
-
-    detail = "remove stale project entries: " + ", ".join(sorted(missing_keys))
-    if dry_run:
-        return [WriteAction(path=config_file, action="would update", detail=detail)], []
+        return [], [f"{stale_entries.config_file} projects must be a JSON object"]
 
     for key in missing_keys:
         del projects[key]
     state["schema_version"] = 1
     state["agent_feed_version"] = __version__
     write_user_config(
-        config_file,
+        stale_entries.config_file,
         json.dumps(state, indent=2, ensure_ascii=False, sort_keys=True) + "\n",
     )
-    return [WriteAction(path=config_file, action="update", detail=detail)], []
+    return [WriteAction(path=stale_entries.config_file, action="update", detail=detail)], []
 
 
 def current_assets(root: Path) -> list[TrustAsset]:

@@ -3,15 +3,35 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from agent_feed.models import VerificationProfile, WriteAction
 from agent_feed.project_settings import metadata_settings_errors
 from agent_feed.upgrade import METADATA_PATH, is_installed, read_metadata, unified_diff
+from agent_feed.asset_trust import (
+    missing_project_entries,
+    project_local_config_errors,
+    trust_config_path,
+    validate_config_shape as validate_user_config_shape,
+)
 
 
 MUTABLE_TOP_LEVEL_KEYS = {"project_name", "verification_profile"}
+
+
+@dataclass(frozen=True)
+class ConfigCheckReport:
+    target: Path
+    project_config: Path
+    user_config: Path | None
+    errors: tuple[str, ...]
+    warnings: tuple[str, ...]
+
+    @property
+    def ok(self) -> bool:
+        return not self.errors
 
 
 def config_path(root: Path) -> Path:
@@ -151,9 +171,64 @@ def validate_config_value(path: tuple[str, ...], value: Any) -> list[str]:
 
 def validate_config_shape_data(data: dict[str, Any]) -> list[str]:
     errors: list[str] = []
+    for key in (
+        "schema_version",
+        "agent_feed_version",
+        "template",
+        "project_name",
+        "verification_profile",
+    ):
+        if key not in data:
+            errors.append(f"{METADATA_PATH} missing {key}")
+    if data.get("schema_version") != 1:
+        errors.append(f"{METADATA_PATH} schema_version must be 1")
+    if data.get("template") != "standard":
+        errors.append(f"{METADATA_PATH} template must be standard")
     if "verification_profile" in data:
         errors.extend(validate_config_value(("verification_profile",), data["verification_profile"]))
     if "project_name" in data:
         errors.extend(validate_config_value(("project_name",), data["project_name"]))
     errors.extend(metadata_settings_errors(data, label=str(METADATA_PATH)))
     return errors
+
+
+def check_config(root: Path) -> ConfigCheckReport:
+    project_path = config_path(root)
+    errors: list[str] = []
+    warnings: list[str] = []
+
+    data, project_errors = read_config(root)
+    if project_errors:
+        errors.extend(project_errors)
+    else:
+        errors.extend(validate_config_shape_data(data))
+
+    user_config, user_config_errors = trust_config_path()
+    if user_config_errors:
+        errors.extend(user_config_errors)
+    elif user_config is not None:
+        errors.extend(project_local_config_errors(root, user_config))
+        if user_config.exists() or user_config.with_name("agent-feed.json").exists():
+            errors.extend(validate_user_config_shape(user_config))
+        else:
+            errors.append(
+                f"missing user-level Agent Feed config: {user_config}. "
+                "Run agent-feed env setup."
+            )
+
+    stale_entries, stale_errors = missing_project_entries()
+    errors.extend(stale_errors)
+    if stale_entries is not None:
+        for project_root in stale_entries.project_roots:
+            warnings.append(
+                f"{stale_entries.config_file}: stale project entry points to missing directory "
+                f"{project_root}"
+            )
+
+    return ConfigCheckReport(
+        target=root,
+        project_config=project_path,
+        user_config=user_config,
+        errors=tuple(errors),
+        warnings=tuple(warnings),
+    )

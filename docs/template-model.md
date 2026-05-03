@@ -20,11 +20,11 @@ AGENTS.md
   agents/
 ```
 
-`AGENTS.md` is the thin entry contract. `.agents/` contains the reusable rules, project customization layer, domain knowledge, task workflows, local session-state policy, and protocol helper scripts.
+`AGENTS.md` is the thin entry contract. `.agents/` contains the reusable rules, project customization layer, domain knowledge, task workflows, local session-state policy, and protocol helper scripts that together form the workflow pipeline for AI-assisted development.
 
 ## Client Adapter Model
 
-Tool-specific folders are generated adapters, not sources of truth.
+Tool-specific folders are generated adapters, not sources of truth. The product promise is one canonical workflow pipeline with thin client adapters, not duplicated rules per tool.
 
 ```text
 CLAUDE.md
@@ -76,7 +76,7 @@ Do not duplicate `.agents/rules/`; update the canonical files under `.agents/`.
 
 `.claude/skills/` mirrors `.agents/skills/`.
 
-## Skill Index
+## Skill Index And Public Skill Import
 
 `.agents/skills/README.md` is generated from skill frontmatter and is the first stop for optional, custom, or imported skill discovery.
 
@@ -87,6 +87,14 @@ agent-feed index-skills
 ```
 
 Then run client adapter sync when generated clients are configured.
+
+Curated public skill import goes through:
+
+```sh
+agent-feed skill-hub
+```
+
+Imported skills stay lower-priority than the canonical protocol. When a skill is missing frontmatter, Agent Feed fills metadata from project settings; imported skills should default to `trust: custom` unless the user deliberately changes that state after review.
 
 Skill and managed-script sha256 values are kept in `$AGENT_FEED_HOME/config.json`, not in the project directory or user-facing skill index. By default, Agent Feed uses a user-level persistent home: `~/.agent-feed` on macOS/Linux and `%APPDATA%\agent-feed` on Windows. Use `agent-feed env setup` to create and persist that external home, `agent-feed env print` to print the shell command for manual configuration, or `agent-feed env uninstall --remove-home -y` to remove it. `status`, `preview`, and `check` read current files directly, so they can report drift without requiring a prior indexing step.
 
@@ -101,7 +109,7 @@ Supported settings:
 3. `settings.skills.default_import_trust`: fallback `trust` for skills missing that frontmatter. Supported project-configurable values are `custom` and `reviewed`.
 4. `settings.claude.required_snippets`: required references for a user-owned `CLAUDE.md`.
 
-Change these values with `agent-feed config set KEY VALUE`; the command also regenerates affected managed assets, refreshes the skill index, and updates external trust state.
+Change these values with `agent-feed config set KEY VALUE`; the command also regenerates affected managed assets, refreshes the skill index, updates external trust state, and runs the same health checks exposed by `agent-feed config check`.
 
 ### Cursor
 
@@ -120,6 +128,8 @@ alwaysApply: true
 agentFeedManaged: true
 agentFeedVersion: 1
 ---
+
+@AGENTS.md
 
 Start with `AGENTS.md`, then follow the referenced `.agents/` rules, project constraints, domain docs, and skills.
 ```
