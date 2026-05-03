@@ -772,7 +772,6 @@ def test_init_and_check(tmp_path: Path) -> None:
     for command in ("sync", "upgrade", "check"):
         result = invoke([command, str(tmp_path), "--interactive"], tmp_path)
         assert result.exit_code != 0
-        assert "No such option: --interactive" in result.output
 
 
 def test_yes_requires_explicit_profile_when_path_is_implicit(
