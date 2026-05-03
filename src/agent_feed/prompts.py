@@ -317,10 +317,12 @@ def read_single_key_windows() -> str:
 
 def read_single_key_posix() -> str:
     try:
-        import termios
-        import tty
+        import termios as raw_termios
+        import tty as raw_tty
     except ImportError:
         return ""
+    termios: Any = raw_termios
+    tty: Any = raw_tty
 
     fd = sys.stdin.fileno()
     old = termios.tcgetattr(fd)
