@@ -637,7 +637,24 @@ def test_init_and_check(tmp_path: Path) -> None:
 
     env_setup_help = invoke(["env", "setup", "--help"], tmp_path)
     assert env_setup_help.exit_code == 0, env_setup_help.output
-    assert "--force" in env_setup_help.output
+
+    env_setup_force = invoke(
+        [
+            "env",
+            "setup",
+            str(tmp_path),
+            "--home",
+            str(tmp_path.parent / f"{tmp_path.name}-agent-feed-home"),
+            "--shell",
+            "bash",
+            "--force",
+            "--dry-run",
+        ],
+        tmp_path,
+        env={"HOME": str(tmp_path / "help-home"), "AGENT_FEED_HOME": ""},
+    )
+    assert env_setup_force.exit_code == 0, env_setup_force.output
+    assert "would create" in env_setup_force.output
 
     init_help = invoke(["init", "--help"], tmp_path)
     assert init_help.exit_code == 0, init_help.output
