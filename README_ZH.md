@@ -1,13 +1,38 @@
-![Agent Feed workflow pipeline](docs/assets/agent-feed-workflow-pipeline.png)
+<p align="center">
+  <a href="README.md">English</a>
+</p>
 
-# Agent Feed
+<p align="center">
+  <img src="docs/assets/agent-feed-workflow-pipeline.png" alt="Agent Feed workflow pipeline" width="920">
+</p>
 
-**让 AI 编程不再跑偏。**
-**将零散的提示词指令转化为可靠的、代码仓库专属的工作流管道。**
+<h1 align="center">Agent Feed</h1>
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Protocol Flow](https://img.shields.io/badge/docs-protocol%20flow-7c3aed.svg)](docs/ai-development-protocol-flow.md)
-[![Template Model](https://img.shields.io/badge/docs-template%20model-2563eb.svg)](docs/template-model.md)
+<h3 align="center">面向 AI 编程 Agent 的仓库级工作流治理层。</h3>
+
+<p align="center">
+  <strong>让 AI 编程不再跑偏。</strong><br>
+  将零散提示词指令转化为面向 Codex、Claude Code、Cursor、验证、审查和交接的可靠工作流管道。
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
+  <a href="pyproject.toml"><img alt="Python 3.11+" src="https://img.shields.io/badge/python-3.11%2B-2563eb.svg"></a>
+  <a href="AGENTS.md"><img alt="AGENTS.md" src="https://img.shields.io/badge/AGENTS.md-ready-111827.svg"></a>
+  <a href="docs/ai-development-protocol-flow.md"><img alt="Protocol Flow" src="https://img.shields.io/badge/docs-protocol%20flow-7c3aed.svg"></a>
+  <a href="docs/template-model.md"><img alt="Template Model" src="https://img.shields.io/badge/docs-template%20model-059669.svg"></a>
+</p>
+
+<p align="center">
+  <a href="#-为什么你会感受到前所未有的不同">为什么</a> ·
+  <a href="#-解决的核心痛点">痛点</a> ·
+  <a href="#-快速开始">快速开始</a> ·
+  <a href="#️-工作原理">工作原理</a> ·
+  <a href="#-常用命令">命令</a> ·
+  <a href="#-文档导航">文档</a>
+</p>
+
+---
 
 > 你的 AI 编程助手并没有坏，它只是缺少一个统一的工作流。
 
@@ -66,24 +91,11 @@ uv run agent-feed
 
 ## ⚙️ 工作原理
 
+### 指令进入，带证据交接。
+
 核心工作流强制执行严格的线性管道，而非开放式的闲聊：
 
-```mermaid
-flowchart TD
-    Start["AGENTS.md (入口)"] --> Boundary["结果边界 & 任务简报"]
-    Boundary --> Context["任务分类 & 最小化上下文加载"]
-    Context --> Routing["技能路由"]
-    Routing --> Lookup["项目/领域事实来源查找"]
-    Lookup --> Decision{"是否影响未来架构/行为？"}
-    Decision -- "是" --> Ask["🛑 决策节点：询问人类"]
-    Decision -- "否" --> Scoped["范围可控的开发与验证"]
-    Ask --> Scoped
-    Scoped --> Review["审查节点"]
-    Review --> Handoff["无缝交接 (上下文胶囊)"]
-
-    classDef highlight fill:#7c3aed,stroke:#4c1d95,stroke-width:2px,color:#fff;
-    class Ask highlight;
-```
+![Agent Feed protocol flow](docs/assets/agent-feed-protocol-flow.svg)
 
 该协议在保持高度可定制性的同时，在职责上进行了明确的拆分：
 

@@ -25,7 +25,6 @@ build/
 
 # Local release/readiness notes that should not be published.
 /docs/.internal/
-/README_ZH.md
 
 # Local lockfile is not part of the current package contract.
 /uv.lock

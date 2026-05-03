@@ -1,13 +1,38 @@
-![Agent Feed workflow pipeline](docs/assets/agent-feed-workflow-pipeline.png)
+<p align="center">
+  <a href="README_ZH.md">简体中文</a>
+</p>
 
-# Agent Feed
+<p align="center">
+  <img src="docs/assets/agent-feed-workflow-pipeline.png" alt="Agent Feed workflow pipeline" width="920">
+</p>
 
-**Stop AI coding from drifting.**
-**Turn scattered instructions into a reliable, repository-owned workflow pipeline.**
+<h1 align="center">Agent Feed</h1>
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Protocol Flow](https://img.shields.io/badge/docs-protocol%20flow-7c3aed.svg)](docs/ai-development-protocol-flow.md)
-[![Template Model](https://img.shields.io/badge/docs-template%20model-2563eb.svg)](docs/template-model.md)
+<h3 align="center">Repository-owned workflow governance for AI coding agents.</h3>
+
+<p align="center">
+  <strong>Stop AI coding from drifting.</strong><br>
+  Turn scattered instructions into a reliable workflow pipeline for Codex, Claude Code, Cursor, verification, review, and handoff.
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
+  <a href="pyproject.toml"><img alt="Python 3.11+" src="https://img.shields.io/badge/python-3.11%2B-2563eb.svg"></a>
+  <a href="AGENTS.md"><img alt="AGENTS.md" src="https://img.shields.io/badge/AGENTS.md-ready-111827.svg"></a>
+  <a href="docs/ai-development-protocol-flow.md"><img alt="Protocol Flow" src="https://img.shields.io/badge/docs-protocol%20flow-7c3aed.svg"></a>
+  <a href="docs/template-model.md"><img alt="Template Model" src="https://img.shields.io/badge/docs-template%20model-059669.svg"></a>
+</p>
+
+<p align="center">
+  <a href="#-why-youll-feel-the-difference">Why</a> ·
+  <a href="#-problems-it-solves">Problems</a> ·
+  <a href="#-quick-start">Quick Start</a> ·
+  <a href="#-how-it-works">How It Works</a> ·
+  <a href="#-common-commands">Commands</a> ·
+  <a href="#-documentation">Docs</a>
+</p>
+
+---
 
 > Your AI coding assistant is not broken. It is usually missing a shared workflow.
 
@@ -66,24 +91,11 @@ uv run agent-feed
 
 ## ⚙️ How It Works
 
+### Instruction In. Verified Handoff Out.
+
 The core workflow enforces a strict, linear pipeline instead of an open-ended chat:
 
-```mermaid
-flowchart TD
-    Start["AGENTS.md (Entry)"] --> Boundary["Outcome Boundary & Task Brief"]
-    Boundary --> Context["Task Classification & Context Loading"]
-    Context --> Routing["Skill Routing"]
-    Routing --> Lookup["Project/Domain Source-of-Truth Lookup"]
-    Lookup --> Decision{"Affects Future Behavior?"}
-    Decision -- "Yes" --> Ask["🛑 Decision Gate: Ask Human"]
-    Decision -- "No" --> Scoped["Scoped Work & Verification"]
-    Ask --> Scoped
-    Scoped --> Review["Review Gate"]
-    Review --> Handoff["Clean Handoff (Context Capsule)"]
-
-    classDef highlight fill:#7c3aed,stroke:#4c1d95,stroke-width:2px,color:#fff;
-    class Ask highlight;
-```
+![Agent Feed protocol flow](docs/assets/agent-feed-protocol-flow.svg)
 
 The protocol is intentionally split by responsibility while remaining customizable:
 
