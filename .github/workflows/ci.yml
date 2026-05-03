@@ -62,7 +62,8 @@ jobs:
         shell: pwsh
         run: |
           python -m venv "$env:RUNNER_TEMP\agent-feed-wheel-smoke"
-          & "$env:RUNNER_TEMP\agent-feed-wheel-smoke\Scripts\python.exe" -m pip install dist/*.whl
+          $wheel = Get-ChildItem -Path dist -Filter *.whl | Select-Object -First 1
+          & "$env:RUNNER_TEMP\agent-feed-wheel-smoke\Scripts\python.exe" -m pip install $wheel.FullName
           & "$env:RUNNER_TEMP\agent-feed-wheel-smoke\Scripts\agent-feed.exe" --version
           & "$env:RUNNER_TEMP\agent-feed-wheel-smoke\Scripts\agent-feed.exe" --help
           & "$env:RUNNER_TEMP\agent-feed-wheel-smoke\Scripts\agent-feed.exe" init --help
