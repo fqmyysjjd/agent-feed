@@ -658,7 +658,28 @@ def test_init_and_check(tmp_path: Path) -> None:
 
     init_help = invoke(["init", "--help"], tmp_path)
     assert init_help.exit_code == 0, init_help.output
-    assert "--env-home" in init_help.output
+
+    init_env_home = tmp_path.parent / f"{tmp_path.name}-init-env-home"
+    init_env_target = tmp_path / "init-env-target"
+    init_env_home_result = runner.invoke(
+        app,
+        [
+            "init",
+            str(init_env_target),
+            "--project-name",
+            "Env Home Example",
+            "--clients",
+            "none",
+            "--profile",
+            "python",
+            "--env-home",
+            str(init_env_home),
+            "--dry-run",
+        ],
+        env={"AGENT_FEED_HOME": "", "HOME": str(tmp_path / "init-help-home")},
+    )
+    assert init_env_home_result.exit_code == 0, init_env_home_result.output
+    assert "would create" in init_env_home_result.output
 
     preview_help = invoke(["preview", "--help"], tmp_path)
     assert preview_help.exit_code == 0, preview_help.output
