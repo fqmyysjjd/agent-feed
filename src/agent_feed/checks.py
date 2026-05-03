@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -192,7 +193,7 @@ def validate_scripts(root: Path) -> list[str]:
         path = root / rel_path
         if not path.exists():
             errors.append(f"missing script: {rel_path}")
-        elif not path.stat().st_mode & 0o111:
+        elif os.name != "nt" and not path.stat().st_mode & 0o111:
             errors.append(f"script is not executable: {rel_path}")
     errors.extend(asset_trust_errors(root, kinds={"script"}))
     return errors

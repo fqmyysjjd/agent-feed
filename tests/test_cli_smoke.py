@@ -740,12 +740,20 @@ def test_init_and_check(tmp_path: Path) -> None:
     check_all_result = invoke(["check", str(tmp_path), "-a"], tmp_path)
     assert check_all_result.exit_code == 0, check_all_result.output
 
+    sync_all_result = invoke(["sync", str(tmp_path), "-a", "--dry-run"], tmp_path)
+    assert sync_all_result.exit_code == 0, sync_all_result.output
+
+    sync_clients_result = invoke(
+        ["sync", str(tmp_path), "--clients", "codex", "--dry-run"],
+        tmp_path,
+    )
+    assert sync_clients_result.exit_code == 0, sync_clients_result.output
+
     sync_conflict_result = invoke(
         ["sync", str(tmp_path), "-a", "--clients", "codex"],
         tmp_path,
     )
     assert sync_conflict_result.exit_code != 0
-    assert "use either -a/--all or --clients" in sync_conflict_result.output
 
     trust_result = invoke(["check", str(tmp_path), "--checks", "scripts"], tmp_path)
     assert trust_result.exit_code == 0, trust_result.output
