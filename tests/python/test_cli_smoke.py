@@ -722,6 +722,9 @@ def test_init_and_check(tmp_path: Path) -> None:
     assert "protocol|docs" not in verify_script
     assert "docs      Check AI engineering docs" in verify_script
     assert "Selected scope: protocol" not in verify_script
+    assert "--exclude .agents/skills" in verify_script
+    assert "--exclude .claude/skills" in verify_script
+    assert "--exclude .feed-backup" in verify_script
     skill_index = (tmp_path / ".agents/skills/README.md").read_text(encoding="utf-8")
     assert "`concept-review`" in skill_index
     assert "`project-review`" in skill_index

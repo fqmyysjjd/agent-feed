@@ -15,13 +15,17 @@ import {
   setConfigValue,
 } from "./config.js";
 import {
+  hasDiffDetails,
   printActionResult,
   printCheckReport,
   printConfigCheckReport,
+  printDiffDetails,
+  printDiffHint,
   printErrorPanel,
   printInfo,
   printInspectionPlan,
   printNextStep,
+  printPanel,
   printRecommendedCommand,
   printStatus,
   printWarning,
@@ -46,24 +50,30 @@ import {
   installRemoteSkillPackage,
   preferredGithubToken,
   previewSkillTree,
+  saveGithubToken,
   searchRemoteSkills,
   skillHubFailureHelp,
   type RemoteSkill,
+  type RemoteSkillPackage,
 } from "./skill-hub.js";
 import {
   canPrompt,
   isPromptCanceled,
   promptChecks,
   promptClients,
+  promptClientsStep,
   promptConfirm,
   promptMainAction,
-  promptPath,
+  promptPathStep,
+  promptSecret,
   promptSkillKeyword,
   promptSkillSelection,
-  promptText,
+  promptTextStep,
+  promptViewDiffKey,
   promptVerificationProfile,
+  promptVerificationProfileStep,
 } from "./prompts.js";
-import { TRUST_ENV, syncAssetTrust, trustConfigPath } from "./trust.js";
+import { TRUST_ENV, syncAssetTrust, trustConfigPath, trustPreviewActions } from "./trust.js";
 import {
   applyTemplates,
   inferProfile,
@@ -98,7 +108,7 @@ Usage:
   agent-feed env print [--home path] [--shell auto|zsh|bash|fish|powershell]
   agent-feed env uninstall [--home path] [--shell auto|zsh|bash|fish|powershell] [--remove-home] [--dry-run] [-y] [--no-input]
   agent-feed index-skills [path] [--dry-run] [-y]
-  agent-feed skill-hub [path] [--keyword keyword] [--dry-run] [--no-input]
+  agent-feed skill-hub [path] [--keyword keyword] [--dry-run] [--save-token|--no-save-token] [--no-input]
   agent-feed --version
   agent-feed --help
 `);
@@ -185,7 +195,7 @@ Regenerate .agents/skills/README.md and refresh external trust state.
     "skill-hub": `Agent Feed ${VERSION}
 
 Usage:
-  agent-feed skill-hub [path] [--keyword keyword] [--dry-run] [--no-input]
+  agent-feed skill-hub [path] [--keyword keyword] [--dry-run] [--save-token|--no-save-token] [--no-input]
 
 Search curated public skill hubs and install matched skills.
 `,
@@ -262,6 +272,145 @@ function isNoInput(options: Map<string, string | boolean>): boolean {
   return options.has("-y") || options.has("--yes") || options.has("--no-input");
 }
 
+type InitWizardResult = {
+  target: string;
+  projectName: string;
+  clients: Client[];
+  profile: VerificationProfile;
+};
+
+type UpgradeWizardResult = {
+  target: string;
+  projectName: string;
+  clients: Client[];
+};
+
+async function promptInitWizard(options: {
+  target: string;
+  projectName: string;
+  clients: Client[];
+  profile: VerificationProfile;
+  projectNameExplicit: boolean;
+}): Promise<InitWizardResult | undefined> {
+  let step = 0;
+  let currentTarget = options.target;
+  let currentProjectName = options.projectName;
+  let currentClients = options.clients;
+  let currentProfile = options.profile;
+
+  while (step < 4) {
+    if (step === 0) {
+      const value = await promptPathStep("Project path", currentTarget);
+      if (value === undefined) {
+        return undefined;
+      }
+      currentTarget = parsePath(value || currentTarget);
+      if (!options.projectNameExplicit) {
+        currentProjectName = parseProjectName(currentTarget);
+      }
+      step += 1;
+      continue;
+    }
+    if (step === 1) {
+      const value = await promptTextStep("Project display name", currentProjectName);
+      if (value === undefined) {
+        step -= 1;
+        printStepBack("Project path");
+        continue;
+      }
+      currentProjectName = value.trim() || currentProjectName;
+      step += 1;
+      continue;
+    }
+    if (step === 2) {
+      const value = await promptClientsStep("Select AI clients to configure", currentClients);
+      if (value === undefined) {
+        step -= 1;
+        printStepBack("project display name");
+        continue;
+      }
+      currentClients = value;
+      step += 1;
+      continue;
+    }
+    const value = await promptVerificationProfileStep("Select project verification profile", currentProfile);
+    if (value === undefined) {
+      step -= 1;
+      printStepBack("AI clients");
+      continue;
+    }
+    currentProfile = value;
+    step += 1;
+  }
+
+  return {
+    target: currentTarget,
+    projectName: currentProjectName,
+    clients: currentClients,
+    profile: currentProfile,
+  };
+}
+
+async function promptUpgradeWizard(options: {
+  target: string;
+  projectName: string;
+  clients: Client[];
+  clientsExplicit: boolean;
+  projectNameExplicit: boolean;
+}): Promise<UpgradeWizardResult | undefined> {
+  let step = 0;
+  let currentTarget = options.target;
+  let currentProjectName = options.projectName;
+  let currentClients = options.clients;
+
+  while (step < 3) {
+    if (step === 0) {
+      const value = await promptPathStep("Project path", currentTarget);
+      if (value === undefined) {
+        return undefined;
+      }
+      currentTarget = parsePath(value || currentTarget);
+      if (!options.projectNameExplicit) {
+        currentProjectName = inferProjectName(currentTarget);
+      }
+      if (!options.clientsExplicit) {
+        currentClients = installedClients(currentTarget);
+      }
+      step += 1;
+      continue;
+    }
+    if (step === 1) {
+      const value = await promptTextStep("Project display name", currentProjectName);
+      if (value === undefined) {
+        step -= 1;
+        printStepBack("Project path");
+        continue;
+      }
+      currentProjectName = value.trim() || currentProjectName;
+      step += 1;
+      continue;
+    }
+    const value = await promptClientsStep("Select AI clients to configure", currentClients);
+    if (value === undefined) {
+      step -= 1;
+      printStepBack("project display name");
+      continue;
+    }
+    currentClients = value;
+    step += 1;
+  }
+
+  return {
+    target: currentTarget,
+    projectName: currentProjectName,
+    clients: currentClients,
+  };
+}
+
+function printStepBack(label: string): void {
+  printInfo(`Returned to ${label}.`);
+}
+
 async function initCommand(target: string, args: ParsedArgs): Promise<number> {
   let currentTarget = target;
   let projectName = optionString(args.options, "--project-name") ?? parseProjectName(target);
@@ -272,13 +421,25 @@ async function initCommand(target: string, args: ParsedArgs): Promise<number> {
 
   if (canPrompt() && !args.path && !noInput) {
     printWelcome();
-    currentTarget = parsePath(await promptPath("Project path", currentTarget));
-    if (!optionString(args.options, "--project-name")) {
-      projectName = await promptText("Project display name", parseProjectName(currentTarget));
+    const wizard = await promptInitWizard({
+      target: currentTarget,
+      projectName,
+      clients,
+      profile: parseProfile(explicitProfile, "python"),
+      projectNameExplicit: Boolean(optionString(args.options, "--project-name")),
+    });
+    if (!wizard) {
+      printActionResult({
+        title: "Initialization",
+        message: "Canceled",
+        kind: "warning",
+      });
+      return 0;
     }
-    if (!optionString(args.options, "--clients") && !args.options.has("--all")) {
-      clients = await promptClients("Select AI clients to configure", clients);
-    }
+    currentTarget = wizard.target;
+    projectName = wizard.projectName;
+    clients = wizard.clients;
+    explicitProfile = wizard.profile;
   }
 
   const profile = await resolveInitProfile(explicitProfile, { noInput });
@@ -470,8 +631,9 @@ function previewActions(
     forceGenerated: !installed,
     pruneGenerated: installed ? false : true,
   });
+  const trust = installed ? trustPreviewActions(target) : [];
   return {
-    actions: [...canonical.actions, ...adapters.actions],
+    actions: [...canonical.actions, ...adapters.actions, ...trust],
     errors: [...canonical.errors, ...adapters.errors],
   };
 }
@@ -483,13 +645,16 @@ async function checkCommand(target: string, args: ParsedArgs): Promise<number> {
   return report.ok ? 0 : 1;
 }
 
-function statusCommand(target: string, args: ParsedArgs): number {
+async function statusCommand(target: string, args: ParsedArgs): Promise<number> {
   if (args.options.has("--json")) {
     printStatus(collectStatus(target), { asJson: true });
     return 0;
   }
   const drift = previewActions(target, new Map());
   printInspectionPlan(target, drift.actions, canPrompt());
+  if (hasDiffDetails(drift.actions) && canPrompt() && (await promptViewDiffKey())) {
+    previewCommand(target, { options: new Map() });
+  }
   if (drift.errors.length > 0) {
     printErrorPanel("Status blocked", drift.errors);
     return 3;
@@ -527,6 +692,20 @@ function previewCommand(target: string, args: ParsedArgs): number {
   return 0;
 }
 
+async function promptWriteDiffDetails(actions: WriteAction[], command: string, target: string): Promise<void> {
+  if (!hasDiffDetails(actions)) {
+    return;
+  }
+  const interactive = canPrompt();
+  printDiffHint({
+    command: `${command} ${target}`,
+    interactive,
+  });
+  if (interactive && (await promptViewDiffKey())) {
+    printDiffDetails(actions);
+  }
+}
+
 async function upgradeCommand(target: string, args: ParsedArgs): Promise<number> {
   const dryRun = args.options.has("--dry-run");
   const noInput = isNoInput(args.options);
@@ -540,13 +719,26 @@ async function upgradeCommand(target: string, args: ParsedArgs): Promise<number>
 
   if (canPrompt() && !args.path && !noInput) {
     printWelcome();
-    currentTarget = parsePath(await promptPath("Project path", currentTarget));
-    if (!optionString(args.options, "--project-name")) {
-      projectName = await promptText("Project display name", inferProjectName(currentTarget));
+    const wizard = await promptUpgradeWizard({
+      target: currentTarget,
+      projectName,
+      clients,
+      clientsExplicit: Boolean(optionString(args.options, "--clients")) || args.options.has("--all"),
+      projectNameExplicit: Boolean(optionString(args.options, "--project-name")),
+    });
+    if (!wizard) {
+      printInfo("agent-feed: upgrade canceled");
+      return 0;
     }
-    if (!optionString(args.options, "--clients") && !args.options.has("--all")) {
-      clients = await promptClients("Select AI clients to configure", clients);
-    }
+    currentTarget = wizard.target;
+    projectName = wizard.projectName;
+    clients = wizard.clients;
+  }
+
+  const envReady = await ensureTrustHomeForUpgrade(currentTarget, { noInput });
+  if (!envReady.ok) {
+    printErrorPanel("Environment setup blocked", envReady.errors);
+    return 3;
   }
 
   const profile = inferProfile(currentTarget);
@@ -562,7 +754,9 @@ async function upgradeCommand(target: string, args: ParsedArgs): Promise<number>
     projectName,
     pruneMissing: true,
   });
-  printWritePlan([...canonical.actions, ...adapters.actions, ...trust.actions], { showDiffs: true });
+  const actions = [...canonical.actions, ...adapters.actions, ...trust.actions];
+  printWritePlan(actions);
+  await promptWriteDiffDetails(actions, "agent-feed preview", currentTarget);
   if (canonical.errors.length > 0 || adapters.errors.length > 0 || trust.errors.length > 0) {
     printErrorPanel("Upgrade blocked", [...canonical.errors, ...adapters.errors, ...trust.errors]);
     return 3;
@@ -954,6 +1148,73 @@ async function ensureTrustHomeForInit(
   };
 }
 
+async function ensureTrustHomeForUpgrade(
+  target: string,
+  options: { noInput: boolean },
+): Promise<{ ok: boolean; actions: WriteAction[]; errors: string[] }> {
+  const config = trustConfigPath();
+  if (config.errors.length === 0) {
+    return { ok: true, actions: [], errors: [] };
+  }
+  const missingEnv = config.errors.some((error) => error.includes(`${TRUST_ENV} is required`));
+  if (!missingEnv || options.noInput || !canPrompt()) {
+    return { ok: true, actions: [], errors: [] };
+  }
+
+  const recommended = suggestedAgentFeedHome(target);
+  printActionResult({
+    title: "Environment Setup Required",
+    message: "Agent Feed needs an external user config home",
+    kind: "warning",
+    detail: `Recommended: ${recommended}`,
+  });
+  const confirmed = await promptConfirm(`Set up ${TRUST_ENV} now and continue?`, true);
+  if (!confirmed) {
+    return { ok: true, actions: [], errors: [] };
+  }
+  let result = setupAgentFeedHome({
+    home: recommended,
+    target,
+    dryRun: false,
+    force: false,
+  });
+  if (result.errors.some((error) => error.includes("pass --force"))) {
+    const replace = await promptConfirm(
+      `${TRUST_ENV} already points to another path. Replace it with ${result.home}?`,
+      false,
+    );
+    if (replace) {
+      result = setupAgentFeedHome({
+        home: recommended,
+        target,
+        dryRun: false,
+        force: true,
+      });
+    }
+  }
+  if (result.actions.length > 0) {
+    printWritePlan(result.actions);
+  }
+  if (result.errors.length > 0) {
+    return {
+      ok: false,
+      actions: result.actions,
+      errors: [
+        ...result.errors,
+        `Run: \`agent-feed env setup ${target}\``,
+        "If shell detection failed, add `--shell zsh`, `bash`, `fish`, or `powershell`.",
+      ],
+    };
+  }
+  printActionResult({
+    title: "Environment Setup",
+    message: "Environment configured",
+    kind: "success",
+    detail: "The user-level Agent Feed home and shell binding are ready for this session.",
+  });
+  return { ok: true, actions: result.actions, errors: [] };
+}
+
 function indexSkillsCommand(target: string, args: ParsedArgs): number {
   const dryRun = args.options.has("--dry-run");
   const acceptChanged = args.options.has("-y") || args.options.has("--yes");
@@ -983,53 +1244,122 @@ function indexSkillsCommand(target: string, args: ParsedArgs): number {
 }
 
 async function skillHubCommand(target: string, args: ParsedArgs): Promise<number> {
-  let keyword = optionString(args.options, "--keyword")?.trim();
+  const keywordOption = optionString(args.options, "--keyword")?.trim();
+  let keyword = keywordOption;
   const dryRun = args.options.has("--dry-run");
   const noInput = args.options.has("--no-input");
-  if (!keyword) {
-    if (noInput || !canPrompt()) {
-      printErrorPanel("Skill hub search blocked", ["pass `--keyword` before searching curated skill hubs"]);
-      return 3;
-    }
-    keyword = (await promptSkillKeyword()).trim();
-  }
-  if (!keyword) {
-    printInfo("agent-feed: skill hub search canceled");
-    return 0;
+  const saveToken = !args.options.has("--no-save-token");
+  const interactive = canPrompt() && !noInput;
+  const keywordFromPrompt = !keyword && interactive;
+  if (!keyword && !interactive) {
+    printErrorPanel("Skill hub search blocked", ["pass `--keyword` before searching curated skill hubs"]);
+    return 3;
   }
   if (!existsSync(join(target, ".agents", "skills"))) {
     printErrorPanel("Skill hub install blocked", ["missing `.agents/skills`; run `agent-feed init` before installing skills"]);
     return 3;
   }
-  const token = preferredGithubToken(target);
-  for (const warning of token.warnings) {
+  const tokenState = preferredGithubToken(target);
+  let activeToken = tokenState.token;
+  for (const warning of tokenState.warnings) {
     printWarning(warning);
   }
 
+  let selected: RemoteSkill[] | undefined;
   let skills: RemoteSkill[];
-  try {
-    skills = await runWithSpinner("Searching curated skill hubs", () =>
-      searchRemoteSkills(keyword!, { token: token.token }),
-    );
-  } catch (error) {
-    printErrorPanel("Skill hub search blocked", [
-      skillHubFailureHelp(error instanceof Error ? error.message : String(error)),
-    ]);
-    return 3;
-  }
-  if (skills.length === 0) {
-    printInfo("No curated skills matched that keyword.");
-    printInfo("Hubs searched:");
-    for (const hub of CURATED_HUBS) {
-      printInfo(`- ${hub.name}: ${hub.url}`);
+  while (true) {
+    if (!keyword) {
+      const value = await promptSkillKeyword();
+      if (value === undefined || !value.trim()) {
+        printActionResult({
+          title: "Skill Hub",
+          message: "Canceled",
+          kind: "warning",
+          detail: "No skills were installed.",
+        });
+        return 0;
+      }
+      keyword = value.trim();
     }
-    return 0;
+
+    try {
+      skills = await runWithSpinner("Searching curated skill hubs", () =>
+        searchRemoteSkills(keyword!, { token: activeToken }),
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const retry = await retrySkillHubWithToken({
+        keyword,
+        error: message,
+        noInput,
+        saveToken,
+        target,
+      });
+      if (!retry) {
+        printErrorPanel("Skill hub search blocked", [skillHubFailureHelp(message)]);
+        return 3;
+      }
+      if (retry === "blocked") {
+        return 3;
+      }
+      skills = retry.skills;
+      activeToken = retry.token;
+    }
+    if (skills.length === 0) {
+      printActionResult({
+        title: "Skill Hub",
+        message: "No curated skills matched that keyword",
+        kind: "warning",
+        detail: "Try another keyword or check the curated hubs below.",
+      });
+      printInfo("Hubs searched:");
+      for (const hub of CURATED_HUBS) {
+        printInfo(`- ${hub.name}: ${hub.url}`);
+      }
+      if (keywordFromPrompt) {
+        keyword = undefined;
+        printInfo("Try another keyword, or press Esc to cancel.");
+        continue;
+      }
+      return 0;
+    }
+
+    selected = noInput
+      ? skills
+      : await promptSkillSelection(skills, {
+          onPreview: async (skill) => {
+            try {
+              const remotePackage = await runWithSpinner(`Loading preview for ${skill.name}`, () =>
+                fetchRemoteSkill(skill, { token: activeToken }),
+              );
+              printSkillPreview(remotePackage);
+            } catch (error) {
+              printErrorPanel("Skill preview blocked", [
+                skillHubFailureHelp(error instanceof Error ? error.message : String(error)),
+              ]);
+            }
+          },
+        });
+    if (selected === undefined) {
+      if (keywordFromPrompt) {
+        keyword = undefined;
+        printInfo("Returned to keyword search.");
+        continue;
+      }
+      printActionResult({
+        title: "Skill Hub",
+        message: "Canceled",
+        kind: "warning",
+        detail: "No skills were installed.",
+      });
+      return 0;
+    }
+    break;
   }
 
-  const selected = noInput ? skills : await promptSkillSelection(skills);
   if (selected.length === 0) {
-    printInfo("agent-feed: skill hub install canceled");
-    return 0;
+    printErrorPanel("Skill hub install blocked", ["select at least one skill"]);
+    return 3;
   }
 
   const actions: WriteAction[] = [];
@@ -1037,7 +1367,7 @@ async function skillHubCommand(target: string, args: ParsedArgs): Promise<number
   for (const skill of selected) {
     try {
       const remotePackage = await runWithSpinner(`Fetching ${skill.name}`, () =>
-        fetchRemoteSkill(skill, { token: token.token }),
+        fetchRemoteSkill(skill, { token: activeToken }),
       );
       if (dryRun) {
         printInfo(previewSkillTree(remotePackage));
@@ -1091,6 +1421,71 @@ async function runWithSpinner<T>(text: string, fn: () => Promise<T>): Promise<T>
     spinner.fail(text);
     throw error;
   }
+}
+
+function printSkillPreview(remotePackage: RemoteSkillPackage): void {
+  printPanel(
+    "Skill Preview",
+    [
+      `Source: ${remotePackage.skill.hub.name}  ${remotePackage.skill.hub.url}`,
+      `Skill:  ${remotePackage.skill.name}  ${remotePackage.skill.url}`,
+      "",
+      "Files to add:",
+      "",
+      previewSkillTree(remotePackage),
+      "",
+      "Imported skills are installed as `trust: custom`. Agent Feed does not execute remote scripts during install.",
+    ].join("\n"),
+    { kind: "warning" },
+  );
+}
+
+async function retrySkillHubWithToken(options: {
+  keyword: string;
+  error: string;
+  noInput: boolean;
+  saveToken: boolean;
+  target: string;
+}): Promise<{ skills: RemoteSkill[]; token: string } | "blocked" | undefined> {
+  if (options.noInput || !canPrompt() || !skillHubErrorCanUseToken(options.error)) {
+    return undefined;
+  }
+  printActionResult({
+    title: "Skill Hub",
+    message: "GitHub did not allow the anonymous skill-hub request",
+    kind: "warning",
+    detail: skillHubFailureHelp(options.error),
+  });
+  const token = await promptSecret("GitHub token");
+  if (!token) {
+    return undefined;
+  }
+  if (options.saveToken) {
+    const saved = saveGithubToken(token, options.target);
+    if (saved.actions.length > 0) {
+      printWritePlan(saved.actions);
+    }
+    if (saved.errors.length > 0) {
+      printErrorPanel("GitHub token not saved", saved.errors);
+      printInfo("Continuing with the token for this command only.");
+    }
+  }
+  try {
+    const skills = await runWithSpinner("Searching curated skill hubs", () =>
+      searchRemoteSkills(options.keyword, { token }),
+    );
+    return { skills, token };
+  } catch (error) {
+    printErrorPanel("Skill hub search blocked", [
+      skillHubFailureHelp(error instanceof Error ? error.message : String(error)),
+    ]);
+    return "blocked";
+  }
+}
+
+function skillHubErrorCanUseToken(error: string): boolean {
+  const lowered = error.toLowerCase();
+  return ["rate limit", "http 401", "http 403", "token"].some((needle) => lowered.includes(needle));
 }
 
 async function main(argv: string[]): Promise<number> {

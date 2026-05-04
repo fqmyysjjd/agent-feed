@@ -452,6 +452,29 @@ test("status json reports trusted hash mismatch for changed managed script", () 
   assert.match(JSON.stringify(payload.errors), /\.agents\/scripts\/check-agent-assets\.sh/);
 });
 
+test("preview reports trusted hash mismatch with diff details", () => {
+  const target = mkdtempSync(join(tmpdir(), "agent-feed-node-"));
+  const env = { ...process.env, ...withTrustEnv() };
+  const init = spawnSync(process.execPath, [cliPath, "init", target, "--clients", "none", "--profile", "python"], {
+    encoding: "utf8",
+    env,
+  });
+  assert.equal(init.status, 0, init.stdout + init.stderr);
+
+  const scriptFile = join(target, ".agents", "scripts", "verify-agent-dev.sh");
+  writeFileSync(scriptFile, `${readFileSync(scriptFile, "utf8")}\n# trust drift\n`, "utf8");
+
+  const result = spawnSync(process.execPath, [cliPath, "preview", target], {
+    encoding: "utf8",
+    env,
+  });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /review/);
+  assert.match(result.stdout, /Agent Feed asset changed/);
+  assert.match(result.stdout, /verify-agent-dev\.sh/);
+  assert.match(result.stdout, /trust drift/);
+});
+
 test("check validates session-state handoff cards", () => {
   const target = mkdtempSync(join(tmpdir(), "agent-feed-node-"));
   const env = { ...process.env, ...withTrustEnv() };
@@ -755,6 +778,29 @@ test("skill hub reads saved github token from user config", async () => {
     const token = skillHub.configuredGithubToken(mkdtempSync(join(tmpdir(), "agent-feed-node-")));
     assert.deepEqual(token.errors, []);
     assert.equal(token.token, "saved-token");
+  } finally {
+    if (previous === undefined) {
+      delete process.env.AGENT_FEED_HOME;
+    } else {
+      process.env.AGENT_FEED_HOME = previous;
+    }
+  }
+});
+
+test("skill hub can save github token in user config", async () => {
+  const trustHome = withTrustEnv().AGENT_FEED_HOME;
+  const target = mkdtempSync(join(tmpdir(), "agent-feed-node-"));
+  const skillHub = await import(skillHubModulePath);
+  const previous = process.env.AGENT_FEED_HOME;
+  process.env.AGENT_FEED_HOME = trustHome;
+  try {
+    const saved = skillHub.saveGithubToken("new-token", target);
+    assert.deepEqual(saved.errors, []);
+    assert.equal(saved.actions.length, 1);
+    const config = JSON.parse(readFileSync(join(trustHome, "config.json"), "utf8")) as {
+      settings?: { github_token?: string };
+    };
+    assert.equal(config.settings?.github_token, "new-token");
   } finally {
     if (previous === undefined) {
       delete process.env.AGENT_FEED_HOME;

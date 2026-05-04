@@ -6,11 +6,13 @@ import { type WriteAction } from "./template.js";
 import {
   CONFIG_FILE,
   TRUST_ENV,
+  defaultTrustConfig,
   legacyConfigPath,
   projectLocalConfigErrors,
   readExistingOrLegacyConfig,
   recommendedHome,
   trustConfigPath,
+  writeUserConfig,
 } from "./trust.js";
 import { VERSION } from "./version.js";
 
@@ -259,6 +261,38 @@ export function preferredGithubToken(root: string): { token?: string; warnings: 
   }
   const configured = configuredGithubToken(root);
   return { token: configured.token, warnings: configured.errors };
+}
+
+export function saveGithubToken(token: string, root: string): { actions: WriteAction[]; errors: string[] } {
+  const config = settingsConfigPath(root);
+  if (config.errors.length > 0) {
+    return { actions: [], errors: config.errors };
+  }
+  const existed = existsSync(config.path);
+  const loaded = existed || existsSync(legacyConfigPath(config.path))
+    ? readExistingOrLegacyConfig(config.path)
+    : { state: defaultTrustConfig(), errors: [], usedLegacy: false };
+  if (loaded.errors.length > 0) {
+    return { actions: [], errors: loaded.errors };
+  }
+  const state = loaded.state;
+  if (!state.settings || typeof state.settings !== "object" || Array.isArray(state.settings)) {
+    state.settings = {};
+  }
+  (state.settings as Record<string, unknown>).github_token = token;
+  state.schema_version = 1;
+  state.agent_feed_version = VERSION;
+  writeUserConfig(config.path, state);
+  return {
+    actions: [
+      {
+        path: config.path,
+        action: existed ? "update" : "create",
+        detail: "saved GitHub token in user-level Agent Feed config",
+      },
+    ],
+    errors: [],
+  };
 }
 
 export function skillHubFailureHelp(error: string): string {

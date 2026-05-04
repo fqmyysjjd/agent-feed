@@ -193,6 +193,22 @@ export function printActionResult(options: {
   printBox({ title: options.title, body, color, stream });
 }
 
+export function printPanel(
+  title: string,
+  body: string,
+  options: { kind?: "success" | "warning" | "error" | "info"; stream?: Stream } = {},
+): void {
+  const color =
+    options.kind === "success"
+      ? chalk.green
+      : options.kind === "warning"
+        ? chalk.yellow
+        : options.kind === "error"
+          ? chalk.red
+          : chalk.cyan;
+  printBox({ title, body, color, stream: options.stream });
+}
+
 export function printRecommendedCommand(message: string, value: string, options: { path?: string } = {}): void {
   const pieces = [chalk.bold.cyan(message)];
   if (options.path) {

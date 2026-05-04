@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 import { VERSION } from "./version.js";
 
 const CURRENT_DIR = dirname(fileURLToPath(import.meta.url));
-const TEMPLATE_ROOT = join(CURRENT_DIR, "..", "templates", "standard");
+export const TEMPLATE_ROOT = join(CURRENT_DIR, "..", "templates", "standard");
 
 export type VerificationProfile = "python" | "node" | "custom" | "none";
 

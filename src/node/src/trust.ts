@@ -1,10 +1,11 @@
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { homedir, platform } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 
 import { readFrontmatter } from "./skill-index.js";
-import { type WriteAction, walkFiles } from "./template.js";
+import { TEMPLATE_ROOT, type WriteAction, unifiedDiff, walkFiles } from "./template.js";
 import { VERSION } from "./version.js";
 
 export const TRUST_ENV = "AGENT_FEED_HOME";
@@ -265,6 +266,32 @@ export function assetTrustErrors(root: string, kinds?: Set<string>): string[] {
   );
 }
 
+export function trustPreviewActions(root: string): WriteAction[] {
+  const report = checkAssetTrust(root);
+  if (report.errors.length > 0) {
+    return report.errors.map((error) => ({
+      path: root,
+      action: "blocked",
+      detail: error,
+    }));
+  }
+  if (report.missingState) {
+    return [
+      {
+        path: report.configPath ?? root,
+        action: "review",
+        detail: "missing external trust state; run agent-feed index-skills -y after review",
+      },
+    ];
+  }
+  return report.issues.map((issue) => ({
+    path: join(root, issue.path),
+    action: "review",
+    detail: "Agent Feed asset changed; highest-priority rule requires stopping",
+    diff: assetDiff(root, issue.path) || `${issue.path}: current content does not match trusted Agent Feed state.`,
+  }));
+}
+
 export function checkAssetTrust(
   root: string,
   kinds?: Set<string>,
@@ -315,6 +342,39 @@ export function checkAssetTrust(
     }
   }
   return { configPath: config.path, missingState: false, issues, errors: [] };
+}
+
+function assetDiff(root: string, relPath: string): string {
+  const gitDiff = gitCommand(root, ["diff", "--", relPath]);
+  if (gitDiff) {
+    return gitDiff;
+  }
+  const stagedDiff = gitCommand(root, ["diff", "--cached", "--", relPath]);
+  if (stagedDiff) {
+    return stagedDiff;
+  }
+
+  const currentFile = join(root, relPath);
+  const templateFile = join(TEMPLATE_ROOT, relPath);
+  if (existsSync(currentFile) && existsSync(templateFile)) {
+    return unifiedDiff(
+      relPath,
+      readFileSync(currentFile, "utf8"),
+      readFileSync(templateFile, "utf8"),
+    );
+  }
+  return "";
+}
+
+function gitCommand(root: string, args: string[]): string {
+  try {
+    return execFileSync("git", ["-C", root, ...args], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+  } catch {
+    return "";
+  }
 }
 
 export function readExistingOrLegacyConfig(configPath: string): { state: TrustState; errors: string[]; usedLegacy: boolean } {
