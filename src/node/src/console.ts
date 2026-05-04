@@ -104,11 +104,19 @@ export function printCheckReport(report: CheckReport, options: { asJson: boolean
   printNextStep(checkNextStep(report.errors, report.warnings), report.ok ? "stdout" : "stderr");
 }
 
-export function printConfigCheckReport(report: ConfigCheckReport): void {
-  if (report.errors.length === 0 && report.warnings.length === 0) {
+export function printConfigCheckReport(report: ConfigCheckReport, options: { asJson?: boolean } = {}): void {
+  if (options.asJson) {
+    stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+    return;
+  }
+  if (report.ok && report.warnings.length === 0) {
     printBox({
       title: "Agent Feed",
-      body: chalk.bold.green("Config checks passed"),
+      body: [
+        chalk.bold.green("Config checks passed"),
+        `${chalk.dim("Project")} ${displayPath(report.project_config)}`,
+        `${chalk.dim("User")}    ${report.user_config ? displayPath(report.user_config) : "not configured"}`,
+      ].join("\n"),
       color: chalk.green,
     });
     return;

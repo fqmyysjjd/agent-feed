@@ -19,7 +19,37 @@ function escapeRegExp(value: string): string {
 test("version command works", () => {
   const result = spawnSync(process.execPath, [cliPath, "--version"], { encoding: "utf8" });
   assert.equal(result.status, 0);
-  assert.match(result.stdout, /1\.0\.0/);
+  assert.match(result.stdout, /agent-feed 1\.0\.0/);
+  assert.match(result.stdout, /executable:/);
+  assert.match(result.stdout, /package:/);
+});
+
+test("hidden compatibility aliases work", () => {
+  const version = spawnSync(process.execPath, [cliPath, "version"], { encoding: "utf8" });
+  assert.equal(version.status, 0);
+  assert.match(version.stdout, /agent-feed 1\.0\.0/);
+
+  const target = mkdtempSync(join(tmpdir(), "agent-feed-node-"));
+  const env = { ...process.env, ...withTrustEnv() };
+  const init = spawnSync(process.execPath, [cliPath, "i", target, "--profile", "python", "--clients", "none"], {
+    encoding: "utf8",
+    env,
+  });
+  assert.equal(init.status, 0, init.stdout + init.stderr);
+
+  const sync = spawnSync(process.execPath, [cliPath, "s", target, "--clients", "cursor", "--dry-run"], {
+    encoding: "utf8",
+    env,
+  });
+  assert.equal(sync.status, 0, sync.stdout + sync.stderr);
+  assert.match(sync.stdout, /\.cursor\/rules\/agent-feed\.mdc/);
+
+  const check = spawnSync(process.execPath, [cliPath, "c", target, "--checks", "structure", "--json"], {
+    encoding: "utf8",
+    env,
+  });
+  assert.equal(check.status, 0, check.stdout + check.stderr);
+  assert.equal(JSON.parse(check.stdout).ok, true);
 });
 
 test("init dry-run prints planned files", () => {
@@ -117,6 +147,12 @@ test("sync dry-run previews adapter writes", () => {
   assert.equal(result.status, 0, result.stdout + result.stderr);
   assert.match(result.stdout, /\.claude\/skills/);
   assert.match(result.stdout, /\.cursor\/rules\/agent-feed\.mdc/);
+
+  const conflict = spawnSync(process.execPath, [cliPath, "sync", target, "-a", "--clients", "cursor", "--dry-run"], {
+    encoding: "utf8",
+  });
+  assert.equal(conflict.status, 3);
+  assert.match(conflict.stderr, /use either -a\/--all or --clients/);
 });
 
 test("sync dry-run can preview adapters before init", () => {
@@ -568,6 +604,13 @@ test("config get reads project config values", () => {
   });
   assert.equal(result.status, 0, result.stdout + result.stderr);
   assert.match(result.stdout, /python/);
+
+  const jsonResult = spawnSync(process.execPath, [cliPath, "config", "get", "verification_profile", "--path", target, "--json"], {
+    encoding: "utf8",
+    env,
+  });
+  assert.equal(jsonResult.status, 0, jsonResult.stdout + jsonResult.stderr);
+  assert.equal(JSON.parse(jsonResult.stdout), "python");
 });
 
 test("config check warns about stale user-level project entries", () => {
@@ -588,6 +631,18 @@ test("config check warns about stale user-level project entries", () => {
   const result = spawnSync(process.execPath, [cliPath, "config", "check", "--path", target], { encoding: "utf8", env });
   assert.equal(result.status, 0, result.stdout + result.stderr);
   assert.match(result.stderr, /stale project entry/);
+
+  const jsonResult = spawnSync(process.execPath, [cliPath, "config", "check", "--path", target, "--json"], {
+    encoding: "utf8",
+    env,
+  });
+  assert.equal(jsonResult.status, 0, jsonResult.stdout + jsonResult.stderr);
+  const payload = JSON.parse(jsonResult.stdout);
+  assert.equal(payload.ok, true);
+  assert.equal(payload.target, target);
+  assert.match(payload.project_config, /\.agents\/agent-feed\.json$/);
+  assert.match(payload.user_config, /config\.json$/);
+  assert.match(JSON.stringify(payload), /stale project entry/);
 });
 
 test("config prune requires -y and removes stale entries", () => {

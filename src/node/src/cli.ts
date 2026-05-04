@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { existsSync, statSync } from "node:fs";
-import { basename, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { basename, dirname, join, resolve } from "node:path";
 
 import ora from "ora";
 
@@ -92,26 +93,32 @@ function printHelp(): void {
   console.log(`Agent Feed ${VERSION}
 
 Usage:
-  agent-feed init [path] [--clients all|none|codex,claude,cursor] [--profile python|node|custom|none] [--env-home path] [--dry-run] [-y]
-  agent-feed sync [path] [-a|--all] [--clients all|none|codex,claude,cursor] [--dry-run] [--force-generated]
-  agent-feed preview [path] [--clients all|none|codex,claude,cursor] [--profile python|node|custom|none]
-  agent-feed upgrade [path] [--clients all|none|codex,claude,cursor] [--dry-run]
+  agent-feed init [path] [--clients all|none|codex,claude,cursor] [--profile python|node|custom|none] [--project-name name] [--env-home path] [--dry-run] [-y] [--no-input] [--force-generated]
+  agent-feed sync [path] [-a|--all] [--clients all|none|codex,claude,cursor] [--dry-run] [--force-generated] [--no-input]
+  agent-feed preview [path] [--clients all|none|codex,claude,cursor] [--profile python|node|custom|none] [--project-name name]
+  agent-feed upgrade [path] [--clients all|none|codex,claude,cursor] [--project-name name] [--dry-run] [-y] [--no-input]
   agent-feed uninstall [path] [--dry-run] [-y] [--no-input]
   agent-feed check [path] [--checks ...|--only ...] [--clients ...] [-a|--all] [--json] [--no-input]
   agent-feed status [path] [--json]
-  agent-feed config get [key] [--path path]
+  agent-feed config get [key] [--path path] [--json]
   agent-feed config set <key> <value> [--path path] [--dry-run]
-  agent-feed config check [--path path]
+  agent-feed config check [--path path] [--json]
   agent-feed config prune [--dry-run] [-y] [--no-input]
   agent-feed env status [path]
   agent-feed env setup [path] [--home path] [--shell auto|zsh|bash|fish|powershell] [--force] [--dry-run]
   agent-feed env print [--home path] [--shell auto|zsh|bash|fish|powershell]
   agent-feed env uninstall [--home path] [--shell auto|zsh|bash|fish|powershell] [--remove-home] [--dry-run] [-y] [--no-input]
   agent-feed index-skills [path] [--dry-run] [-y]
-  agent-feed skill-hub [path] [--keyword keyword] [--dry-run] [--save-token|--no-save-token] [--no-input]
+  agent-feed skill-hub [path] [-k|--keyword keyword] [--dry-run] [--save-token|--no-save-token] [--no-input]
   agent-feed --version
   agent-feed --help
 `);
+}
+
+function printVersion(): void {
+  console.log(`agent-feed ${VERSION}`);
+  console.log(`executable: ${resolve(process.argv[1] ?? "agent-feed")}`);
+  console.log(`package: ${dirname(fileURLToPath(import.meta.url))}`);
 }
 
 function printCommandHelp(command: string): void {
@@ -140,7 +147,7 @@ Show init writes or installed-project upgrade diffs without changing files.
     upgrade: `Agent Feed ${VERSION}
 
 Usage:
-  agent-feed upgrade [path] [--clients all|none|codex,claude,cursor] [--dry-run]
+  agent-feed upgrade [path] [--clients all|none|codex,claude,cursor] [--dry-run] [-y] [--no-input]
 
 Refresh managed Agent Feed assets without overwriting project/domain files.
 `,
@@ -168,9 +175,9 @@ Show a compact health and managed-drift summary.
     config: `Agent Feed ${VERSION}
 
 Usage:
-  agent-feed config get [key] [--path path]
+  agent-feed config get [key] [--path path] [--json]
   agent-feed config set <key> <value> [--path path] [--dry-run]
-  agent-feed config check [--path path]
+  agent-feed config check [--path path] [--json]
   agent-feed config prune [--dry-run] [-y] [--no-input]
 
 Read, validate, or update Agent Feed project config and user-level trust config.
@@ -195,12 +202,25 @@ Regenerate .agents/skills/README.md and refresh external trust state.
     "skill-hub": `Agent Feed ${VERSION}
 
 Usage:
-  agent-feed skill-hub [path] [--keyword keyword] [--dry-run] [--save-token|--no-save-token] [--no-input]
+  agent-feed skill-hub [path] [-k|--keyword keyword] [--dry-run] [--save-token|--no-save-token] [--no-input]
 
 Search curated public skill hubs and install matched skills.
 `,
   };
   console.log(help[command] ?? `Unknown command: ${command}`);
+}
+
+function normalizeCommandAlias(command: string | undefined, rest: string[]): { command: string | undefined; rest: string[] } {
+  if (command === "i") {
+    return { command: "init", rest };
+  }
+  if (command === "s") {
+    return { command: "sync", rest: rest.includes("--no-input") ? rest : [...rest, "--no-input"] };
+  }
+  if (command === "c") {
+    return { command: "check", rest: rest.includes("--no-input") ? rest : [...rest, "--no-input"] };
+  }
+  return { command, rest };
 }
 
 function parsePath(arg?: string): string {
@@ -598,6 +618,9 @@ async function parseCheckSelection(args: ParsedArgs): Promise<CheckName[]> {
 
 async function parseSyncClients(args: ParsedArgs): Promise<Client[]> {
   const raw = optionString(args.options, "--clients");
+  if (args.options.has("--all") && raw) {
+    throw new Error("use either -a/--all or --clients, not both");
+  }
   if (args.options.has("--all") || raw || args.options.has("--no-input")) {
     return parseClients(raw, args.options.has("--all"), ALL_CLIENTS);
   }
@@ -811,18 +834,20 @@ async function configCommand(args: string[]): Promise<number> {
   const parsed = parseArgs(rest);
   const target = parsePath(optionString(parsed.options, "--path") ?? parsed.path);
   if (subcommand === "get") {
+    const asJson = parsed.options.has("--json");
     const result = getConfigValue(target, parsed.path);
     if (result.errors.length > 0) {
       printErrorPanel("Config read blocked", result.errors);
       return 3;
     }
-    console.log(typeof result.value === "string" ? result.value : JSON.stringify(result.value, null, 2));
+    console.log(asJson || typeof result.value !== "string" ? JSON.stringify(result.value, null, 2) : result.value);
     return 0;
   }
   if (subcommand === "check") {
+    const asJson = parsed.options.has("--json");
     const report = checkConfig(target);
-    printConfigCheckReport(report);
-    return report.errors.length === 0 ? 0 : 1;
+    printConfigCheckReport(report, { asJson });
+    return report.ok ? 0 : 1;
   }
   if (subcommand === "prune") {
     const dryRun = parsed.options.has("--dry-run");
@@ -1490,8 +1515,7 @@ function skillHubErrorCanUseToken(error: string): boolean {
 
 async function main(argv: string[]): Promise<number> {
   const [first, ...rest] = argv;
-  let command = first;
-  let commandRest = [...rest];
+  let { command, rest: commandRest } = normalizeCommandAlias(first, [...rest]);
 
   if (!command) {
     if (canPrompt()) {
@@ -1510,8 +1534,8 @@ async function main(argv: string[]): Promise<number> {
     printHelp();
     return 0;
   }
-  if (command === "--version" || command === "-v") {
-    console.log(VERSION);
+  if (command === "--version" || command === "-v" || command === "version") {
+    printVersion();
     return 0;
   }
 
@@ -1537,37 +1561,37 @@ async function main(argv: string[]): Promise<number> {
     const parsed = parseArgs(commandRest);
     const target = parsePath(parsed.path);
     if (command === "config") {
-      return configCommand(commandRest);
+      return await configCommand(commandRest);
     }
     if (command === "env") {
-      return envCommand(commandRest);
+      return await envCommand(commandRest);
     }
     if (command === "index-skills") {
       return indexSkillsCommand(target, parsed);
     }
     if (command === "skill-hub") {
-      return skillHubCommand(target, parsed);
+      return await skillHubCommand(target, parsed);
     }
     if (command === "init") {
-      return initCommand(target, parsed);
+      return await initCommand(target, parsed);
     }
     if (command === "sync") {
-      return syncCommand(target, parsed);
+      return await syncCommand(target, parsed);
     }
     if (command === "preview") {
       return previewCommand(target, parsed);
     }
     if (command === "upgrade") {
-      return upgradeCommand(target, parsed);
+      return await upgradeCommand(target, parsed);
     }
     if (command === "uninstall") {
       return uninstallCommand(target, parsed);
     }
     if (command === "check") {
-      return checkCommand(target, parsed);
+      return await checkCommand(target, parsed);
     }
     if (command === "status") {
-      return statusCommand(target, parsed);
+      return await statusCommand(target, parsed);
     }
     printHelp();
     return 1;

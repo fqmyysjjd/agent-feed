@@ -27,6 +27,10 @@ import {
 const METADATA_PATH = ".agents/agent-feed.json";
 
 export type ConfigCheckReport = {
+  target: string;
+  project_config: string;
+  user_config: string | null;
+  ok: boolean;
   errors: string[];
   warnings: string[];
 };
@@ -152,6 +156,8 @@ export function applyConfigEffects(root: string, dryRun: boolean): { actions: Wr
 export function checkConfig(root: string): ConfigCheckReport {
   const errors: string[] = [];
   const warnings: string[] = [];
+  const projectConfig = join(root, METADATA_PATH);
+  let userConfig: string | null = null;
   const read = readConfig(root);
   if (read.errors.length > 0) {
     errors.push(...read.errors);
@@ -162,6 +168,7 @@ export function checkConfig(root: string): ConfigCheckReport {
   if (config.errors.length > 0) {
     errors.push(...config.errors);
   } else if (config.path) {
+    userConfig = config.path;
     errors.push(...projectLocalConfigErrors(root, config.path));
     if (existsSync(config.path) || existsSync(config.path.replace(/config\.json$/, "agent-feed.json"))) {
       errors.push(...validateUserConfigShape(config.path));
@@ -176,7 +183,14 @@ export function checkConfig(root: string): ConfigCheckReport {
       warnings.push(`${stale.configPath}: stale project entry points to missing directory ${staleRoot}`);
     }
   }
-  return { errors, warnings };
+  return {
+    target: root,
+    project_config: projectConfig,
+    user_config: userConfig,
+    ok: errors.length === 0,
+    errors,
+    warnings,
+  };
 }
 
 export function pruneConfig(dryRun: boolean): { actions: WriteAction[]; errors: string[] } {
