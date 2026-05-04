@@ -94,6 +94,17 @@ For local development from this checkout:
 uv run agent-feed
 ```
 
+## 🤝 Start AI-Assisted Development
+
+After initialization, open your AI coding assistant in the repository and begin with the following task prompt:
+
+```text
+First, review the development guidelines for the project, and then, start to carry out our tasks:
+
+1. [Describe the first concrete result you want to achieve]
+2. [Describe the second concrete result you want to achieve]
+```
+
 ## ⚙️ How It Works
 
 ### Instruction In. Verified Handoff Out.

@@ -130,7 +130,11 @@ export function applyConfigEffects(root: string, dryRun: boolean): { actions: Wr
   actions.push(...skills.actions);
   errors.push(...skills.errors);
 
-  const adapters = syncClients(root, installedClients(root), dryRun);
+  const adapters = syncClients(root, installedClients(root), {
+    dryRun,
+    forceGenerated: true,
+    pruneGenerated: false,
+  });
   actions.push(...adapters.actions);
   errors.push(...adapters.errors);
 
