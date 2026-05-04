@@ -143,6 +143,7 @@ agent-feed sync -a         # 更新所有支持的客户端适配器
 agent-feed index-skills    # 在修改/导入技能后，重新生成技能索引
 agent-feed skill-hub       # 浏览并导入官方精选的公共技能，打造团队专属工作流
 agent-feed config check    # 校验项目级与用户级的配置
+agent-feed config prune    # 清理用户级配置里的失效项目记录
 agent-feed --help          # 查看完整的 CLI 命令帮助
 ```
 *(所有路径参数均可省略。省略时，默认在当前目录下执行。)*
@@ -157,10 +158,14 @@ agent-feed --help          # 查看完整的 CLI 命令帮助
 ## 📂 仓库导览
 
 ```txt
-src/agent_feed/              # CLI 工具、检查器、提示词、适配器、信任机制及设置逻辑
-src/agent_feed/templates/    # 标准生成的协议模板
+src/python/agent_feed/       # Python CLI、检查器、提示词、适配器、信任机制及设置逻辑
+src/node/                    # TypeScript npm CLI 实现
+src/templates/               # Python 和 Node 共享的标准协议模板
+package.json                 # npm 包发布契约
+tsconfig.json                # TypeScript 构建契约
 docs/                        # 公开的协议与模板文档
 examples/                    # 生成输出示例及真实协议示例
-tests/                       # CLI 行为与协议回归测试覆盖
+tests/python/                # Python CLI 行为与协议回归测试覆盖
+tests/node/                  # Node CLI 行为测试覆盖
 .agents/                     # 本仓库自身的 Agent 开发协议
 ```

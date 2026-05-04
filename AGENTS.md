@@ -1,4 +1,4 @@
-# Agent Feed AI Development Instructions
+# agent-feed AI Development Instructions
 
 `AGENTS.md` is the repository-level entry contract for AI-assisted development.
 

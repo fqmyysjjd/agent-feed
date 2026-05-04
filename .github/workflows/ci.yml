@@ -73,3 +73,34 @@ jobs:
           uv run agent-feed --version
           uv run agent-feed --help
           uv run agent-feed init --help
+
+  node:
+    name: Node CLI / Node ${{ matrix.node-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version:
+          - "20"
+          - "24"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build package
+        run: npm run build:all
+
+      - name: Test package
+        run: npm run check
+
+      - name: Check npm package contents
+        run: npm run pack:dry-run

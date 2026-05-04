@@ -2,7 +2,7 @@
   "schema_version": 1,
   "agent_feed_version": "1.0.0",
   "template": "standard",
-  "project_name": "Agent Feed",
+  "project_name": "agent-feed",
   "verification_profile": "python",
   "settings": {
     "session_state": {

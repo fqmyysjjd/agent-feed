@@ -109,7 +109,7 @@ Supported settings:
 3. `settings.skills.default_import_trust`: fallback `trust` for skills missing that frontmatter. Supported project-configurable values are `custom` and `reviewed`.
 4. `settings.claude.required_snippets`: required references for a user-owned `CLAUDE.md`.
 
-Change these values with `agent-feed config set KEY VALUE`; the command also regenerates affected managed assets, refreshes the skill index, updates external trust state, and runs the same health checks exposed by `agent-feed config check`.
+Change these values with `agent-feed config set KEY VALUE`; the command also regenerates affected managed assets, refreshes the skill index, updates external trust state, and runs the same health checks exposed by `agent-feed config check`. If user-level trust metadata contains project roots that no longer exist, run `agent-feed config prune` to remove those stale records without changing project files.
 
 ### Cursor
 

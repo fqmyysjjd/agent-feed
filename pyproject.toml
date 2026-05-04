@@ -72,12 +72,14 @@ python_version = "3.11"
 strict = true
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/agent_feed"]
+packages = ["src/python/agent_feed"]
+force-include = { "src/templates/standard" = "agent_feed/templates/standard" }
 
 [tool.hatch.build.targets.sdist]
 only-include = [
   "/LICENSE",
   "/README.md",
   "/pyproject.toml",
-  "/src/agent_feed",
+  "/src/python/agent_feed",
+  "/src/templates/standard",
 ]

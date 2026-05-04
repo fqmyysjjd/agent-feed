@@ -143,6 +143,7 @@ agent-feed sync -a         # update all supported client adapters
 agent-feed index-skills    # regenerate the skill index after local or imported skill changes
 agent-feed skill-hub       # browse and import curated public skills for team-specific workflows
 agent-feed config check    # validate project and user-level config
+agent-feed config prune    # remove stale user-level project records
 agent-feed --help          # full CLI reference
 ```
 
@@ -158,10 +159,14 @@ All path arguments are optional. When omitted, commands operate on the current d
 ## 📂 Repository Tour
 
 ```txt
-src/agent_feed/              CLI, checks, prompts, adapters, trust, and settings logic
-src/agent_feed/templates/    canonical generated protocol template
+src/python/agent_feed/       Python CLI, checks, prompts, adapters, trust, and settings logic
+src/node/                    TypeScript npm CLI implementation
+src/templates/               canonical generated protocol template shared by both runtimes
+package.json                 npm package contract
+tsconfig.json                TypeScript build contract
 docs/                        public protocol and template docs
 examples/                    generated output and live protocol examples
-tests/                       CLI behavior and protocol regression coverage
+tests/python/                Python CLI behavior and protocol regression coverage
+tests/node/                  Node CLI behavior coverage
 .agents/                     development protocol for this repository itself
 ```

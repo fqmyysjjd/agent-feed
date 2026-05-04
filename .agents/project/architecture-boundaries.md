@@ -6,13 +6,13 @@ Agent Feed is a local CLI and template package for installing AI engineering pro
 
 ## Non-Negotiable Boundaries
 
-1. `agent-feed` is the CLI entry point and must remain usable with standard Python packaging.
-2. `src/agent_feed/templates/standard/` is the canonical source for generated protocol assets.
+1. `agent-feed` is the CLI entry point and must remain usable with standard Python packaging and npm global installation.
+2. `src/templates/standard/` is the canonical source for generated protocol assets shared by both runtimes.
 3. Generated client folders such as `.codex/` and `.claude/` are mirrors, not canonical sources.
 4. The installed CLI must not require network access for `init`, `check`, `sync`, `status`, `preview`, or `upgrade`.
 5. The standard template must keep reusable rules separate from project-specific constraints.
 6. The standard template must not hard-code Fast Agent runtime product constraints.
-7. The root `.agents/` directory is for developing this CLI project; template `.agents/` files live under `src/agent_feed/templates/standard/`.
+7. The root `.agents/` directory is for developing this CLI project; template `.agents/` files live under `src/templates/standard/`.
 
 ## Stop Rules
 

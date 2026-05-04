@@ -1712,6 +1712,43 @@ def test_config_check_warns_for_stale_external_project_entries(tmp_path: Path) -
     assert "stale project entry" in result.output
     assert "directory" in result.output
     assert "deleted-project" in result.output
+    assert "agent-feed config prune" in result.output
+
+
+def test_config_prune_removes_stale_external_project_entries(tmp_path: Path) -> None:
+    init_result = invoke(["init", str(tmp_path), "--project-name", "Example", "--profile", "python"], tmp_path)
+    assert init_result.exit_code == 0, init_result.output
+
+    config_path = trust_config_path(tmp_path)
+    state = json.loads(config_path.read_text(encoding="utf-8"))
+    stale_root = tmp_path.parent / "deleted-project"
+    state["projects"][str(stale_root)] = {
+        "project_root": str(stale_root),
+        "project_name": "Deleted Project",
+        "assets": {},
+    }
+    config_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+
+    blocked = invoke(["config", "prune", "--no-input"], tmp_path)
+    assert blocked.exit_code == 3, blocked.output
+    assert "agent-feed config prune -y" in blocked.output
+    assert str(stale_root) in json.loads(config_path.read_text(encoding="utf-8"))["projects"]
+
+    dry_run = invoke(["config", "prune", "--dry-run"], tmp_path)
+    assert dry_run.exit_code == 0, dry_run.output
+    assert "would update" in dry_run.output
+    assert str(stale_root) in json.loads(config_path.read_text(encoding="utf-8"))["projects"]
+
+    result = invoke(["config", "prune", "-y"], tmp_path)
+    assert result.exit_code == 0, result.output
+    assert "Stale Project Entries" in result.output
+    assert "Stale project entries removed" in result.output
+    updated = json.loads(config_path.read_text(encoding="utf-8"))
+    assert str(stale_root) not in updated["projects"]
+
+    clean = invoke(["config", "prune", "-y"], tmp_path)
+    assert clean.exit_code == 0, clean.output
+    assert "No stale project entries found" in clean.output
 
 
 def test_skill_body_change_reports_trust_drift_without_reindex(

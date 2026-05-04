@@ -1,0 +1,52 @@
+{
+  "name": "agent-feed",
+  "version": "1.0.0",
+  "description": "Repository-owned workflow governance for AI coding agents.",
+  "license": "MIT",
+  "homepage": "https://github.com/fqmyysjjd/agent-feed",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fqmyysjjd/agent-feed.git"
+  },
+  "bugs": {
+    "url": "https://github.com/fqmyysjjd/agent-feed/issues"
+  },
+  "type": "module",
+  "bin": {
+    "agent-feed": "./dist-node/src/cli.js"
+  },
+  "files": [
+    "dist-node/src/",
+    "dist-node/templates/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "build:tests": "tsc -p tsconfig.tests.json",
+    "check": "node dist-node-tests/tests/node/cli.test.js",
+    "prepare:templates": "node ./dist-node/src/copy-templates.js",
+    "build:all": "npm run build && npm run build:tests && npm run prepare:templates",
+    "pack:dry-run": "npm pack --dry-run --cache .npm-pack-cache"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "@types/node": "^24.6.0",
+    "typescript": "^5.9.3"
+  },
+  "keywords": [
+    "agents",
+    "agents-md",
+    "ai-agents",
+    "ai-coding",
+    "ai-development",
+    "ai-engineering",
+    "claude-code",
+    "codex",
+    "cursor",
+    "developer-tools",
+    "workflow-governance"
+  ]
+}

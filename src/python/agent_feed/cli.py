@@ -725,6 +725,54 @@ def config_check_cmd(
         raise typer.Exit(1)
 
 
+@config_app.command("prune")
+def config_prune_cmd(
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Preview stale project cleanup without writing files."),
+    ] = False,
+    yes: Annotated[
+        bool,
+        typer.Option(
+            "-y",
+            help="Remove stale project records with defaults; do not ask for confirmation.",
+        ),
+    ] = False,
+    no_input: Annotated[
+        bool,
+        typer.Option("--no-input", help="Never prompt; fail instead of asking for input."),
+    ] = False,
+) -> None:
+    """Remove stale project records from the user-level Agent Feed config."""
+    actions, errors = prune_missing_project_entries(
+        dry_run=dry_run,
+        yes=yes,
+        no_input=no_input,
+    )
+    if errors:
+        _print_errors("Config prune blocked", errors)
+        raise typer.Exit(3)
+    if actions:
+        print_write_plan(actions)
+    if dry_run:
+        console.print("[cyan]agent-feed: config prune preview complete; no files changed[/cyan]")
+        return
+    if not actions:
+        print_action_result(
+            title="Config Prune",
+            message="No stale project entries found",
+            kind="success",
+            detail="The user-level Agent Feed config is already clean.",
+        )
+        return
+    print_action_result(
+        title="Config Prune",
+        message="Stale project entries removed",
+        kind="success",
+        detail="Only user-level trust metadata was changed; project files were not touched.",
+    )
+
+
 @config_app.command("set")
 def config_set_cmd(
     key: Annotated[
@@ -2029,6 +2077,35 @@ def maybe_cleanup_missing_project_entries(*, dry_run: bool) -> tuple[list[WriteA
     print_stale_project_cleanup(stale_entries.config_file, stale_entries.project_roots)
     if not prompt_confirm("Remove these stale project records from the user-level config?", True):
         return [], []
+    return cleanup_missing_project_entries(dry_run=False)
+
+
+def prune_missing_project_entries(
+    *,
+    dry_run: bool,
+    yes: bool,
+    no_input: bool,
+) -> tuple[list[WriteAction], list[str]]:
+    stale_entries, errors = missing_project_entries()
+    if errors:
+        return [], errors
+    if stale_entries is None:
+        return [], []
+
+    print_stale_project_cleanup(stale_entries.config_file, stale_entries.project_roots)
+    actions, errors = cleanup_missing_project_entries(dry_run=True)
+    if errors:
+        return [], errors
+    if dry_run:
+        return actions, []
+    if not yes:
+        if no_input or not can_prompt():
+            return [], [
+                "stale project entries found; rerun `agent-feed config prune -y` "
+                "to remove them without prompting"
+            ]
+        if not prompt_confirm("Remove these stale project records from the user-level config?", True):
+            return [], []
     return cleanup_missing_project_entries(dry_run=False)
 
 

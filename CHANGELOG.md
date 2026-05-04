@@ -9,10 +9,12 @@ This project uses semantic versioning. Patch releases preserve the public comman
 ### Added
 
 - GitHub Actions CI for tests, linting, type checking, package build, and CLI smoke checks.
+- GitHub Release publishing workflow for PyPI and npm.
 - GitHub issue templates and pull request template.
 - Contribution and security policies.
 - Code of Conduct.
 - Basic generated-output example for first-time repository visitors.
+- TypeScript npm CLI implementation for `npm install -g agent-feed`.
 
 ### Changed
 
