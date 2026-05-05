@@ -28,7 +28,7 @@
   <a href="#-problems-it-solves">Problems</a> ·
   <a href="#-quick-start">Quick Start</a> ·
   <a href="#-how-it-works">How It Works</a> ·
-  <a href="https://github.com/fqmyysjjd/agent-feed/blob/main/docs/ai-protocol-usage-guide.md">Usage Guide</a> ·
+  <a href="https://github.com/fqmyysjjd/agent-feed/blob/main/docs/usage-guide.md">Usage Guide</a> ·
   <a href="#-common-commands">Commands</a> ·
   <a href="#-documentation">Docs</a>
 </p>
@@ -40,6 +40,11 @@
 Agent Feed installs `AGENTS.md` plus a standardized `.agents/` protocol into your repository, giving Codex, Claude Code, Cursor, verification, review, and handoff one unified source of truth. Teams can then extend that foundation without changing the core protocol by layering in project-specific constraints, domain knowledge, and imported skills from `skill-hub`.
 
 No more drifting conversations, scope creep, invented architecture decisions, or lost context after compression.
+
+<p align="center">
+  <strong><a href="https://github.com/fqmyysjjd/agent-feed/blob/main/docs/usage-guide.md">Read the Usage Guide</a></strong><br>
+  <sub>Setup, first AI prompt, project/domain customization, skill imports, upgrades, and troubleshooting.</sub>
+</p>
 
 ## 💡  Why You'll Feel The Difference
 
@@ -167,7 +172,7 @@ All path arguments are optional. When omitted, commands operate on the current d
 ## 📚 Documentation
 
 - **[AI Development Protocol Flow](https://github.com/fqmyysjjd/agent-feed/blob/main/docs/ai-development-protocol-flow.md)**: the full governance loop, trigger points, file responsibilities, and pain points solved.
-- **[AI Protocol Usage Guide](https://github.com/fqmyysjjd/agent-feed/blob/main/docs/ai-protocol-usage-guide.md)**: how to use, customize, index, and maintain repository-specific AI rules.
+- **[Agent Feed Usage Guide](https://github.com/fqmyysjjd/agent-feed/blob/main/docs/usage-guide.md)**: practical setup, daily workflow, customization, skills, upgrades, and troubleshooting.
 - **[Template Model](https://github.com/fqmyysjjd/agent-feed/blob/main/docs/template-model.md)**: canonical structure, adapters, skill index, project settings, and trust-state ownership.
 - [Basic Generated Output](https://github.com/fqmyysjjd/agent-feed/blob/main/examples/basic-output.md): the directory layout created by `agent-feed init`.
 - [Live Protocol Example](https://github.com/fqmyysjjd/agent-feed/blob/main/examples/live-protocol/README.md): the real `AGENTS.md`, `CLAUDE.md`, `.agents/project/`, `.agents/domain/`, and skill index used to develop this repository.

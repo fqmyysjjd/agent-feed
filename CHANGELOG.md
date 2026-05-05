@@ -4,6 +4,17 @@ All notable changes to Agent Feed are tracked here.
 
 This project uses semantic versioning. Patch releases preserve the public command surface and generated-template contracts unless the changelog calls out a migration.
 
+## 1.1.0 - 2026-05-05
+
+### Added
+
+- Added a practical Agent Feed usage guide covering setup, first AI prompts, project/domain customization, skill management, upgrades, and troubleshooting.
+- Added user-facing prompt examples for bootstrapping project/domain rules from templates, migrating legacy AI instructions from `.feed-backup/`, and keeping project/domain README indexes current.
+
+### Changed
+
+- Moved the usage guide to `docs/usage-guide.md` and made it prominent in the English and Chinese README hero sections.
+
 ## 1.0.1 - 2026-05-05
 
 ### Fixed

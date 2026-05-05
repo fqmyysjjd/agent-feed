@@ -28,7 +28,7 @@
   <a href="#-解决的核心痛点">痛点</a> ·
   <a href="#-快速开始">快速开始</a> ·
   <a href="#️-工作原理">工作原理</a> ·
-  <a href="docs/ai-protocol-usage-guide.md">使用手册</a> ·
+  <a href="docs/usage-guide.md">使用手册</a> ·
   <a href="#-常用命令">命令</a> ·
   <a href="#-文档导航">文档</a>
 </p>
@@ -40,6 +40,11 @@
 Agent Feed 会在你的代码仓库中安装 `AGENTS.md` 以及标准化的 `.agents/` 协议，为 Codex、Claude Code、Cursor、代码验证、代码审查以及会话交接提供**唯一事实来源 (Single Source of Truth)**。团队可以在此基础之上，叠加项目特定的约束、领域知识，或通过 `skill-hub` 导入外部技能，而无需修改核心协议。
 
 告别跑偏的对话、失控的需求膨胀、凭空捏造的架构决策，以及长对话压缩后丢失的核心上下文。
+
+<p align="center">
+  <strong><a href="docs/usage-guide.md">阅读使用手册</a></strong><br>
+  <sub>安装初始化、首次 AI 提示词、项目/领域定制、技能导入、升级和排查。</sub>
+</p>
 
 ## 💡 为什么你会感受到前所未有的不同
 
@@ -166,7 +171,7 @@ agent-feed --help          # 查看完整的 CLI 命令帮助
 ## 📚 文档导航
 
 - **[AI Development Protocol Flow (协议工作流解析)](docs/ai-development-protocol-flow.md)**：端到端的 AI 治理循环、触发点、文件职责以及解决的痛点。
-- **[AI Protocol Usage Guide (协议使用维护手册)](docs/ai-protocol-usage-guide.md)**：如何使用、定制、索引和维护仓库级 AI 规范。
+- **[Agent Feed Usage Guide (使用手册)](docs/usage-guide.md)**：实际安装、初始化、日常工作流、定制规则、技能、升级和排查。
 - **[Template Model (模板模型)](docs/template-model.md)**：标准目录结构、适配器边界、技能索引、项目设置以及信任状态归属。
 - [Basic Generated Output (基础生成示例)](examples/basic-output.md)：`agent-feed init` 初始化的目录结构示例。
 - [Live Protocol Example (真实协议示例)](examples/live-protocol/README.md)：开发本仓库时实际使用的 `AGENTS.md`、`CLAUDE.md`、项目规则及技能索引。
