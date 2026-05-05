@@ -59,7 +59,7 @@ jobs:
       - pypi
     environment:
       name: npm
-      url: https://www.npmjs.com/package/agent-feed
+      url: https://www.npmjs.com/package/@yysjjd/agent-feed
     permissions:
       contents: read
       id-token: write
