@@ -51,6 +51,11 @@ def main() -> None:
         r'(?m)^__version__ = "[^"]+"$',
         f'__version__ = "{version}"',
     )
+    replace_once(
+        ROOT / ".agents/agent-feed.json",
+        r'(?m)^  "agent_feed_version": "[^"]+",$',
+        f'  "agent_feed_version": "{version}",',
+    )
     sync_package_json(ROOT / "package.json", version)
     sync_package_json(ROOT / "package-lock.json", version)
 

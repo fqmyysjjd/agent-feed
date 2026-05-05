@@ -4,6 +4,13 @@ All notable changes to Agent Feed are tracked here.
 
 This project uses semantic versioning. Patch releases preserve the public command surface and generated-template contracts unless the changelog calls out a migration.
 
+## 1.1.2 - 2026-05-05
+
+### Changed
+
+- Synced Python package metadata, npm package metadata, and template `agent_feed_version` fields to the current `v1.1.2` release tag.
+- Updated `scripts/sync-release-version.py` so future release-version syncs also update `.agents/agent-feed.json`.
+
 ## 1.1.0 - 2026-05-05
 
 ### Added
