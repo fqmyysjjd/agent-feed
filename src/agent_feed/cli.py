@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import os
+import shutil
 import sys
 from pathlib import Path
 from typing import Annotated
 
 import typer
+from rich import box
 from rich.progress import BarColumn, MofNCompleteColumn, Progress, SpinnerColumn, TextColumn
+from rich.table import Table
 
 import agent_feed
 from agent_feed import __version__
@@ -96,7 +99,7 @@ from agent_feed.skill_hub import (
     preview_skill_tree,
     search_remote_skills,
 )
-from agent_feed.skill_index import index_skill_metadata
+from agent_feed.skill_index import discover_skills, index_skill_metadata
 from agent_feed.templates import canonical_write_plan, write_text
 from agent_feed.uninstall import apply_uninstall_plan, has_deletions, uninstall_plan
 from agent_feed.upgrade import (
@@ -134,6 +137,14 @@ config_app = typer.Typer(
     context_settings={"help_option_names": ["-h", "--help"]},
 )
 app.add_typer(config_app, name="config")
+skills_app = typer.Typer(
+    name="skills",
+    help="List or remove installed local skills.",
+    no_args_is_help=True,
+    add_completion=False,
+    context_settings={"help_option_names": ["-h", "--help"]},
+)
+app.add_typer(skills_app, name="skills")
 
 
 @app.callback()
@@ -673,6 +684,151 @@ def index_skills_cmd(
         console.print("[green]agent-feed: skills indexed[/green]")
 
 
+@skills_app.command("list")
+def skills_list_cmd(
+    path: Annotated[
+        Path | None, typer.Argument(help="Target project path. Defaults to cwd.")
+    ] = None,
+) -> None:
+    """List installed local skills."""
+    target = (path or Path(".")).resolve()
+    skill_root = target / ".agents/skills"
+    if not skill_root.exists():
+        _print_errors("Skill listing blocked", ["missing .agents/skills; run agent-feed init first"])
+        raise typer.Exit(3)
+
+    skills = discover_skills(target)
+    if not skills:
+        print_action_result(
+            title="Skills",
+            message="No installed skills found",
+            kind="warning",
+            detail=f"Checked {skill_root}",
+        )
+        return
+
+    table = Table(
+        title=f"Installed Skills: {target}",
+        box=box.SIMPLE_HEAVY,
+        header_style="bold",
+    )
+    table.add_column("Skill", style="bold")
+    table.add_column("Source")
+    table.add_column("Trust")
+    table.add_column("Path", overflow="fold")
+    for skill in skills:
+        table.add_row(skill.name, skill.source, skill.trust, skill.path.as_posix())
+    console.print(table)
+
+
+@skills_app.command("remove")
+def skills_remove_cmd(
+    name: Annotated[str, typer.Argument(help="Installed skill directory name to remove.")],
+    path: Annotated[
+        Path | None, typer.Argument(help="Target project path. Defaults to cwd.")
+    ] = None,
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Preview skill removal without deleting files.")
+    ] = False,
+    yes: Annotated[
+        bool,
+        typer.Option("-y", help="Remove the skill and refresh derived assets without asking."),
+    ] = False,
+    no_input: Annotated[
+        bool, typer.Option("--no-input", help="Never prompt; require -y for removal.")
+    ] = False,
+    force: Annotated[
+        bool,
+        typer.Option("--force", help="Allow removal of bundled core skills after review."),
+    ] = False,
+) -> None:
+    """Remove an installed local skill and refresh indexes."""
+    target = (path or Path(".")).resolve()
+    skill_root = target / ".agents/skills"
+    if not _safe_skill_name(name):
+        _print_errors("Skill removal blocked", [f"unsafe skill name: {name}"])
+        raise typer.Exit(3)
+    if not skill_root.exists():
+        _print_errors("Skill removal blocked", ["missing .agents/skills; run agent-feed init first"])
+        raise typer.Exit(3)
+
+    skill_dir = skill_root / name
+    skill_file = skill_dir / "SKILL.md"
+    if not skill_dir.exists() or not skill_dir.is_dir():
+        _print_errors("Skill removal blocked", [f"installed skill not found: {name}"])
+        raise typer.Exit(3)
+    if not skill_file.exists():
+        _print_errors("Skill removal blocked", [f"{skill_dir} does not contain SKILL.md"])
+        raise typer.Exit(3)
+
+    skill_metadata = next(
+        (skill for skill in discover_skills(target) if skill.path.parent.name == name),
+        None,
+    )
+    if (
+        skill_metadata
+        and not force
+        and (skill_metadata.source == "agent-feed" or skill_metadata.trust == "core")
+    ):
+        _print_errors(
+            "Skill removal blocked",
+            [
+                f"{name} is a bundled core skill. Review the impact first, then rerun with --force if intentional."
+            ],
+        )
+        raise typer.Exit(3)
+
+    delete_action = WriteAction(
+        path=skill_dir,
+        action="would delete" if dry_run else "delete",
+        detail="installed skill",
+    )
+    if dry_run:
+        print_write_plan([delete_action])
+        print_recommended_command("Preview complete", f"agent-feed skills remove {name} {target} -y")
+        return
+    if not yes:
+        if no_input or not can_prompt():
+            _print_errors("Skill removal blocked", ["pass -y to remove a skill without prompts"])
+            raise typer.Exit(3)
+        if not prompt_confirm(f"Remove skill {name} from {target}?", default=False):
+            print_action_result(
+                title="Skills",
+                message="Canceled",
+                kind="warning",
+                detail="No skills were removed.",
+            )
+            return
+
+    shutil.rmtree(skill_dir)
+    index_actions, index_errors = index_skill_metadata(target, dry_run=False)
+    adapter_actions, adapter_errors = sync_clients(
+        target,
+        clients=installed_clients(target),
+        dry_run=False,
+        force_generated=False,
+    )
+    trust_actions, trust_errors = sync_asset_trust(
+        target,
+        dry_run=False,
+        accept_changed=True,
+        project_name=infer_project_name(target),
+    )
+    actions = [delete_action, *index_actions, *adapter_actions, *trust_actions]
+    errors = [*index_errors, *adapter_errors, *trust_errors]
+    if actions:
+        print_write_plan(actions)
+    if errors:
+        _print_errors("Skill removal blocked", errors)
+        raise typer.Exit(3)
+    print_action_result(
+        title="Skills",
+        message="Skill removed",
+        kind="success",
+        detail="The skill index, client adapters, and trust state were refreshed.",
+    )
+
+
 @config_app.command("get")
 def config_get_cmd(
     key: Annotated[
@@ -723,6 +879,54 @@ def config_check_cmd(
     print_config_check_report(report, as_json=json_output)
     if not report.ok:
         raise typer.Exit(1)
+
+
+@config_app.command("prune")
+def config_prune_cmd(
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Preview stale project cleanup without writing files."),
+    ] = False,
+    yes: Annotated[
+        bool,
+        typer.Option(
+            "-y",
+            help="Remove stale project records with defaults; do not ask for confirmation.",
+        ),
+    ] = False,
+    no_input: Annotated[
+        bool,
+        typer.Option("--no-input", help="Never prompt; fail instead of asking for input."),
+    ] = False,
+) -> None:
+    """Remove stale project records from the user-level Agent Feed config."""
+    actions, errors = prune_missing_project_entries(
+        dry_run=dry_run,
+        yes=yes,
+        no_input=no_input,
+    )
+    if errors:
+        _print_errors("Config prune blocked", errors)
+        raise typer.Exit(3)
+    if actions:
+        print_write_plan(actions)
+    if dry_run:
+        console.print("[cyan]agent-feed: config prune preview complete; no files changed[/cyan]")
+        return
+    if not actions:
+        print_action_result(
+            title="Config Prune",
+            message="No stale project entries found",
+            kind="success",
+            detail="The user-level Agent Feed config is already clean.",
+        )
+        return
+    print_action_result(
+        title="Config Prune",
+        message="Stale project entries removed",
+        kind="success",
+        detail="Only user-level trust metadata was changed; project files were not touched.",
+    )
 
 
 @config_app.command("set")
@@ -959,54 +1163,77 @@ def skill_hub_cmd(
 
     actions: list[WriteAction] = []
     errors: list[str] = []
-    for key in selected_keys:
-        skill = by_key[key]
-        try:
-            package = _fetch_remote_skill_with_feedback(
-                skill,
-                token=token,
-                message=f"Downloading {skill.name}...",
-            )
-        except RuntimeError as exc:
-            errors.append(str(exc))
+    installed_labels: list[str] = []
+    selected_skills = [by_key[key] for key in selected_keys]
+    packages = _download_selected_skill_packages(selected_skills, token=token)
+    for skill, package, fetch_error in packages:
+        if fetch_error:
+            errors.append(_skill_hub_error_label(skill, fetch_error))
             continue
-        package_actions, package_errors = install_remote_skill_package(
-            target,
-            package,
-            dry_run=dry_run,
-        )
+        if package is None:
+            errors.append(_skill_hub_error_label(skill, "skill package was not loaded"))
+            continue
+        try:
+            package_actions, package_errors = install_remote_skill_package(
+                target,
+                package,
+                dry_run=dry_run,
+            )
+        except Exception as exc:
+            errors.append(_skill_hub_error_label(skill, str(exc)))
+            continue
+        if package_errors:
+            errors.extend(_skill_hub_error_label(skill, error) for error in package_errors)
+            continue
         actions.extend(package_actions)
-        errors.extend(package_errors)
+        installed_labels.append(f"{skill.name} ({skill.hub.name})")
 
     if actions:
         print_write_plan(actions)
-    if errors:
-        _print_errors("Skill hub install blocked", errors)
-        raise typer.Exit(3)
+    if installed_labels:
+        print_action_result(
+            title="Skill Hub",
+            message="Skills ready" if dry_run else "Skills installed",
+            kind="success",
+            detail=", ".join(installed_labels),
+        )
     if dry_run:
+        if errors:
+            _print_errors("Skill hub install blocked", errors)
+            raise typer.Exit(3)
         print_recommended_command(
             "Preview complete",
             f"agent-feed skill-hub {target} --keyword {current_keyword!r}",
         )
         return
 
-    index_actions, index_errors = index_skill_metadata(target, dry_run=False)
-    trust_actions, trust_errors = sync_asset_trust(
-        target,
-        dry_run=False,
-        accept_changed=True,
-        project_name=infer_project_name(target),
-    )
-    if index_actions or trust_actions:
-        print_write_plan([*index_actions, *trust_actions])
-    if index_errors or trust_errors:
-        _print_errors("Skill indexing blocked", [*index_errors, *trust_errors])
+    if installed_labels:
+        if not _confirm_skill_registration(target=target, interactive=interactive):
+            print_action_result(
+                title="Skill Hub",
+                message="Skills installed but not registered",
+                kind="warning",
+                detail="Run agent-feed index-skills -y when ready.",
+            )
+            if errors:
+                _print_errors("Skill hub install blocked", errors)
+                raise typer.Exit(3)
+            return
+
+        registration_actions, registration_errors = _register_installed_skills(target)
+        if registration_actions:
+            print_write_plan(registration_actions)
+        if registration_errors:
+            _print_errors("Skill indexing blocked", registration_errors)
+            raise typer.Exit(3)
+    if errors:
+        _print_errors("Skill hub install blocked", errors)
         raise typer.Exit(3)
     print_action_result(
         title="Skill Hub",
         message="Selected skills installed",
         kind="success",
-        detail="The skill index and trust state were refreshed automatically.",
+        detail="The skill index, client adapters, and trust state were refreshed.",
     )
 
 
@@ -1504,6 +1731,12 @@ def installed_clients(root: Path) -> tuple[Client, ...]:
     return tuple(clients)
 
 
+def _safe_skill_name(name: str) -> bool:
+    if not name or name in {".", ".."} or name.startswith("."):
+        return False
+    return all(character.isalnum() or character in {"-", "_", "."} for character in name)
+
+
 def planned_backup_resolves_init_adapter_error(
     error: str,
     backup_actions: list[WriteAction],
@@ -1763,10 +1996,11 @@ def _search_remote_skills_with_feedback(
     keyword: str,
     *,
     token: str | None,
+    message: str | None = None,
 ) -> list[RemoteSkill]:
     if can_prompt():
         with console.status(
-            f"[cyan]Searching curated skill hubs for {keyword!r}...[/cyan]",
+            f"[cyan]{message or f'Searching curated skill hubs for {keyword!r}...'}[/cyan]",
             spinner="dots",
         ):
             return search_remote_skills(keyword, token=token)
@@ -1790,6 +2024,82 @@ def _fetch_remote_skill_with_feedback(
         raise RuntimeError(str(exc)) from exc
 
 
+def _download_selected_skill_packages(
+    skills: list[RemoteSkill],
+    *,
+    token: str | None,
+) -> list[tuple[RemoteSkill, RemoteSkillPackage | None, str | None]]:
+    results: list[tuple[RemoteSkill, RemoteSkillPackage | None, str | None]] = []
+    if can_prompt():
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            MofNCompleteColumn(),
+            TextColumn("[dim]{task.fields[skill]}[/dim]"),
+            console=console,
+        ) as progress:
+            task_id = progress.add_task(
+                "Downloading skills",
+                total=len(skills),
+                skill="",
+            )
+            for index, skill in enumerate(skills, start=1):
+                progress.update(task_id, skill=f"{index}/{len(skills)} {skill.name}")
+                try:
+                    results.append((skill, fetch_remote_skill(skill, token=token), None))
+                except Exception as exc:
+                    results.append((skill, None, str(exc)))
+                progress.advance(task_id)
+        return results
+
+    for index, skill in enumerate(skills, start=1):
+        try:
+            package = _fetch_remote_skill_with_feedback(
+                skill,
+                token=token,
+                message=f"Downloading skill {index}/{len(skills)}: {skill.name}...",
+            )
+            results.append((skill, package, None))
+        except RuntimeError as exc:
+            results.append((skill, None, str(exc)))
+    return results
+
+
+def _register_installed_skills(target: Path) -> tuple[list[WriteAction], list[str]]:
+    index_actions, index_errors = index_skill_metadata(target, dry_run=False)
+    adapter_actions, adapter_errors = sync_clients(
+        target,
+        clients=installed_clients(target),
+        dry_run=False,
+        force_generated=False,
+    )
+    trust_actions, trust_errors = sync_asset_trust(
+        target,
+        dry_run=False,
+        accept_changed=True,
+        project_name=infer_project_name(target),
+    )
+    return [*index_actions, *adapter_actions, *trust_actions], [
+        *index_errors,
+        *adapter_errors,
+        *trust_errors,
+    ]
+
+
+def _confirm_skill_registration(*, target: Path, interactive: bool) -> bool:
+    if not interactive:
+        return True
+    return prompt_confirm(
+        f"Register installed skills in Agent Feed now for {target}?",
+        default=True,
+    )
+
+
+def _skill_hub_error_label(skill: RemoteSkill, error: str) -> str:
+    return f"{skill.name} ({skill.hub.name}): {error}"
+
+
 def _retry_skill_hub_with_token(
     *,
     keyword: str,
@@ -1803,7 +2113,12 @@ def _retry_skill_hub_with_token(
 
     console.print("[yellow]GitHub did not allow the anonymous skill-hub request.[/yellow]")
     console.print(_skill_hub_failure_help(error))
-    token = prompt_secret("GitHub token")
+    token_prompt = (
+        "GitHub token (saved to settings.github_token, then retries search)"
+        if save_token
+        else "GitHub token (used once, then retries search)"
+    )
+    token = prompt_secret(token_prompt)
     if not token:
         return None
 
@@ -1816,7 +2131,14 @@ def _retry_skill_hub_with_token(
             console.print("[dim]Continuing with the token for this command only.[/dim]")
 
     try:
-        return search_remote_skills(keyword, token=token), token
+        return (
+            _search_remote_skills_with_feedback(
+                keyword,
+                token=token,
+                message=f"Searching curated skill hubs for {keyword!r} with token...",
+            ),
+            token,
+        )
     except RuntimeError as exc:
         _print_errors("Skill hub search blocked", [_skill_hub_failure_help(str(exc))])
         raise typer.Exit(3) from exc
@@ -2032,6 +2354,35 @@ def maybe_cleanup_missing_project_entries(*, dry_run: bool) -> tuple[list[WriteA
     return cleanup_missing_project_entries(dry_run=False)
 
 
+def prune_missing_project_entries(
+    *,
+    dry_run: bool,
+    yes: bool,
+    no_input: bool,
+) -> tuple[list[WriteAction], list[str]]:
+    stale_entries, errors = missing_project_entries()
+    if errors:
+        return [], errors
+    if stale_entries is None:
+        return [], []
+
+    print_stale_project_cleanup(stale_entries.config_file, stale_entries.project_roots)
+    actions, errors = cleanup_missing_project_entries(dry_run=True)
+    if errors:
+        return [], errors
+    if dry_run:
+        return actions, []
+    if not yes:
+        if no_input or not can_prompt():
+            return [], [
+                "stale project entries found; rerun `agent-feed config prune -y` "
+                "to remove them without prompting"
+            ]
+        if not prompt_confirm("Remove these stale project records from the user-level config?", True):
+            return [], []
+    return cleanup_missing_project_entries(dry_run=False)
+
+
 def _run_menu_action(action: str) -> int:
     try:
         if action == "exit":
@@ -2089,8 +2440,8 @@ def print_inspection_plan(actions: list[WriteAction], *, target: Path) -> None:
 def print_skill_preview(package: RemoteSkillPackage) -> None:
     body = "\n".join(
         [
-            f"**Source:** [{package.skill.hub.name}]({package.skill.hub.url})",
-            f"**Skill:** [{package.skill.name}]({package.skill.url})",
+            f"**Source:** {package.skill.hub.name}  {package.skill.hub.url}",
+            f"**Skill:** {package.skill.name}  {package.skill.url}",
             "",
             "**Files to add:**",
             "",

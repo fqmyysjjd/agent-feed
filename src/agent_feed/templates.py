@@ -6,6 +6,7 @@ from importlib import resources
 from importlib.resources.abc import Traversable
 import json
 from pathlib import Path
+from typing import cast
 
 from agent_feed import __version__
 from agent_feed.models import VerificationProfile, WriteAction
@@ -15,7 +16,12 @@ from agent_feed.verification_profiles import verification_context
 
 
 def standard_template_root() -> Traversable:
-    return resources.files("agent_feed").joinpath("templates/standard")
+    packaged_root = resources.files("agent_feed").joinpath("templates/standard")
+    if packaged_root.is_dir():
+        return packaged_root
+
+    source_root = Path(__file__).resolve().parent / "templates" / "standard"
+    return cast(Traversable, source_root)
 
 
 def walk_templates(root: Traversable, prefix: Path | None = None) -> list[tuple[Path, Traversable]]:

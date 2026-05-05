@@ -1,0 +1,43 @@
+{
+  "name": "agent-feed",
+  "version": "1.0.0",
+  "description": "Repository-owned workflow governance for AI coding agents.",
+  "license": "MIT",
+  "homepage": "https://github.com/fqmyysjjd/agent-feed",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fqmyysjjd/agent-feed.git"
+  },
+  "bugs": {
+    "url": "https://github.com/fqmyysjjd/agent-feed/issues"
+  },
+  "type": "module",
+  "bin": {
+    "agent-feed": "./npm/agent-feed.js"
+  },
+  "files": [
+    "npm/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "postinstall": "node ./npm/postinstall.js",
+    "pack:dry-run": "npm pack --dry-run --cache .npm-pack-cache"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "keywords": [
+    "agents",
+    "agents-md",
+    "ai-agents",
+    "ai-coding",
+    "ai-development",
+    "ai-engineering",
+    "claude-code",
+    "codex",
+    "cursor",
+    "developer-tools",
+    "workflow-governance"
+  ]
+}

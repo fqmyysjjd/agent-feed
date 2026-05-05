@@ -40,7 +40,7 @@ class RemoteSkill:
 @dataclass(frozen=True)
 class RemoteSkillFile:
     path: str
-    content: str
+    content: str | bytes
 
 
 @dataclass(frozen=True)
@@ -196,7 +196,7 @@ def fetch_tree_files(
             files.append(
                 RemoteSkillFile(
                     path=rel_path,
-                    content=github_file_text(client, hub, entry_path, token=token),
+                    content=github_file_bytes(client, hub, entry_path, token=token),
                 )
             )
     return files
@@ -227,13 +227,18 @@ def install_remote_skill_package(
         )
         if not dry_run:
             destination.parent.mkdir(parents=True, exist_ok=True)
-            destination.write_text(content, encoding="utf-8")
+            if isinstance(content, bytes):
+                destination.write_bytes(content)
+            else:
+                destination.write_text(content, encoding="utf-8")
     return actions, []
 
 
-def normalize_skill_content(package: RemoteSkillPackage, remote_file: RemoteSkillFile) -> str:
+def normalize_skill_content(package: RemoteSkillPackage, remote_file: RemoteSkillFile) -> str | bytes:
     content = remote_file.content
     if remote_file.path == "SKILL.md":
+        if isinstance(content, bytes):
+            content = content.decode("utf-8")
         return normalize_skill_frontmatter(content, package.skill)
     return content
 
@@ -329,6 +334,16 @@ def github_file_text(
     *,
     token: str | None = None,
 ) -> str:
+    return github_file_bytes(client, hub, path, token=token).decode("utf-8")
+
+
+def github_file_bytes(
+    client: httpx.Client,
+    hub: SkillHub,
+    path: str,
+    *,
+    token: str | None = None,
+) -> bytes:
     response = client.get(
         f"{GITHUB_API}/repos/{hub.owner}/{hub.repo}/contents/{path}",
         params={"ref": hub.branch},
@@ -341,7 +356,7 @@ def github_file_text(
     encoded = data.get("content")
     if not isinstance(encoded, str):
         raise RuntimeError(f"Missing content for {hub.owner}/{hub.repo}/{path}")
-    return base64.b64decode(encoded).decode("utf-8")
+    return base64.b64decode("".join(encoded.split()))
 
 
 def parse_frontmatter(content: str) -> dict[str, str]:

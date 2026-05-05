@@ -70,10 +70,17 @@ Agent Feed 将 AI 编程中常见的“翻车场景”转化为了切实可见�
 安装 Agent Feed:
 
 ```sh
+brew install fqmyysjjd/tap/agent-feed
+# 或使用
 uv tool install agent-feed
 # 或使用
 pipx install agent-feed
+# 或使用
+npm install -g agent-feed
 ```
+
+npm 包只是 Python CLI 的薄包装器。使用 npm 安装时，本机仍需要 Python
+3.11+，安装过程会自动安装同版本的 PyPI 包。
 
 在你的项目中初始化:
 
@@ -92,6 +99,17 @@ agent-feed status    # 查看当前状态及下一步推荐操作
 
 ```sh
 uv run agent-feed
+```
+
+## 🤝 开始 AI 辅助开发
+
+初始化完成后，在仓库中打开你的 AI 编程助手，并使用以下任务提示启动：
+
+```txt
+首先，梳理项目的开发规范，然后，开始执行我们的任务：
+
+1. [描述你要达成的第一个具体成果]
+2. [描述你要达成的第二个具体成果]
 ```
 
 ## ⚙️ 工作原理
@@ -141,8 +159,11 @@ agent-feed status          # 查看精简的健康度与偏移状态摘要
 agent-feed check -a        # 运行所有的协议及适配器检查
 agent-feed sync -a         # 更新所有支持的客户端适配器
 agent-feed index-skills    # 在修改/导入技能后，重新生成技能索引
+agent-feed skills list     # 查看当前安装的本地技能
+agent-feed skills remove   # 删除一个已安装技能并刷新相关资产
 agent-feed skill-hub       # 浏览并导入官方精选的公共技能，打造团队专属工作流
 agent-feed config check    # 校验项目级与用户级的配置
+agent-feed config prune    # 清理用户级配置里的失效项目记录
 agent-feed --help          # 查看完整的 CLI 命令帮助
 ```
 *(所有路径参数均可省略。省略时，默认在当前目录下执行。)*
@@ -157,10 +178,11 @@ agent-feed --help          # 查看完整的 CLI 命令帮助
 ## 📂 仓库导览
 
 ```txt
-src/agent_feed/              # CLI 工具、检查器、提示词、适配器、信任机制及设置逻辑
-src/agent_feed/templates/    # 标准生成的协议模板
+src/agent_feed/              # Python CLI、检查器、提示词、适配器、信任机制、设置与模板
+npm/                         # 只转发到 Python CLI 的 npm 薄包装器
+package.json                 # npm 包装器发布契约
 docs/                        # 公开的协议与模板文档
 examples/                    # 生成输出示例及真实协议示例
-tests/                       # CLI 行为与协议回归测试覆盖
+tests/                       # Python CLI 行为与协议回归测试覆盖
 .agents/                     # 本仓库自身的 Agent 开发协议
 ```

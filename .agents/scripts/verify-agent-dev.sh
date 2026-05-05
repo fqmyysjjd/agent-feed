@@ -145,8 +145,15 @@ run_python_code() {
     fail "python profile requires uv, python3, or python. Install one or choose the custom profile."
   fi
 
-  run_optional_python_module ruff "ruff check" check .
-  run_optional_python_module mypy "mypy" .
+  run_optional_python_module ruff "ruff check" check \
+    --exclude .agents/skills \
+    --exclude .claude/skills \
+    --exclude .feed-backup \
+    --exclude test \
+    .
+  run_optional_python_module mypy "mypy" \
+    --exclude '(^|/)(\.agents/skills|\.claude/skills|\.feed-backup|test)/' \
+    .
 }
 
 has_npm_script() {

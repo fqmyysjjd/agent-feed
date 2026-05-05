@@ -164,7 +164,7 @@ def print_check_report(report: CheckReport, *, as_json: bool) -> None:
         for warning in report.warnings:
             table.add_row("?", "[yellow]warning[/yellow]", warning)
         console.print(table)
-        print_next_step("Review the warnings above before the final handoff.")
+        print_next_step(check_next_step(report.errors, report.warnings))
     else:
         table = Table(title="Checks blocked", box=box.SIMPLE_HEAVY, header_style="bold red")
         table.add_column("", width=2)
@@ -175,7 +175,18 @@ def print_check_report(report: CheckReport, *, as_json: bool) -> None:
         for warning in report.warnings:
             table.add_row("?", "[yellow]warning[/yellow]", warning)
         console.print(table)
-        print_next_step("Fix the diagnostics above, then rerun `agent-feed check`.")
+        print_next_step(check_next_step(report.errors, report.warnings))
+
+
+def check_next_step(errors: list[str] | tuple[str, ...], warnings: list[str] | tuple[str, ...]) -> str:
+    diagnostics = "\n".join((*errors, *warnings))
+    if "stale project entry" in diagnostics:
+        return "Run `agent-feed config prune`, then rerun `agent-feed check -a`."
+    if "AGENT_FEED_HOME" in diagnostics or "user-level Agent Feed config" in diagnostics:
+        return "Run `agent-feed env setup`, then rerun `agent-feed check -a`."
+    if errors:
+        return "Fix the diagnostics above, then rerun `agent-feed check -a`."
+    return "Review the warnings above before the final handoff."
 
 
 def print_config_check_report(report: ConfigCheckReport, *, as_json: bool) -> None:
@@ -213,9 +224,22 @@ def print_config_check_report(report: ConfigCheckReport, *, as_json: bool) -> No
         table.add_row("?", "[yellow]warning[/yellow]", warning)
     console.print(table)
     if report.errors:
-        print_next_step("Fix the config diagnostics above, then rerun `agent-feed config check`.")
+        print_next_step(config_next_step(report.errors, report.warnings))
     else:
-        print_next_step("Review stale entries or rerun `agent-feed config set` to clean them.")
+        print_next_step(config_next_step(report.errors, report.warnings))
+
+
+def config_next_step(
+    errors: tuple[str, ...] | list[str], warnings: tuple[str, ...] | list[str]
+) -> str:
+    diagnostics = "\n".join((*errors, *warnings))
+    if "stale project entry" in diagnostics:
+        return "Run `agent-feed config prune`, then rerun `agent-feed config check`."
+    if "AGENT_FEED_HOME" in diagnostics or "user-level Agent Feed config" in diagnostics:
+        return "Run `agent-feed env setup`, then rerun `agent-feed config check`."
+    if errors:
+        return "Fix the config diagnostics above, then rerun `agent-feed config check`."
+    return "Review the config warnings above."
 
 
 def print_status(status: ProjectStatus, *, as_json: bool) -> None:

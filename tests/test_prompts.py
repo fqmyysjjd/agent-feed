@@ -5,7 +5,16 @@ from typing import Any
 
 from prompt_toolkit.keys import Keys
 
-from agent_feed.prompts import ESC_KEY_TIMEOUT_SECONDS, make_escape_eager, tune_escape_key
+from agent_feed import prompts
+from agent_feed.models import CHECKS, CLIENTS
+from agent_feed.prompts import (
+    ESC_KEY_TIMEOUT_SECONDS,
+    make_escape_eager,
+    prompt_checks,
+    prompt_clients,
+    prompt_clients_step,
+    tune_escape_key,
+)
 
 
 class PromptWithEager:
@@ -72,3 +81,33 @@ def test_tune_escape_key_without_register_kb_is_a_noop() -> None:
 
     assert returned is prompt
     assert prompt.application.ttimeoutlen == ESC_KEY_TIMEOUT_SECONDS
+
+
+def test_checkbox_prompts_do_not_preselect_defaults(monkeypatch: Any) -> None:
+    captured: list[dict[str, Any]] = []
+
+    class CheckboxPrompt:
+        def __init__(self, kwargs: dict[str, Any]) -> None:
+            self.kwargs = kwargs
+            self.application = SimpleNamespace(ttimeoutlen=1.0)
+
+        def register_kb(self, *_keys: Any, **_kwargs: Any) -> Any:
+            def decorator(func: Any) -> Any:
+                return func
+
+            return decorator
+
+        def execute(self) -> list[Any]:
+            return []
+
+    def checkbox(**kwargs: Any) -> CheckboxPrompt:
+        captured.append(kwargs)
+        return CheckboxPrompt(kwargs)
+
+    monkeypatch.setattr(prompts, "inquirer", SimpleNamespace(checkbox=checkbox))
+
+    assert prompt_clients(tuple(CLIENTS)) == ()
+    assert prompt_clients_step(tuple(CLIENTS)) == ()
+    assert prompt_checks(tuple(CHECKS)) == ()
+
+    assert [call["default"] for call in captured] == [[], [], []]

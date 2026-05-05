@@ -7,6 +7,8 @@ __pycache__/
 dist/
 build/
 *.egg-info/
+node_modules/
+.agent-feed-python/
 .DS_Store
 .idea/
 
@@ -35,3 +37,4 @@ github_common.pub
 
 # Local lockfile is not part of the current package contract.
 /uv.lock
+.npm-pack-cache/

@@ -70,10 +70,17 @@ In short: Agent Feed turns chaotic AI-assisted coding into a repeatable, control
 Install Agent Feed:
 
 ```sh
+brew install fqmyysjjd/tap/agent-feed
+# or
 uv tool install agent-feed
 # or
 pipx install agent-feed
+# or
+npm install -g agent-feed
 ```
+
+The npm package is a thin wrapper around the Python CLI. It requires Python
+3.11+ on the machine and installs the matching PyPI package during npm install.
 
 Initialize a project:
 
@@ -92,6 +99,17 @@ For local development from this checkout:
 
 ```sh
 uv run agent-feed
+```
+
+## 🤝 Start AI-Assisted Development
+
+After initialization, open your AI coding assistant in the repository and begin with the following task prompt:
+
+```text
+First, review the development guidelines for the project, and then, start to carry out our tasks:
+
+1. [Describe the first concrete result you want to achieve]
+2. [Describe the second concrete result you want to achieve]
 ```
 
 ## ⚙️ How It Works
@@ -141,8 +159,11 @@ agent-feed status          # compact health and drift summary
 agent-feed check -a        # run every protocol and adapter check
 agent-feed sync -a         # update all supported client adapters
 agent-feed index-skills    # regenerate the skill index after local or imported skill changes
+agent-feed skills list     # inspect installed local skills
+agent-feed skills remove   # remove one installed skill and refresh derived assets
 agent-feed skill-hub       # browse and import curated public skills for team-specific workflows
 agent-feed config check    # validate project and user-level config
+agent-feed config prune    # remove stale user-level project records
 agent-feed --help          # full CLI reference
 ```
 
@@ -158,10 +179,11 @@ All path arguments are optional. When omitted, commands operate on the current d
 ## 📂 Repository Tour
 
 ```txt
-src/agent_feed/              CLI, checks, prompts, adapters, trust, and settings logic
-src/agent_feed/templates/    canonical generated protocol template
+src/agent_feed/              Python CLI, checks, prompts, adapters, trust, settings, and templates
+npm/                         thin npm wrapper that delegates to the Python CLI
+package.json                 npm wrapper package contract
 docs/                        public protocol and template docs
 examples/                    generated output and live protocol examples
-tests/                       CLI behavior and protocol regression coverage
+tests/                       Python CLI behavior and protocol regression coverage
 .agents/                     development protocol for this repository itself
 ```

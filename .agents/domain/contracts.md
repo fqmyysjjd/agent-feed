@@ -8,8 +8,8 @@ The public command families are:
 
 1. Project lifecycle: `init`, `upgrade`, `uninstall`.
 2. Inspection and validation: `status`, `preview`, `check`.
-3. Client and skill maintenance: `sync`, `index-skills`, `skill-hub`.
-4. Configuration: `config get`, `config set`, `config check`.
+3. Client and skill maintenance: `sync`, `index-skills`, `skills`, `skill-hub`.
+4. Configuration: `config get`, `config set`, `config check`, `config prune`.
 5. Environment setup: `env status`, `env setup`, `env print`, `env uninstall`.
 6. Version/help: `--version`, `--help`.
 
@@ -57,6 +57,8 @@ The standard template must generate:
 `.agents/agent-feed.json` owns project-visible Agent Feed metadata and non-secret settings. `$AGENT_FEED_HOME/config.json` owns user-level secrets and accepted AI asset hashes.
 
 `agent-feed config check` must validate the project-visible config shape, the user-level config shape, and stale user-level project roots without modifying files.
+
+`agent-feed config prune` must remove stale user-level project records whose roots no longer exist without changing project files or project-visible `.agents/agent-feed.json` settings.
 
 `agent-feed config set` must preserve that boundary while updating one project-visible config value, reapplying the affected settings-driven output such as session-state schema limits, skill metadata defaults, skill index content, verification profile behavior, and configured client adapter checks, then running the same config health check.
 

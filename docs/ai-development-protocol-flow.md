@@ -101,6 +101,9 @@ Project-visible settings stay in `.agents/agent-feed.json`. User-level secrets
 and accepted hashes stay in `$AGENT_FEED_HOME/config.json`. After changing
 project settings, run `agent-feed config set` so generated schema limits,
 skill defaults, client checks, indexes, and external trust state stay aligned.
+If user-level trust metadata still references deleted project roots, run
+`agent-feed config prune` to remove those stale records without changing any
+project files.
 
 ## End-To-End Flow
 
@@ -759,7 +762,7 @@ responsibility.
 | Work touches public contract or durable fact | `domain/contracts`, `source-of-truth` | Read canonical contract owner or stop if missing | Prevents hallucinated contracts |
 | Work touches project architecture or structure | `.agents/project/*` | Read project constraint index and relevant file | Project-specific ownership stays local |
 | AI uses built-in or reviewed skills | `check-agent-trust.sh`, `$AGENT_FEED_HOME/config.json` | Stop if a managed skill or protocol script hash changed unexpectedly | Prevents silently following tampered trusted guidance |
-| User imports or edits a skill | `index-skills`, `.agents/skills/README.md` | Fill missing metadata and keep custom skills advisory | Extends capability without letting external guidance override core rules |
+| User imports, edits, or removes a skill | `skill-hub`, `skills`, `index-skills`, `.agents/skills/README.md` | Fill missing metadata, remove stale index/trust entries, and keep custom skills advisory | Extends capability without letting external guidance override core rules |
 | User proposes a concrete implementation plan | User-proposed approach gate | Assess against code, contracts, and decision gates before editing | Avoids turning partial solution sketches into hidden product decisions |
 | Work changes AI protocol assets | `testing-gates`, `review-gates` | Verify links, names, mirrors, indexes, session JSON | Protocol health is evidence-backed |
 | Work involves git review or commit handoff | `git-collaboration` | Review diff, keep commit scope clean, use concise imperative messages | Supports team development without mixing unrelated changes |

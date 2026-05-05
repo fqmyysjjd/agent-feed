@@ -17,7 +17,6 @@
 # }
 #
 # Remove this placeholder implementation after adding real project commands.
-
 run_project_code_checks() {
   red=$(printf '\033[31m')
   yellow=$(printf '\033[33m')

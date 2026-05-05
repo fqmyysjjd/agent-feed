@@ -5,8 +5,9 @@ Define durable fact ownership for Agent Feed.
 ## Ownership
 
 1. CLI command behavior:
-   - `src/agent_feed/cli.py`
-   - tests under `tests/`
+   - Python runtime: `src/agent_feed/cli.py`
+   - Python tests under `tests/`
+   - npm wrapper under `npm/` may only delegate to the Python runtime
 2. Generated protocol template:
    - `src/agent_feed/templates/standard/`
 3. Product intent and market positioning:

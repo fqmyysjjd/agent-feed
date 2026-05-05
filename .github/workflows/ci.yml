@@ -40,10 +40,10 @@ jobs:
         run: uv run python -m pytest
 
       - name: Run ruff
-        run: uv run python -m ruff check .
+        run: uv run python -m ruff check src tests
 
       - name: Run mypy
-        run: uv run python -m mypy .
+        run: uv run python -m mypy src tests
 
       - name: Build package
         run: uv build
@@ -73,3 +73,19 @@ jobs:
           uv run agent-feed --version
           uv run agent-feed --help
           uv run agent-feed init --help
+
+  npm-wrapper:
+    name: npm wrapper package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Check npm package contents
+        run: npm run pack:dry-run

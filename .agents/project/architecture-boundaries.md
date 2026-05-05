@@ -6,7 +6,7 @@ Agent Feed is a local CLI and template package for installing AI engineering pro
 
 ## Non-Negotiable Boundaries
 
-1. `agent-feed` is the CLI entry point and must remain usable with standard Python packaging.
+1. `agent-feed` is the CLI entry point and must remain usable with standard Python packaging; npm is allowed only as a thin wrapper that delegates to the Python CLI.
 2. `src/agent_feed/templates/standard/` is the canonical source for generated protocol assets.
 3. Generated client folders such as `.codex/` and `.claude/` are mirrors, not canonical sources.
 4. The installed CLI must not require network access for `init`, `check`, `sync`, `status`, `preview`, or `upgrade`.

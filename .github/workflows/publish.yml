@@ -16,6 +16,7 @@ jobs:
       name: pypi
       url: https://pypi.org/p/agent-feed
     permissions:
+      contents: read
       id-token: write
 
     steps:
@@ -37,10 +38,10 @@ jobs:
         run: uv run python -m pytest
 
       - name: Run ruff
-        run: uv run python -m ruff check .
+        run: uv run python -m ruff check src tests
 
       - name: Run mypy
-        run: uv run python -m mypy .
+        run: uv run python -m mypy src tests
 
       - name: Build package
         run: uv build
@@ -50,3 +51,188 @@ jobs:
 
       - name: Publish package
         uses: pypa/gh-action-pypi-publish@release/v1
+
+  npm:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    needs:
+      - pypi
+    environment:
+      name: npm
+      url: https://www.npmjs.com/package/agent-feed
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Check npm package contents
+        run: npm run pack:dry-run
+
+      - name: Publish package
+        run: npm publish --provenance --access public
+
+  homebrew:
+    name: Update Homebrew tap
+    runs-on: macos-latest
+    needs:
+      - pypi
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out source repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Resolve release version
+        run: |
+          python - <<'PY'
+          import os
+          import tomllib
+          from pathlib import Path
+
+          version = tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"]
+
+          with open(os.environ["GITHUB_ENV"], "a") as env:
+              print(f"AGENT_FEED_VERSION={version}", file=env)
+
+          print(f"Resolved agent-feed version {version}")
+          PY
+
+      - name: Resolve PyPI source distribution
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import time
+          import urllib.error
+          import urllib.request
+
+          version = os.environ["AGENT_FEED_VERSION"]
+          package_url = f"https://pypi.org/pypi/agent-feed/{version}/json"
+          last_error = None
+
+          for attempt in range(1, 31):
+              try:
+                  with urllib.request.urlopen(package_url, timeout=20) as response:
+                      package = json.load(response)
+
+                  sdist = next(
+                      item for item in package["urls"] if item.get("packagetype") == "sdist"
+                  )
+                  sdist_url = sdist["url"]
+                  sdist_sha256 = sdist["digests"]["sha256"]
+                  break
+              except (KeyError, StopIteration, json.JSONDecodeError, TimeoutError, urllib.error.URLError) as exc:
+                  last_error = exc
+                  print(
+                      f"PyPI sdist for agent-feed {version} is not ready "
+                      f"on attempt {attempt}: {exc}"
+                  )
+                  time.sleep(10)
+          else:
+              raise SystemExit(
+                  f"PyPI sdist for agent-feed {version} was not available: {last_error}"
+              )
+
+          with open(os.environ["GITHUB_ENV"], "a") as env:
+              print(f"PYPI_SDIST_URL={sdist_url}", file=env)
+              print(f"PYPI_SDIST_SHA256={sdist_sha256}", file=env)
+
+          print(f"Resolved PyPI sdist for agent-feed {version}")
+          PY
+
+      - name: Check Homebrew tap token
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          if [ -z "$HOMEBREW_TAP_TOKEN" ]; then
+            echo "::error::Set HOMEBREW_TAP_TOKEN with write access to fqmyysjjd/homebrew-tap."
+            exit 1
+          fi
+
+      - name: Check out Homebrew tap
+        uses: actions/checkout@v4
+        with:
+          repository: fqmyysjjd/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-tap
+
+      - name: Register Homebrew tap
+        run: |
+          brew tap fqmyysjjd/tap ./homebrew-tap
+          echo "HOMEBREW_TAP_REPO=$(brew --repository fqmyysjjd/tap)" >> "$GITHUB_ENV"
+
+      - name: Update Python resources
+        run: |
+          brew update-python-resources fqmyysjjd/tap/agent-feed \
+            --package-name agent-feed \
+            --version "$AGENT_FEED_VERSION"
+
+      - name: Update formula source
+        run: |
+          python - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          formula = Path(os.environ["HOMEBREW_TAP_REPO"]) / "Formula" / "agent-feed.rb"
+          text = formula.read_text()
+          text = re.sub(
+              r'(?m)^  url ".*"$',
+              f'  url "{os.environ["PYPI_SDIST_URL"]}"',
+              text,
+              count=1,
+          )
+          text = re.sub(
+              r'(?m)^  sha256 ".*"$',
+              f'  sha256 "{os.environ["PYPI_SDIST_SHA256"]}"',
+              text,
+              count=1,
+          )
+          text = re.sub(
+              r'assert_match "agent-feed [^"]+", shell_output',
+              'assert_match "agent-feed #{version}", shell_output',
+              text,
+              count=1,
+          )
+          formula.write_text(text)
+          PY
+
+      - name: Test Homebrew formula
+        run: |
+          brew style fqmyysjjd/tap/agent-feed
+          brew install --build-from-source fqmyysjjd/tap/agent-feed
+          brew test fqmyysjjd/tap/agent-feed
+          brew audit --strict --online fqmyysjjd/tap/agent-feed
+
+      - name: Sync formula back to tap checkout
+        run: cp "$HOMEBREW_TAP_REPO/Formula/agent-feed.rb" homebrew-tap/Formula/agent-feed.rb
+
+      - name: Commit Homebrew tap update
+        run: |
+          cd homebrew-tap
+
+          if git diff --quiet; then
+            echo "Homebrew formula already matches agent-feed $AGENT_FEED_VERSION."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/agent-feed.rb
+          git commit -m "agent-feed $AGENT_FEED_VERSION"
+          git push
