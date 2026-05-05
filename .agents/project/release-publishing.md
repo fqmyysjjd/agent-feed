@@ -23,6 +23,12 @@ version `1.0.1` across PyPI, npm, and Homebrew.
 4. The npm job must publish the synchronized `@yysjjd/agent-feed` package.
 5. The Homebrew job must resolve the version from `GITHUB_REF_NAME`, wait for
    the matching PyPI sdist, then update `fqmyysjjd/homebrew-tap`.
+6. The publish workflow must be safe to rerun after a partial release:
+   - PyPI publishing uses `skip-existing`.
+   - npm publishing checks whether `@yysjjd/agent-feed@<version>` already
+     exists before publishing.
+   - Homebrew updates must work after PyPI has already published the release
+     version.
 
 ## Package Name Constraints
 
@@ -41,3 +47,4 @@ Stop and ask before:
 3. Reintroducing manual-only version bump steps as the required release path.
 4. Changing PyPI, npm, or Homebrew publishing order.
 5. Changing trusted-publisher, provenance, or token requirements.
+6. Removing partial-release rerun safety from PyPI, npm, or Homebrew jobs.

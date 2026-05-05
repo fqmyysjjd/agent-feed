@@ -13,7 +13,7 @@
   },
   "type": "module",
   "bin": {
-    "agent-feed": "./npm/agent-feed.js"
+    "agent-feed": "npm/agent-feed.js"
   },
   "files": [
     "npm/",
@@ -21,7 +21,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "postinstall": "node ./npm/postinstall.js",
+    "postinstall": "node npm/postinstall.js",
     "pack:dry-run": "npm pack --dry-run --cache .npm-pack-cache"
   },
   "engines": {

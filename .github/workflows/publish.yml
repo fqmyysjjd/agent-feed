@@ -74,6 +74,8 @@ jobs:
 
       - name: Publish package
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true
 
   npm:
     name: Publish to npm
@@ -108,7 +110,20 @@ jobs:
       - name: Check npm package contents
         run: npm run pack:dry-run
 
+      - name: Check npm package version
+        id: npm-version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if npm view "@yysjjd/agent-feed@$version" version >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "@yysjjd/agent-feed@$version already exists on npm; skipping publish."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "@yysjjd/agent-feed@$version is not published yet."
+          fi
+
       - name: Publish package
+        if: steps.npm-version.outputs.exists != 'true'
         run: npm publish --provenance --access public
 
   homebrew:
@@ -205,41 +220,14 @@ jobs:
           brew tap fqmyysjjd/tap ./homebrew-tap
           echo "HOMEBREW_TAP_REPO=$(brew --repository fqmyysjjd/tap)" >> "$GITHUB_ENV"
 
-      - name: Update Python resources
+      - name: Update formula source and Python resources
         run: |
-          brew update-python-resources fqmyysjjd/tap/agent-feed \
+          python scripts/update-homebrew-formula.py \
+            --formula "$HOMEBREW_TAP_REPO/Formula/agent-feed.rb" \
             --package-name agent-feed \
-            --version "$AGENT_FEED_VERSION"
-
-      - name: Update formula source
-        run: |
-          python - <<'PY'
-          import os
-          import re
-          from pathlib import Path
-
-          formula = Path(os.environ["HOMEBREW_TAP_REPO"]) / "Formula" / "agent-feed.rb"
-          text = formula.read_text()
-          text = re.sub(
-              r'(?m)^  url ".*"$',
-              f'  url "{os.environ["PYPI_SDIST_URL"]}"',
-              text,
-              count=1,
-          )
-          text = re.sub(
-              r'(?m)^  sha256 ".*"$',
-              f'  sha256 "{os.environ["PYPI_SDIST_SHA256"]}"',
-              text,
-              count=1,
-          )
-          text = re.sub(
-              r'assert_match "agent-feed [^"]+", shell_output',
-              'assert_match "agent-feed #{version}", shell_output',
-              text,
-              count=1,
-          )
-          formula.write_text(text)
-          PY
+            --version "$AGENT_FEED_VERSION" \
+            --source-url "$PYPI_SDIST_URL" \
+            --source-sha256 "$PYPI_SDIST_SHA256"
 
       - name: Test Homebrew formula
         run: |
