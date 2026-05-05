@@ -1527,6 +1527,54 @@ def test_skill_hub_github_headers_and_rate_limit_message(
     assert "GITHUB_TOKEN" in message
 
 
+def test_skill_hub_fetch_formats_github_rate_limit_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    hub = SkillHub(
+        key="example",
+        name="Example Hub",
+        owner="example",
+        repo="skills",
+        branch="main",
+        skills_path="skills",
+        url="https://github.com/example/skills",
+        description="Example skills.",
+    )
+    remote_skill = RemoteSkill(
+        hub=hub,
+        name="limited-skill",
+        path="skills/limited-skill",
+        url="https://github.com/example/skills/tree/main/skills/limited-skill",
+        description="Rate limited skill.",
+    )
+    request = httpx.Request("GET", "https://api.github.com/repos/example/skills")
+    response = httpx.Response(
+        403,
+        request=request,
+        headers={"x-ratelimit-remaining": "0", "x-ratelimit-reset": "123"},
+    )
+
+    def fake_fetch_tree_files(
+        _client: object,
+        _hub: SkillHub,
+        _path: str,
+        *,
+        root: str | None = None,
+        token: str | None = None,
+    ) -> list[RemoteSkillFile]:
+        raise httpx.HTTPStatusError("rate limited", request=request, response=response)
+
+    monkeypatch.setattr(skill_hub, "fetch_tree_files", fake_fetch_tree_files)
+
+    with pytest.raises(RuntimeError) as exc_info:
+        skill_hub.fetch_remote_skill(remote_skill)
+
+    message = str(exc_info.value)
+    assert "GitHub API rate limit reached" in message
+    assert "GITHUB_TOKEN" in message
+    assert "settings.github_token" in message
+
+
 def test_skill_hub_uses_saved_user_level_github_token(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1682,6 +1730,94 @@ def test_skill_hub_prompts_for_token_and_saves_it(
     config = trust_config(tmp_path)
     assert config["settings"]["github_token"] == "entered-token"
     assert_private_file_mode_when_supported(trust_config_path(tmp_path))
+
+
+def test_skill_hub_install_rate_limit_reuses_token_retry_flow(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    init_result = invoke(["init", str(tmp_path), "--project-name", "Example", "--profile", "python"], tmp_path)
+    assert init_result.exit_code == 0, init_result.output
+
+    hub = SkillHub(
+        key="example",
+        name="Example Hub",
+        owner="example",
+        repo="skills",
+        branch="main",
+        skills_path="skills",
+        url="https://github.com/example/skills",
+        description="Example skills.",
+    )
+    remote_skill = RemoteSkill(
+        hub=hub,
+        name="install-token-skill",
+        path="skills/install-token-skill",
+        url="https://github.com/example/skills/tree/main/skills/install-token-skill",
+        description="Retries install with token.",
+    )
+    package = RemoteSkillPackage(
+        skill=remote_skill,
+        files=(
+            RemoteSkillFile(
+                path="SKILL.md",
+                content="\n".join(
+                    [
+                        "---",
+                        "name: install-token-skill",
+                        "description: Retries install with token.",
+                        "---",
+                        "",
+                        "# Install Token Skill",
+                        "",
+                    ]
+                ),
+            ),
+        ),
+    )
+
+    search_calls: list[str | None] = []
+    fetch_calls: list[str | None] = []
+    prompt_messages: list[str] = []
+
+    def fake_search(
+        _keyword: str, *, token: str | None = None, hubs: Any = None
+    ) -> list[RemoteSkill]:
+        search_calls.append(token)
+        return [remote_skill]
+
+    def fake_fetch(_skill: RemoteSkill, token: str | None = None) -> RemoteSkillPackage:
+        fetch_calls.append(token)
+        if token is None:
+            raise RuntimeError("GitHub request failed with HTTP 403")
+        return package
+
+    def fake_prompt_secret(message: str) -> str:
+        prompt_messages.append(message)
+        return "entered-install-token"
+
+    monkeypatch.setattr(cli, "can_prompt", lambda: True)
+    monkeypatch.setattr(cli, "prompt_secret", fake_prompt_secret)
+    monkeypatch.setattr(cli, "prompt_confirm", lambda _message, default=True: True)
+    monkeypatch.setattr(
+        cli,
+        "prompt_skill_hub_selection",
+        lambda _choices, on_preview: ["example:install-token-skill"],
+    )
+    monkeypatch.setattr(cli, "search_remote_skills", fake_search)
+    monkeypatch.setattr(cli, "fetch_remote_skill", fake_fetch)
+
+    result = invoke(["skill-hub", str(tmp_path), "--keyword", "install"], tmp_path)
+
+    assert result.exit_code == 0, result.output
+    assert search_calls == [None, "entered-install-token"]
+    assert fetch_calls == [None, "entered-install-token"]
+    assert prompt_messages == [
+        "GitHub token (saved to settings.github_token, then retries search)"
+    ]
+    assert (tmp_path / ".agents/skills/install-token-skill/SKILL.md").exists()
+    config = trust_config(tmp_path)
+    assert config["settings"]["github_token"] == "entered-install-token"
 
 
 def test_skill_hub_failure_help_shows_shell_commands_and_json_example() -> None:

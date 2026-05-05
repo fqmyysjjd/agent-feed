@@ -4,6 +4,13 @@ All notable changes to Agent Feed are tracked here.
 
 This project uses semantic versioning. Patch releases preserve the public command surface and generated-template contracts unless the changelog calls out a migration.
 
+## 1.1.4 - 2026-05-05
+
+### Fixed
+
+- Reused the skill-hub GitHub token retry flow when selected skill downloads hit GitHub 403 or rate-limit responses after search succeeds.
+- Normalized GitHub API download HTTP errors into the same user-friendly `GITHUB_TOKEN` and `settings.github_token` guidance used during skill search.
+
 ## 1.1.3 - 2026-05-05
 
 ### Changed

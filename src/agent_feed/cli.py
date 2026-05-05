@@ -1120,59 +1120,60 @@ def skill_hub_cmd(
                 continue
             return
 
-        by_key = {f"{skill.hub.key}:{skill.name}": skill for skill in skills}
-        if interactive:
-            choices = [
-                {
-                    "name": f"{skill.name}  [dim]{skill.hub.name}[/dim]  {skill.description}",
-                    "value": key,
-                }
-                for key, skill in by_key.items()
-            ]
-
-            def preview_current(selection: dict[str, object]) -> None:
-                value = str(selection.get("value", ""))
-                skill = by_key.get(value)
-                if skill is None:
-                    return
-                try:
-                    package = _fetch_remote_skill_with_feedback(
-                        skill,
-                        token=token,
-                        message=f"Loading preview for {skill.name}...",
-                    )
-                except RuntimeError as exc:
-                    _print_errors("Skill preview blocked", [_skill_hub_failure_help(str(exc))])
-                    return
-                print_skill_preview(package)
-
-            result = prompt_skill_hub_selection(choices, on_preview=preview_current)
-            if result is None:
-                if keyword_from_prompt:
-                    current_keyword = ""
-                    console.print("[dim]Returned to keyword search.[/dim]")
-                    continue
-                print_action_result(
-                    title="Skill Hub",
-                    message="Canceled",
-                    kind="warning",
-                    detail="No skills were installed.",
-                )
-                return
-            selected_keys = result
-        else:
-            selected_keys = list(by_key)
+        selection = _select_remote_skills(skills, token=token, interactive=interactive)
+        if selection is None:
+            if keyword_from_prompt:
+                current_keyword = ""
+                console.print("[dim]Returned to keyword search.[/dim]")
+                continue
+            print_action_result(
+                title="Skill Hub",
+                message="Canceled",
+                kind="warning",
+                detail="No skills were installed.",
+            )
+            return
+        selected_keys, by_key = selection
         break
 
     if not selected_keys:
         _print_errors("Skill hub install blocked", ["select at least one skill"])
         raise typer.Exit(3)
 
+    selected_skills = [by_key[key] for key in selected_keys]
+    packages = _download_selected_skill_packages(selected_skills, token=token)
+    token_retry_error = _first_skill_hub_token_retry_error(packages)
+    if token_retry_error is not None:
+        retry = _retry_skill_hub_with_token(
+            keyword=current_keyword,
+            error=token_retry_error,
+            no_input=no_input,
+            save_token=save_token,
+            target=target,
+        )
+        if retry is None:
+            _print_errors("Skill hub install blocked", [_skill_hub_failure_help(token_retry_error)])
+            raise typer.Exit(3)
+        skills, token = retry
+        selection = _select_remote_skills(skills, token=token, interactive=interactive)
+        if selection is None:
+            print_action_result(
+                title="Skill Hub",
+                message="Canceled",
+                kind="warning",
+                detail="No skills were installed.",
+            )
+            return
+        selected_keys, by_key = selection
+        if not selected_keys:
+            _print_errors("Skill hub install blocked", ["select at least one skill"])
+            raise typer.Exit(3)
+        selected_skills = [by_key[key] for key in selected_keys]
+        packages = _download_selected_skill_packages(selected_skills, token=token)
+
     actions: list[WriteAction] = []
     errors: list[str] = []
     installed_labels: list[str] = []
-    selected_skills = [by_key[key] for key in selected_keys]
-    packages = _download_selected_skill_packages(selected_skills, token=token)
     for skill, package, fetch_error in packages:
         if fetch_error:
             errors.append(_skill_hub_error_label(skill, fetch_error))
@@ -2088,6 +2089,55 @@ def _download_selected_skill_packages(
         except RuntimeError as exc:
             results.append((skill, None, str(exc)))
     return results
+
+
+def _select_remote_skills(
+    skills: list[RemoteSkill],
+    *,
+    token: str | None,
+    interactive: bool,
+) -> tuple[list[str], dict[str, RemoteSkill]] | None:
+    by_key = {f"{skill.hub.key}:{skill.name}": skill for skill in skills}
+    if not interactive:
+        return list(by_key), by_key
+
+    choices = [
+        {
+            "name": f"{skill.name}  [dim]{skill.hub.name}[/dim]  {skill.description}",
+            "value": key,
+        }
+        for key, skill in by_key.items()
+    ]
+
+    def preview_current(selection: dict[str, object]) -> None:
+        value = str(selection.get("value", ""))
+        skill = by_key.get(value)
+        if skill is None:
+            return
+        try:
+            package = _fetch_remote_skill_with_feedback(
+                skill,
+                token=token,
+                message=f"Loading preview for {skill.name}...",
+            )
+        except RuntimeError as exc:
+            _print_errors("Skill preview blocked", [_skill_hub_failure_help(str(exc))])
+            return
+        print_skill_preview(package)
+
+    selected_keys = prompt_skill_hub_selection(choices, on_preview=preview_current)
+    if selected_keys is None:
+        return None
+    return selected_keys, by_key
+
+
+def _first_skill_hub_token_retry_error(
+    packages: list[tuple[RemoteSkill, RemoteSkillPackage | None, str | None]],
+) -> str | None:
+    for _skill, _package, fetch_error in packages:
+        if fetch_error and _skill_hub_error_can_use_token(fetch_error):
+            return fetch_error
+    return None
 
 
 def _register_installed_skills(target: Path) -> tuple[list[WriteAction], list[str]]:

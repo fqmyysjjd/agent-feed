@@ -171,6 +171,8 @@ def fetch_remote_skill(skill: RemoteSkill, *, token: str | None = None) -> Remot
     with httpx.Client(timeout=DEFAULT_TIMEOUT, follow_redirects=True) as client:
         try:
             files = tuple(fetch_tree_files(client, skill.hub, skill.path, token=token))
+        except httpx.HTTPStatusError as exc:
+            raise RuntimeError(format_http_status_error(exc)) from exc
         except ImportError as exc:
             raise RuntimeError(format_import_error(exc)) from exc
     return RemoteSkillPackage(skill=skill, files=files)
