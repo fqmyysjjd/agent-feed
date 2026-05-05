@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import importlib.util
+import json
+import subprocess
 from pathlib import Path
+
+import pytest
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "update-homebrew-formula.py"
@@ -27,6 +31,36 @@ def test_render_resource_blocks() -> None:
     assert 'resource "click" do' in rendered
     assert 'url "https://example.com/click.tar.gz"' in rendered
     assert 'sha256 "def"' in rendered
+
+
+def test_build_pip_report_retries_until_report_is_ready(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    report_path = tmp_path / "agent-feed-homebrew-pip-report.json"
+    calls: list[list[str]] = []
+
+    monkeypatch.setattr(MODULE.tempfile, "gettempdir", lambda: str(tmp_path))
+    monkeypatch.setattr(MODULE.time, "sleep", lambda _seconds: None)
+
+    def fake_run(command: list[str], *, check: bool) -> None:
+        calls.append(command)
+        if len(calls) == 1:
+            raise subprocess.CalledProcessError(1, command)
+        report_path.write_text(json.dumps({"install": []}))
+
+    monkeypatch.setattr(MODULE.subprocess, "run", fake_run)
+
+    report = MODULE.build_pip_report(
+        "agent-feed==1.1.5",
+        "python",
+        attempts=2,
+        delay_seconds=0,
+    )
+
+    assert report == {"install": []}
+    assert len(calls) == 2
+    assert calls[0][-1] == "agent-feed==1.1.5"
 
 
 def test_update_formula_text_replaces_source_and_resources() -> None:

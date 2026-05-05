@@ -9,6 +9,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -19,21 +20,43 @@ def canonical_resource_name(name: str) -> str:
     return re.sub(r"[-_.]+", "-", name).lower()
 
 
-def build_pip_report(package_spec: str, python_bin: str) -> dict[str, object]:
+def build_pip_report(
+    package_spec: str,
+    python_bin: str,
+    *,
+    attempts: int = 30,
+    delay_seconds: float = 10.0,
+) -> dict[str, object]:
     report_path = Path(tempfile.gettempdir()) / "agent-feed-homebrew-pip-report.json"
-    subprocess.run(
-        [
-            python_bin,
-            "-m",
-            "pip",
-            "install",
-            "--dry-run",
-            "--ignore-installed",
-            f"--report={report_path}",
-            package_spec,
-        ],
-        check=True,
-    )
+    command = [
+        python_bin,
+        "-m",
+        "pip",
+        "install",
+        "--dry-run",
+        "--ignore-installed",
+        f"--report={report_path}",
+        package_spec,
+    ]
+    last_error: subprocess.CalledProcessError | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            subprocess.run(command, check=True)
+            break
+        except subprocess.CalledProcessError as exc:
+            last_error = exc
+            print(
+                f"pip report for {package_spec} is not ready "
+                f"on attempt {attempt}/{attempts}: {exc}",
+                file=sys.stderr,
+            )
+            if attempt < attempts:
+                time.sleep(delay_seconds)
+    else:
+        if last_error is not None:
+            raise last_error
+        raise RuntimeError(f"pip report for {package_spec} was not generated")
+
     report = json.loads(report_path.read_text())
     if not isinstance(report, dict):
         raise RuntimeError("pip report must be a JSON object")
@@ -154,9 +177,16 @@ def main() -> None:
     parser.add_argument("--source-url", required=True)
     parser.add_argument("--source-sha256", required=True)
     parser.add_argument("--python-bin", default=sys.executable)
+    parser.add_argument("--pip-report-attempts", type=int, default=30)
+    parser.add_argument("--pip-report-delay", type=float, default=10.0)
     args = parser.parse_args()
 
-    report = build_pip_report(f"{args.package_name}=={args.version}", args.python_bin)
+    report = build_pip_report(
+        f"{args.package_name}=={args.version}",
+        args.python_bin,
+        attempts=args.pip_report_attempts,
+        delay_seconds=args.pip_report_delay,
+    )
     resources = collect_resources(report, args.package_name)
     resource_blocks = render_resource_blocks(resources)
 
