@@ -4,6 +4,14 @@ All notable changes to Agent Feed are tracked here.
 
 This project uses semantic versioning. Patch releases preserve the public command surface and generated-template contracts unless the changelog calls out a migration.
 
+## 1.1.3 - 2026-05-05
+
+### Changed
+
+- Improved `agent-feed init` completion feedback so legacy AI instruction backups print the concrete `.feed-backup/<timestamp>` directory.
+- Narrowed Agent Feed reference checks to active protocol assets and ignored `.feed-backup/` migration archives and repository history docs.
+- Synced the packaged standard template script with the updated reference-check behavior.
+
 ## 1.1.2 - 2026-05-05
 
 ### Changed

@@ -2163,6 +2163,36 @@ def test_status_and_preview_report_managed_script_hash_changes(tmp_path: Path) -
     assert "unsafe-script-change" in preview_result.output
 
 
+def test_check_ignores_feed_backup_reference_noise(tmp_path: Path) -> None:
+    init_result = invoke(["init", str(tmp_path), "--project-name", "Example", "--profile", "python"], tmp_path)
+    assert init_result.exit_code == 0, init_result.output
+
+    backup_rule = tmp_path / ".feed-backup/20260505T084102Z/.agents/rules/context-loading.md"
+    backup_rule.parent.mkdir(parents=True, exist_ok=True)
+    backup_rule.write_text(
+        "See `.agents/skills/fast-agent-review/SKILL.md`.\n",
+        encoding="utf-8",
+    )
+
+    check_result = invoke(["check", str(tmp_path), "--checks", "references"], tmp_path)
+    assert check_result.exit_code == 0, check_result.output
+    assert ".feed-backup/20260505T084102Z" not in check_result.output
+
+
+def test_check_ignores_root_readme_history_reference_noise(tmp_path: Path) -> None:
+    init_result = invoke(["init", str(tmp_path), "--project-name", "Example", "--profile", "python"], tmp_path)
+    assert init_result.exit_code == 0, init_result.output
+
+    (tmp_path / "README.md").write_text(
+        "Legacy note: `.agents/skills/fast-agent-review/SKILL.md`.\n",
+        encoding="utf-8",
+    )
+
+    check_result = invoke(["check", str(tmp_path), "--checks", "references"], tmp_path)
+    assert check_result.exit_code == 0, check_result.output
+    assert "README.md: missing referenced path" not in check_result.output
+
+
 def test_preview_and_upgrade_diff_installed_protocol(tmp_path: Path) -> None:
     init_result = invoke(["init", str(tmp_path), "--project-name", "Example", "--profile", "python"], tmp_path)
     assert init_result.exit_code == 0, init_result.output
@@ -2598,6 +2628,8 @@ def test_init_backs_up_existing_ai_instruction_content(tmp_path: Path) -> None:
     backup_dirs = list((tmp_path / ".feed-backup").iterdir())
     assert len(backup_dirs) == 1
     backup_dir = backup_dirs[0]
+    assert "Legacy AI instruction assets were backed up to" in result.output
+    assert backup_dir.relative_to(tmp_path).as_posix() in result.output
     assert (backup_dir / "AGENTS.md").read_text(encoding="utf-8") == "# Old AI rules\n"
     assert (backup_dir / ".agents/skills/old-skill/SKILL.md").exists()
     manifest = json.loads((backup_dir / "manifest.json").read_text(encoding="utf-8"))

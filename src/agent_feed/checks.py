@@ -245,14 +245,21 @@ def validate_references_and_indexes(root: Path) -> list[str]:
         ".pytest_cache",
         ".ruff_cache",
         ".venv",
+        ".feed-backup",
         "build",
         "dist",
         "node_modules",
         "__pycache__",
     }
     optional_paths = {".agents/session-state/current.json"}
+    reference_roots = {
+        Path("AGENTS.md"),
+        Path("CLAUDE.md"),
+        Path(".cursor/rules/agent-feed.mdc"),
+        Path(".agents"),
+    }
 
-    for markdown_file in sorted(root.rglob("*.md")):
+    for markdown_file in active_reference_markdown_files(root, reference_roots):
         rel_path = markdown_file.relative_to(root)
         if any(part in skip_parts for part in rel_path.parts):
             continue
@@ -301,6 +308,17 @@ def validate_references_and_indexes(root: Path) -> list[str]:
                 errors.append(f"AGENTS.md does not reference required rule {required_rule}")
 
     return errors
+
+
+def active_reference_markdown_files(root: Path, reference_roots: set[Path]) -> list[Path]:
+    files: list[Path] = []
+    for reference_root in sorted(reference_roots):
+        path = root / reference_root
+        if path.is_file() and path.suffix == ".md":
+            files.append(path)
+        elif path.is_dir():
+            files.extend(sorted(path.rglob("*.md")))
+    return files
 
 
 def validate_session_state_files(root: Path) -> list[str]:

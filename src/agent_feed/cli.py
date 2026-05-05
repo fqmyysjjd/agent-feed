@@ -38,6 +38,7 @@ from agent_feed.choices import parse_choice_csv
 from agent_feed.config import check_config, get_config_value, set_config_value
 from agent_feed.console import (
     console,
+    display_path,
     has_diff_details,
     print_diff_details,
     print_diff_hint,
@@ -539,6 +540,12 @@ def init_cmd(
 
     if not dry_run:
         console.print("[green]agent-feed: init complete[/green]")
+        backup_dir = init_backup_dir(actions, target=target)
+        if backup_dir is not None:
+            console.print(
+                f"[cyan]Legacy AI instruction assets were backed up to[/cyan] "
+                f"[blue italic]{display_path(backup_dir)}[/blue italic]"
+            )
         if selected_verification_profile == VerificationProfile.CUSTOM:
             print_recommended_command(
                 "Custom verification needs project commands",
@@ -1587,6 +1594,23 @@ def init_project(
         project_name=project_name,
     )
     return [*actions, *adapter_actions, *trust_actions], [*adapter_errors, *trust_errors]
+
+
+def init_backup_dir(actions: list[WriteAction], *, target: Path) -> Path | None:
+    for action in actions:
+        if action.action != "backup":
+            continue
+        detail = action.detail.strip()
+        if not detail.startswith("-> "):
+            continue
+        destination = (target / detail.removeprefix("-> ")).resolve()
+        try:
+            relative = destination.relative_to(target / ".feed-backup")
+        except ValueError:
+            continue
+        if relative.parts:
+            return target / ".feed-backup" / relative.parts[0]
+    return None
 
 
 def preview_project(

@@ -213,7 +213,7 @@ if [ -f .cursor/rules/agent-feed.mdc ]; then
   fi
 fi
 
-say "Checking .agents path references and indexes..."
+say "Checking active .agents path references and indexes..."
 
 python3 - <<'PY'
 import json
@@ -224,10 +224,27 @@ from pathlib import Path
 root = Path(".").resolve()
 errors: list[str] = []
 path_pattern = re.compile(r"\.agents/[A-Za-z0-9_.*/<>-]+")
-skip_parts = {".git", "node_modules", ".venv"}
+skip_parts = {".git", "node_modules", ".venv", ".feed-backup"}
 optional_local_paths = {".agents/session-state/current.json"}
+reference_roots = [
+    Path("AGENTS.md"),
+    Path("CLAUDE.md"),
+    Path(".cursor/rules/agent-feed.mdc"),
+    Path(".agents"),
+]
 
-for md in root.rglob("*.md"):
+def active_reference_markdown_files() -> list[Path]:
+    files: list[Path] = []
+    for reference_root in reference_roots:
+        path = root / reference_root
+        if path.is_file() and path.suffix == ".md":
+            files.append(path)
+        elif path.is_dir():
+            files.extend(sorted(path.rglob("*.md")))
+    return files
+
+
+for md in active_reference_markdown_files():
     rel = md.relative_to(root)
     if any(part in skip_parts for part in rel.parts):
         continue
