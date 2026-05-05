@@ -9,7 +9,7 @@ template from beginning to end.
 
 Scope:
 
-1. Source template: `src/templates/standard/`.
+1. Source template: `src/agent_feed/templates/standard/`.
 2. Installed project shape: root `AGENTS.md` plus `.agents/`.
 3. Focus: AI development rules, trigger points, handling flow, effect, and pain
    points solved.
@@ -762,7 +762,7 @@ responsibility.
 | Work touches public contract or durable fact | `domain/contracts`, `source-of-truth` | Read canonical contract owner or stop if missing | Prevents hallucinated contracts |
 | Work touches project architecture or structure | `.agents/project/*` | Read project constraint index and relevant file | Project-specific ownership stays local |
 | AI uses built-in or reviewed skills | `check-agent-trust.sh`, `$AGENT_FEED_HOME/config.json` | Stop if a managed skill or protocol script hash changed unexpectedly | Prevents silently following tampered trusted guidance |
-| User imports or edits a skill | `index-skills`, `.agents/skills/README.md` | Fill missing metadata and keep custom skills advisory | Extends capability without letting external guidance override core rules |
+| User imports, edits, or removes a skill | `skill-hub`, `skills`, `index-skills`, `.agents/skills/README.md` | Fill missing metadata, remove stale index/trust entries, and keep custom skills advisory | Extends capability without letting external guidance override core rules |
 | User proposes a concrete implementation plan | User-proposed approach gate | Assess against code, contracts, and decision gates before editing | Avoids turning partial solution sketches into hidden product decisions |
 | Work changes AI protocol assets | `testing-gates`, `review-gates` | Verify links, names, mirrors, indexes, session JSON | Protocol health is evidence-backed |
 | Work involves git review or commit handoff | `git-collaboration` | Review diff, keep commit scope clean, use concise imperative messages | Supports team development without mixing unrelated changes |
@@ -802,18 +802,18 @@ This document explains the workflow loop itself. The adjacent public docs are:
 
 To understand or debug the protocol quickly, read in this order:
 
-1. `src/templates/standard/AGENTS.md`
-2. `src/templates/standard/.agents/README.md`
-3. `src/templates/standard/.agents/rules/outcome-boundary.md`
-4. `src/templates/standard/.agents/rules/context-loading.md`
-5. `src/templates/standard/.agents/rules/decision-gates.md`
-6. `src/templates/standard/.agents/rules/development-workflow.md`
-7. `src/templates/standard/.agents/rules/testing-gates.md`
-8. `src/templates/standard/.agents/rules/review-gates.md`
-9. `src/templates/standard/.agents/rules/session-state.md`
-10. `src/templates/standard/.agents/project/README.md`
-11. `src/templates/standard/.agents/domain/README.md`
-12. `src/templates/standard/.agents/skills/*/SKILL.md`
+1. `src/agent_feed/templates/standard/AGENTS.md`
+2. `src/agent_feed/templates/standard/.agents/README.md`
+3. `src/agent_feed/templates/standard/.agents/rules/outcome-boundary.md`
+4. `src/agent_feed/templates/standard/.agents/rules/context-loading.md`
+5. `src/agent_feed/templates/standard/.agents/rules/decision-gates.md`
+6. `src/agent_feed/templates/standard/.agents/rules/development-workflow.md`
+7. `src/agent_feed/templates/standard/.agents/rules/testing-gates.md`
+8. `src/agent_feed/templates/standard/.agents/rules/review-gates.md`
+9. `src/agent_feed/templates/standard/.agents/rules/session-state.md`
+10. `src/agent_feed/templates/standard/.agents/project/README.md`
+11. `src/agent_feed/templates/standard/.agents/domain/README.md`
+12. `src/agent_feed/templates/standard/.agents/skills/*/SKILL.md`
 
 The mental model is simple: entry first, boundary second, routing third, source
 of truth fourth, action fifth, verification/review sixth, handoff last.

@@ -20,7 +20,7 @@ def standard_template_root() -> Traversable:
     if packaged_root.is_dir():
         return packaged_root
 
-    source_root = Path(__file__).resolve().parents[2] / "templates" / "standard"
+    source_root = Path(__file__).resolve().parent / "templates" / "standard"
     return cast(Traversable, source_root)
 
 

@@ -151,7 +151,7 @@ def prompt_clients(default: tuple[Client, ...]) -> tuple[Client, ...]:
             {"name": "Claude CLAUDE.md + .claude/skills", "value": Client.CLAUDE},
             {"name": "Cursor .cursor/rules/agent-feed.mdc", "value": Client.CURSOR},
         ],
-        default=list(default),
+        default=[],
     ).execute()
     return tuple(selected)
 
@@ -165,7 +165,7 @@ def prompt_clients_step(default: tuple[Client, ...]) -> tuple[Client, ...] | Non
             {"name": "Claude CLAUDE.md + .claude/skills", "value": Client.CLAUDE},
             {"name": "Cursor .cursor/rules/agent-feed.mdc", "value": Client.CURSOR},
         ],
-        default=list(default),
+        default=[],
         mandatory=False,
         keybindings={"skip": [{"key": Keys.Escape}]},
     )
@@ -213,7 +213,7 @@ def prompt_checks(default: tuple[Check, ...]) -> tuple[Check, ...]:
         message="Select checks to run",
         instruction=CHECKBOX_INSTRUCTION,
         choices=[{"name": check.value, "value": check} for check in CHECKS],
-        default=list(default),
+        default=[],
     ).execute()
     return tuple(selected)
 

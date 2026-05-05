@@ -98,8 +98,8 @@ The files under [`../../.agents/project/`](../../.agents/project/) are intention
 
 | File | Maintained fact |
 | --- | --- |
-| [`../../.agents/project/architecture-boundaries.md`](../../.agents/project/architecture-boundaries.md) | Agent Feed is a local CLI and template package; `src/python/agent_feed/templates/standard/` is the canonical generated template source; init/check/sync/status/preview must not require network. |
-| [`../../.agents/project/project-structure.md`](../../.agents/project/project-structure.md) | Python CLI wiring belongs in `src/python/agent_feed/cli.py`; Node CLI wiring belongs in `src/node/src/`; root `package.json` and `tsconfig.json` define npm packaging/build; generated template files belong under `src/python/agent_feed/templates/standard/`. |
+| [`../../.agents/project/architecture-boundaries.md`](../../.agents/project/architecture-boundaries.md) | Agent Feed is a local CLI and template package; `src/agent_feed/templates/standard/` is the canonical generated template source; init/check/sync/status/preview must not require network. |
+| [`../../.agents/project/project-structure.md`](../../.agents/project/project-structure.md) | Python CLI wiring belongs in `src/agent_feed/cli.py`; `npm/` only delegates to the Python CLI; generated template files belong under `src/agent_feed/templates/standard/`. |
 | [`../../.agents/project/milestones.md`](../../.agents/project/milestones.md) | The local implementation phase and release-facing sequencing for this repository. |
 | [`../../.agents/project/verification-commands.sh`](../../.agents/project/verification-commands.sh) | The project-owned custom verification hook when the project selects `verification_profile: custom`. |
 

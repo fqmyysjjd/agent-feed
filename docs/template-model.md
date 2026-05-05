@@ -84,9 +84,14 @@ After manually adding, copying, importing, renaming, or editing a skill, run:
 
 ```sh
 agent-feed index-skills
+agent-feed skills list
+agent-feed skills remove <name>
 ```
 
 Then run client adapter sync when generated clients are configured.
+If a user deletes a skill directory manually, `agent-feed index-skills` rebuilds
+`.agents/skills/README.md` from the remaining `SKILL.md` files and prunes stale
+trust entries.
 
 Curated public skill import goes through:
 

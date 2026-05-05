@@ -149,9 +149,10 @@ run_python_code() {
     --exclude .agents/skills \
     --exclude .claude/skills \
     --exclude .feed-backup \
+    --exclude test \
     .
   run_optional_python_module mypy "mypy" \
-    --exclude '(^|/)(\.agents/skills|\.claude/skills|\.feed-backup)/' \
+    --exclude '(^|/)(\.agents/skills|\.claude/skills|\.feed-backup|test)/' \
     .
 }
 

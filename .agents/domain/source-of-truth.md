@@ -5,12 +5,11 @@ Define durable fact ownership for Agent Feed.
 ## Ownership
 
 1. CLI command behavior:
-   - Python runtime: `src/python/agent_feed/cli.py`
-   - Node runtime: `src/node/src/cli.ts`
-   - Python tests under `tests/python/`
-   - Node tests under `tests/node/`
+   - Python runtime: `src/agent_feed/cli.py`
+   - Python tests under `tests/`
+   - npm wrapper under `npm/` may only delegate to the Python runtime
 2. Generated protocol template:
-   - `src/templates/standard/`
+   - `src/agent_feed/templates/standard/`
 3. Product intent and market positioning:
    - `README.md`
    - `docs/ai-development-protocol-flow.md`
@@ -29,6 +28,6 @@ Define durable fact ownership for Agent Feed.
 
 If generated files drift, recover from the canonical source:
 
-1. For product templates, regenerate from `src/templates/standard/`.
+1. For product templates, regenerate from `src/agent_feed/templates/standard/`.
 2. For root client adapters, run `sh .agents/scripts/sync-agent-assets.sh`.
 3. For long-running AI session conclusions, use `.agents/session-state/`.

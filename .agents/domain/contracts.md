@@ -8,7 +8,7 @@ The public command families are:
 
 1. Project lifecycle: `init`, `upgrade`, `uninstall`.
 2. Inspection and validation: `status`, `preview`, `check`.
-3. Client and skill maintenance: `sync`, `index-skills`, `skill-hub`.
+3. Client and skill maintenance: `sync`, `index-skills`, `skills`, `skill-hub`.
 4. Configuration: `config get`, `config set`, `config check`, `config prune`.
 5. Environment setup: `env status`, `env setup`, `env print`, `env uninstall`.
 6. Version/help: `--version`, `--help`.

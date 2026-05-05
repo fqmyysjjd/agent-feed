@@ -5,11 +5,10 @@ __pycache__/
 .ruff_cache/
 .pytest_cache/
 dist/
-dist-node/
-dist-node-tests/
 build/
 *.egg-info/
 node_modules/
+.agent-feed-python/
 .DS_Store
 .idea/
 
@@ -20,7 +19,7 @@ github_common.pub
 *.key
 
 # Local AI-agent workspace assets. The distributable template source lives under
-# src/templates/standard/.
+# src/agent_feed/templates/standard/.
 /AGENTS.local.md
 /.agents/session-state/*.json
 /.codex/

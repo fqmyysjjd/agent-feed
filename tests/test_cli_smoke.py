@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -12,6 +13,7 @@ from click.testing import Result
 from typer.testing import CliRunner
 
 import agent_feed.cli as cli
+import agent_feed.skill_hub as skill_hub
 from agent_feed.asset_trust import configured_github_token, recommended_agent_feed_home
 from agent_feed.cli import app
 from agent_feed.console import diff_line_style, render_diff
@@ -1169,6 +1171,10 @@ def test_skill_hub_installs_selected_remote_skill_and_indexes(
                     ]
                 ),
             ),
+            RemoteSkillFile(
+                path="assets/blob.bin",
+                content=b"\x89\x91\x00\xff",
+            ),
         ),
     )
 
@@ -1186,12 +1192,283 @@ def test_skill_hub_installs_selected_remote_skill_and_indexes(
     skill_text = skill_file.read_text(encoding="utf-8")
     assert "source: hub:example" in skill_text
     assert "trust: custom" in skill_text
+    assert (tmp_path / ".agents/skills/remote-review/assets/blob.bin").read_bytes() == b"\x89\x91\x00\xff"
     skill_index = (tmp_path / ".agents/skills/README.md").read_text(encoding="utf-8")
     assert "`remote-review`" in skill_index
     assert "`hub:example`" in skill_index
     assert "`custom`" in skill_index
     project_assets = trust_config(tmp_path)["projects"][str(tmp_path.resolve())]["assets"]
     assert ".agents/skills/remote-review/SKILL.md" in project_assets
+
+
+def test_skills_list_and_remove_refreshes_index_and_trust(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    init_result = invoke(["init", str(tmp_path), "--project-name", "Example", "--profile", "python"], tmp_path)
+    assert init_result.exit_code == 0, init_result.output
+
+    hub = SkillHub(
+        key="example",
+        name="Example Hub",
+        owner="example",
+        repo="skills",
+        branch="main",
+        skills_path="skills",
+        url="https://github.com/example/skills",
+        description="Example skills.",
+    )
+    remote_skill = RemoteSkill(
+        hub=hub,
+        name="remote-remove",
+        path="skills/remote-remove",
+        url="https://github.com/example/skills/tree/main/skills/remote-remove",
+        description="Use when testing skill removal.",
+    )
+    package = RemoteSkillPackage(
+        skill=remote_skill,
+        files=(
+            RemoteSkillFile(
+                path="SKILL.md",
+                content="\n".join(
+                    [
+                        "---",
+                        "name: remote-remove",
+                        "description: Use when testing skill removal.",
+                        "---",
+                        "",
+                        "# Remote Remove",
+                        "",
+                    ]
+                ),
+            ),
+        ),
+    )
+
+    monkeypatch.setattr(cli, "search_remote_skills", lambda _keyword, token=None: [remote_skill])
+    monkeypatch.setattr(cli, "fetch_remote_skill", lambda _skill, token=None: package)
+
+    install_result = invoke(
+        ["skill-hub", str(tmp_path), "--keyword", "remove", "--no-input"],
+        tmp_path,
+    )
+    assert install_result.exit_code == 0, install_result.output
+
+    list_result = invoke(["skills", "list", str(tmp_path)], tmp_path)
+    assert list_result.exit_code == 0, list_result.output
+    assert "remote-remove" in list_result.output
+
+    remove_result = invoke(["skills", "remove", "remote-remove", str(tmp_path), "-y"], tmp_path)
+    assert remove_result.exit_code == 0, remove_result.output
+    assert not (tmp_path / ".agents/skills/remote-remove").exists()
+    skill_index = (tmp_path / ".agents/skills/README.md").read_text(encoding="utf-8")
+    assert "`remote-remove`" not in skill_index
+    project_assets = trust_config(tmp_path)["projects"][str(tmp_path.resolve())]["assets"]
+    assert ".agents/skills/remote-remove/SKILL.md" not in project_assets
+
+
+def test_index_skills_prunes_manual_skill_deletion_from_index(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    init_result = invoke(["init", str(tmp_path), "--project-name", "Example", "--profile", "python"], tmp_path)
+    assert init_result.exit_code == 0, init_result.output
+
+    hub = SkillHub(
+        key="example",
+        name="Example Hub",
+        owner="example",
+        repo="skills",
+        branch="main",
+        skills_path="skills",
+        url="https://github.com/example/skills",
+        description="Example skills.",
+    )
+    remote_skill = RemoteSkill(
+        hub=hub,
+        name="manual-delete",
+        path="skills/manual-delete",
+        url="https://github.com/example/skills/tree/main/skills/manual-delete",
+        description="Use when testing manual deletion.",
+    )
+    package = RemoteSkillPackage(
+        skill=remote_skill,
+        files=(
+            RemoteSkillFile(
+                path="SKILL.md",
+                content="\n".join(
+                    [
+                        "---",
+                        "name: manual-delete",
+                        "description: Use when testing manual deletion.",
+                        "---",
+                        "",
+                        "# Manual Delete",
+                        "",
+                    ]
+                ),
+            ),
+        ),
+    )
+    monkeypatch.setattr(cli, "search_remote_skills", lambda _keyword, token=None: [remote_skill])
+    monkeypatch.setattr(cli, "fetch_remote_skill", lambda _skill, token=None: package)
+
+    install_result = invoke(
+        ["skill-hub", str(tmp_path), "--keyword", "manual", "--no-input"],
+        tmp_path,
+    )
+    assert install_result.exit_code == 0, install_result.output
+    assert "`manual-delete`" in (tmp_path / ".agents/skills/README.md").read_text(encoding="utf-8")
+
+    shutil.rmtree(tmp_path / ".agents/skills/manual-delete")
+    index_result = invoke(["index-skills", str(tmp_path), "-y"], tmp_path)
+    assert index_result.exit_code == 0, index_result.output
+    assert "`manual-delete`" not in (tmp_path / ".agents/skills/README.md").read_text(encoding="utf-8")
+
+
+def test_skill_hub_can_skip_registration_after_install(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    init_result = invoke(["init", str(tmp_path), "--project-name", "Example", "--profile", "python"], tmp_path)
+    assert init_result.exit_code == 0, init_result.output
+
+    hub = SkillHub(
+        key="example",
+        name="Example Hub",
+        owner="example",
+        repo="skills",
+        branch="main",
+        skills_path="skills",
+        url="https://github.com/example/skills",
+        description="Example skills.",
+    )
+    remote_skill = RemoteSkill(
+        hub=hub,
+        name="not-registered",
+        path="skills/not-registered",
+        url="https://github.com/example/skills/tree/main/skills/not-registered",
+        description="Use when testing skipped registration.",
+    )
+    package = RemoteSkillPackage(
+        skill=remote_skill,
+        files=(
+            RemoteSkillFile(
+                path="SKILL.md",
+                content="\n".join(
+                    [
+                        "---",
+                        "name: not-registered",
+                        "description: Use when testing skipped registration.",
+                        "---",
+                        "",
+                        "# Not Registered",
+                        "",
+                    ]
+                ),
+            ),
+        ),
+    )
+
+    monkeypatch.setattr(cli, "can_prompt", lambda: True)
+    monkeypatch.setattr(cli, "search_remote_skills", lambda _keyword, token=None: [remote_skill])
+    monkeypatch.setattr(cli, "fetch_remote_skill", lambda _skill, token=None: package)
+    monkeypatch.setattr(
+        cli,
+        "prompt_skill_hub_selection",
+        lambda _choices, on_preview: ["example:not-registered"],
+    )
+    monkeypatch.setattr(cli, "prompt_confirm", lambda _message, default=True: False)
+
+    result = invoke(["skill-hub", str(tmp_path), "--keyword", "register"], tmp_path)
+    assert result.exit_code == 0, result.output
+    assert (tmp_path / ".agents/skills/not-registered/SKILL.md").exists()
+    assert "agent-feed index-skills -y" in result.output
+    assert "`not-registered`" not in (tmp_path / ".agents/skills/README.md").read_text(encoding="utf-8")
+
+
+def test_skill_hub_install_error_names_blocked_skill(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    init_result = invoke(["init", str(tmp_path), "--project-name", "Example", "--profile", "python"], tmp_path)
+    assert init_result.exit_code == 0, init_result.output
+
+    hub = SkillHub(
+        key="example",
+        name="Example Hub",
+        owner="example",
+        repo="skills",
+        branch="main",
+        skills_path="skills",
+        url="https://github.com/example/skills",
+        description="Example skills.",
+    )
+    broken_skill = RemoteSkill(
+        hub=hub,
+        name="broken-skill",
+        path="skills/broken-skill",
+        url="https://github.com/example/skills/tree/main/skills/broken-skill",
+        description="Broken skill.",
+    )
+    package = RemoteSkillPackage(
+        skill=broken_skill,
+        files=(RemoteSkillFile(path="SKILL.md", content=b"\x91broken"),),
+    )
+    monkeypatch.setattr(cli, "search_remote_skills", lambda _keyword, token=None: [broken_skill])
+    monkeypatch.setattr(cli, "fetch_remote_skill", lambda _skill, token=None: package)
+
+    result = invoke(["skill-hub", str(tmp_path), "--keyword", "broken", "--no-input"], tmp_path)
+    assert result.exit_code == 3
+    assert "broken-skill (Example Hub)" in result.output
+    assert "utf-8" in result.output
+
+
+def test_skill_hub_fetches_remote_skill_binary_files_without_utf8_decode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    hub = SkillHub(
+        key="example",
+        name="Example Hub",
+        owner="example",
+        repo="skills",
+        branch="main",
+        skills_path="skills",
+        url="https://github.com/example/skills",
+        description="Example skills.",
+    )
+
+    monkeypatch.setattr(
+        skill_hub,
+        "github_contents",
+        lambda _client, _hub, _path, token=None: [
+            {"type": "file", "path": "skills/remote-review/SKILL.md"},
+            {"type": "file", "path": "skills/remote-review/assets/blob.bin"},
+        ],
+    )
+
+    def fake_file_bytes(
+        _client: object,
+        _hub: SkillHub,
+        path: str,
+        *,
+        token: str | None = None,
+    ) -> bytes:
+        if path.endswith("SKILL.md"):
+            return b"---\nname: remote-review\ndescription: Remote review.\n---\n"
+        return b"\x89\x91\x00\xff"
+
+    monkeypatch.setattr(skill_hub, "github_file_bytes", fake_file_bytes)
+
+    with httpx.Client() as client:
+        files = skill_hub.fetch_tree_files(client, hub, "skills/remote-review")
+
+    assert files[0].path == "SKILL.md"
+    assert isinstance(files[0].content, bytes)
+    assert files[0].content.startswith(b"---")
+    assert files[1].path == "assets/blob.bin"
+    assert isinstance(files[1].content, bytes)
+    assert files[1].content == b"\x89\x91\x00\xff"
 
 
 def test_skill_hub_discovers_skills_from_recursive_tree(
@@ -1378,8 +1655,15 @@ def test_skill_hub_prompts_for_token_and_saves_it(
             raise RuntimeError("GitHub API rate limit reached. Try a token.")
         return [remote_skill]
 
+    prompt_messages: list[str] = []
+
+    def fake_prompt_secret(message: str) -> str:
+        prompt_messages.append(message)
+        return "entered-token"
+
     monkeypatch.setattr(cli, "can_prompt", lambda: True)
-    monkeypatch.setattr(cli, "prompt_secret", lambda _message: "entered-token")
+    monkeypatch.setattr(cli, "prompt_secret", fake_prompt_secret)
+    monkeypatch.setattr(cli, "prompt_confirm", lambda _message, default=True: True)
     monkeypatch.setattr(
         cli,
         "prompt_skill_hub_selection",
@@ -1391,6 +1675,9 @@ def test_skill_hub_prompts_for_token_and_saves_it(
     result = invoke(["skill-hub", str(tmp_path), "--keyword", "retry"], tmp_path)
     assert result.exit_code == 0, result.output
     assert calls == [None, "entered-token"]
+    assert prompt_messages == [
+        "GitHub token (saved to settings.github_token, then retries search)"
+    ]
 
     config = trust_config(tmp_path)
     assert config["settings"]["github_token"] == "entered-token"
@@ -1464,6 +1751,7 @@ def test_skill_hub_escape_from_selection_returns_to_keyword_step(
 
     monkeypatch.setattr(cli, "can_prompt", lambda: True)
     monkeypatch.setattr(cli, "prompt_skill_hub_keyword", lambda _default="": next(keywords, None))
+    monkeypatch.setattr(cli, "prompt_confirm", lambda _message, default=True: True)
 
     def fake_search(
         keyword: str, *, token: str | None = None, hubs: Any = None
@@ -1534,6 +1822,8 @@ def test_skill_hub_preview_uses_feedback_loader(
 
     monkeypatch.setattr(cli, "can_prompt", lambda: True)
     monkeypatch.setattr(cli, "search_remote_skills", lambda _keyword, token=None: [remote_skill])
+    monkeypatch.setattr(cli, "fetch_remote_skill", lambda _skill, token=None: package)
+    monkeypatch.setattr(cli, "prompt_confirm", lambda _message, default=True: True)
 
     def fake_fetch_with_feedback(
         skill: RemoteSkill,
@@ -1555,7 +1845,6 @@ def test_skill_hub_preview_uses_feedback_loader(
     result = invoke(["skill-hub", str(tmp_path), "--keyword", "preview"], tmp_path)
     assert result.exit_code == 0, result.output
     assert "Loading preview for previewable-skill..." in calls
-    assert "Downloading previewable-skill..." in calls
 
 
 def test_skill_hub_token_config_falls_back_to_user_home_without_env(
