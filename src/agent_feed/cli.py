@@ -1120,7 +1120,14 @@ def skill_hub_cmd(
                 continue
             return
 
-        selection = _select_remote_skills(skills, token=token, interactive=interactive)
+        selection = _select_remote_skills(
+            skills,
+            token=token,
+            interactive=interactive,
+            no_input=no_input,
+            save_token=save_token,
+            target=target,
+        )
         if selection is None:
             if keyword_from_prompt:
                 current_keyword = ""
@@ -1133,7 +1140,7 @@ def skill_hub_cmd(
                 detail="No skills were installed.",
             )
             return
-        selected_keys, by_key = selection
+        selected_keys, by_key, token = selection
         break
 
     if not selected_keys:
@@ -1144,31 +1151,17 @@ def skill_hub_cmd(
     packages = _download_selected_skill_packages(selected_skills, token=token)
     token_retry_error = _first_skill_hub_token_retry_error(packages)
     if token_retry_error is not None:
-        retry = _retry_skill_hub_with_token(
-            keyword=current_keyword,
+        retry_token = _prompt_skill_hub_token(
             error=token_retry_error,
             no_input=no_input,
             save_token=save_token,
             target=target,
+            retry_action="download",
         )
-        if retry is None:
+        if retry_token is None:
             _print_errors("Skill hub install blocked", [_skill_hub_failure_help(token_retry_error)])
             raise typer.Exit(3)
-        skills, token = retry
-        selection = _select_remote_skills(skills, token=token, interactive=interactive)
-        if selection is None:
-            print_action_result(
-                title="Skill Hub",
-                message="Canceled",
-                kind="warning",
-                detail="No skills were installed.",
-            )
-            return
-        selected_keys, by_key = selection
-        if not selected_keys:
-            _print_errors("Skill hub install blocked", ["select at least one skill"])
-            raise typer.Exit(3)
-        selected_skills = [by_key[key] for key in selected_keys]
+        token = retry_token
         packages = _download_selected_skill_packages(selected_skills, token=token)
 
     actions: list[WriteAction] = []
@@ -2096,10 +2089,13 @@ def _select_remote_skills(
     *,
     token: str | None,
     interactive: bool,
-) -> tuple[list[str], dict[str, RemoteSkill]] | None:
+    no_input: bool,
+    save_token: bool,
+    target: Path,
+) -> tuple[list[str], dict[str, RemoteSkill], str | None] | None:
     by_key = {f"{skill.hub.key}:{skill.name}": skill for skill in skills}
     if not interactive:
-        return list(by_key), by_key
+        return list(by_key), by_key, token
 
     choices = [
         {
@@ -2110,6 +2106,7 @@ def _select_remote_skills(
     ]
 
     def preview_current(selection: dict[str, object]) -> None:
+        nonlocal token
         value = str(selection.get("value", ""))
         skill = by_key.get(value)
         if skill is None:
@@ -2121,14 +2118,34 @@ def _select_remote_skills(
                 message=f"Loading preview for {skill.name}...",
             )
         except RuntimeError as exc:
-            _print_errors("Skill preview blocked", [_skill_hub_failure_help(str(exc))])
+            retry_token = _prompt_skill_hub_token(
+                error=str(exc),
+                no_input=no_input,
+                save_token=save_token,
+                target=target,
+                retry_action="preview",
+            )
+            if retry_token is None:
+                _print_errors("Skill preview blocked", [_skill_hub_failure_help(str(exc))])
+                return
+            token = retry_token
+            try:
+                package = _fetch_remote_skill_with_feedback(
+                    skill,
+                    token=token,
+                    message=f"Loading preview for {skill.name} with token...",
+                )
+            except RuntimeError as retry_exc:
+                _print_errors("Skill preview blocked", [_skill_hub_failure_help(str(retry_exc))])
+                return
+            print_skill_preview(package)
             return
         print_skill_preview(package)
 
     selected_keys = prompt_skill_hub_selection(choices, on_preview=preview_current)
     if selected_keys is None:
         return None
-    return selected_keys, by_key
+    return selected_keys, by_key, token
 
 
 def _first_skill_hub_token_retry_error(
@@ -2182,27 +2199,15 @@ def _retry_skill_hub_with_token(
     save_token: bool,
     target: Path,
 ) -> tuple[list[RemoteSkill], str] | None:
-    if no_input or not can_prompt() or not _skill_hub_error_can_use_token(error):
-        return None
-
-    console.print("[yellow]GitHub did not allow the anonymous skill-hub request.[/yellow]")
-    console.print(_skill_hub_failure_help(error))
-    token_prompt = (
-        "GitHub token (saved to settings.github_token, then retries search)"
-        if save_token
-        else "GitHub token (used once, then retries search)"
+    token = _prompt_skill_hub_token(
+        error=error,
+        no_input=no_input,
+        save_token=save_token,
+        target=target,
+        retry_action="search",
     )
-    token = prompt_secret(token_prompt)
-    if not token:
+    if token is None:
         return None
-
-    if save_token:
-        save_actions, save_errors = save_github_token(token, target)
-        if save_actions:
-            print_write_plan(save_actions)
-        if save_errors:
-            _print_errors("GitHub token not saved", save_errors)
-            console.print("[dim]Continuing with the token for this command only.[/dim]")
 
     try:
         return (
@@ -2216,6 +2221,39 @@ def _retry_skill_hub_with_token(
     except RuntimeError as exc:
         _print_errors("Skill hub search blocked", [_skill_hub_failure_help(str(exc))])
         raise typer.Exit(3) from exc
+
+
+def _prompt_skill_hub_token(
+    *,
+    error: str,
+    no_input: bool,
+    save_token: bool,
+    target: Path,
+    retry_action: str,
+) -> str | None:
+    if no_input or not can_prompt() or not _skill_hub_error_can_use_token(error):
+        return None
+
+    console.print("[yellow]GitHub did not allow the anonymous skill-hub request.[/yellow]")
+    console.print(_skill_hub_failure_help(error))
+    token_prompt = (
+        f"GitHub token (saved to settings.github_token, then retries {retry_action})"
+        if save_token
+        else f"GitHub token (used once, then retries {retry_action})"
+    )
+    token = prompt_secret(token_prompt)
+    if not token:
+        return None
+
+    if save_token:
+        save_actions, save_errors = save_github_token(token, target)
+        if save_actions:
+            print_write_plan(save_actions)
+        if save_errors:
+            _print_errors("GitHub token not saved", save_errors)
+            console.print("[dim]Continuing with the token for this command only.[/dim]")
+
+    return token
 
 
 def _skill_hub_error_can_use_token(error: str) -> bool:

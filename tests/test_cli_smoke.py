@@ -1694,6 +1694,7 @@ def test_skill_hub_prompts_for_token_and_saves_it(
     )
 
     calls: list[str | None] = []
+    fetch_calls: list[str | None] = []
 
     def fake_search(
         _keyword: str, *, token: str | None = None, hubs: Any = None
@@ -1709,6 +1710,10 @@ def test_skill_hub_prompts_for_token_and_saves_it(
         prompt_messages.append(message)
         return "entered-token"
 
+    def fake_fetch(_skill: RemoteSkill, token: str | None = None) -> RemoteSkillPackage:
+        fetch_calls.append(token)
+        return package
+
     monkeypatch.setattr(cli, "can_prompt", lambda: True)
     monkeypatch.setattr(cli, "prompt_secret", fake_prompt_secret)
     monkeypatch.setattr(cli, "prompt_confirm", lambda _message, default=True: True)
@@ -1718,11 +1723,12 @@ def test_skill_hub_prompts_for_token_and_saves_it(
         lambda _choices, on_preview: ["example:token-retry-skill"],
     )
     monkeypatch.setattr(cli, "search_remote_skills", fake_search)
-    monkeypatch.setattr(cli, "fetch_remote_skill", lambda _skill, token=None: package)
+    monkeypatch.setattr(cli, "fetch_remote_skill", fake_fetch)
 
     result = invoke(["skill-hub", str(tmp_path), "--keyword", "retry"], tmp_path)
     assert result.exit_code == 0, result.output
     assert calls == [None, "entered-token"]
+    assert fetch_calls == ["entered-token"]
     assert prompt_messages == [
         "GitHub token (saved to settings.github_token, then retries search)"
     ]
@@ -1730,6 +1736,54 @@ def test_skill_hub_prompts_for_token_and_saves_it(
     config = trust_config(tmp_path)
     assert config["settings"]["github_token"] == "entered-token"
     assert_private_file_mode_when_supported(trust_config_path(tmp_path))
+
+
+def test_skill_hub_search_rate_limit_without_token_does_not_select_or_download(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    init_result = invoke(["init", str(tmp_path), "--project-name", "Example", "--profile", "python"], tmp_path)
+    assert init_result.exit_code == 0, init_result.output
+
+    search_calls: list[str | None] = []
+    prompt_messages: list[str] = []
+    selection_calls: list[int] = []
+    fetch_calls: list[str | None] = []
+
+    def fake_search(
+        _keyword: str, *, token: str | None = None, hubs: Any = None
+    ) -> list[RemoteSkill]:
+        search_calls.append(token)
+        raise RuntimeError("GitHub API rate limit reached. Try a token.")
+
+    def fake_prompt_secret(message: str) -> str:
+        prompt_messages.append(message)
+        return ""
+
+    def fake_selection(_choices: list[dict[str, Any]], on_preview: Any) -> list[str]:
+        selection_calls.append(1)
+        return []
+
+    def fake_fetch(_skill: RemoteSkill, token: str | None = None) -> RemoteSkillPackage:
+        fetch_calls.append(token)
+        raise AssertionError("download should not run after canceled search retry")
+
+    monkeypatch.setattr(cli, "can_prompt", lambda: True)
+    monkeypatch.setattr(cli, "prompt_secret", fake_prompt_secret)
+    monkeypatch.setattr(cli, "prompt_skill_hub_selection", fake_selection)
+    monkeypatch.setattr(cli, "search_remote_skills", fake_search)
+    monkeypatch.setattr(cli, "fetch_remote_skill", fake_fetch)
+
+    result = invoke(["skill-hub", str(tmp_path), "--keyword", "retry"], tmp_path)
+
+    assert result.exit_code == 3
+    assert search_calls == [None]
+    assert prompt_messages == [
+        "GitHub token (saved to settings.github_token, then retries search)"
+    ]
+    assert selection_calls == []
+    assert fetch_calls == []
+    assert "Skill hub search blocked" in result.output
 
 
 def test_skill_hub_install_rate_limit_reuses_token_retry_flow(
@@ -1779,6 +1833,7 @@ def test_skill_hub_install_rate_limit_reuses_token_retry_flow(
     search_calls: list[str | None] = []
     fetch_calls: list[str | None] = []
     prompt_messages: list[str] = []
+    selection_calls: list[int] = []
 
     def fake_search(
         _keyword: str, *, token: str | None = None, hubs: Any = None
@@ -1799,25 +1854,153 @@ def test_skill_hub_install_rate_limit_reuses_token_retry_flow(
     monkeypatch.setattr(cli, "can_prompt", lambda: True)
     monkeypatch.setattr(cli, "prompt_secret", fake_prompt_secret)
     monkeypatch.setattr(cli, "prompt_confirm", lambda _message, default=True: True)
-    monkeypatch.setattr(
-        cli,
-        "prompt_skill_hub_selection",
-        lambda _choices, on_preview: ["example:install-token-skill"],
-    )
+
+    def fake_selection(_choices: list[dict[str, Any]], on_preview: Any) -> list[str]:
+        selection_calls.append(1)
+        return ["example:install-token-skill"]
+
+    monkeypatch.setattr(cli, "prompt_skill_hub_selection", fake_selection)
     monkeypatch.setattr(cli, "search_remote_skills", fake_search)
     monkeypatch.setattr(cli, "fetch_remote_skill", fake_fetch)
 
     result = invoke(["skill-hub", str(tmp_path), "--keyword", "install"], tmp_path)
 
     assert result.exit_code == 0, result.output
-    assert search_calls == [None, "entered-install-token"]
+    assert search_calls == [None]
     assert fetch_calls == [None, "entered-install-token"]
+    assert selection_calls == [1]
     assert prompt_messages == [
-        "GitHub token (saved to settings.github_token, then retries search)"
+        "GitHub token (saved to settings.github_token, then retries download)"
     ]
     assert (tmp_path / ".agents/skills/install-token-skill/SKILL.md").exists()
     config = trust_config(tmp_path)
     assert config["settings"]["github_token"] == "entered-install-token"
+
+
+def test_skill_hub_install_rate_limit_retry_failure_reports_skill_without_installing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    init_result = invoke(["init", str(tmp_path), "--project-name", "Example", "--profile", "python"], tmp_path)
+    assert init_result.exit_code == 0, init_result.output
+
+    hub = SkillHub(
+        key="example",
+        name="Example Hub",
+        owner="example",
+        repo="skills",
+        branch="main",
+        skills_path="skills",
+        url="https://github.com/example/skills",
+        description="Example skills.",
+    )
+    remote_skill = RemoteSkill(
+        hub=hub,
+        name="still-blocked-install",
+        path="skills/still-blocked-install",
+        url="https://github.com/example/skills/tree/main/skills/still-blocked-install",
+        description="Still blocked after token.",
+    )
+
+    search_calls: list[str | None] = []
+    fetch_calls: list[str | None] = []
+    selection_calls: list[int] = []
+
+    def fake_search(
+        _keyword: str, *, token: str | None = None, hubs: Any = None
+    ) -> list[RemoteSkill]:
+        search_calls.append(token)
+        return [remote_skill]
+
+    def fake_fetch(_skill: RemoteSkill, token: str | None = None) -> RemoteSkillPackage:
+        fetch_calls.append(token)
+        raise RuntimeError("GitHub request failed with HTTP 403")
+
+    def fake_selection(_choices: list[dict[str, Any]], on_preview: Any) -> list[str]:
+        selection_calls.append(1)
+        return ["example:still-blocked-install"]
+
+    monkeypatch.setattr(cli, "can_prompt", lambda: True)
+    monkeypatch.setattr(cli, "prompt_secret", lambda _message: "retry-token")
+    monkeypatch.setattr(cli, "prompt_skill_hub_selection", fake_selection)
+    monkeypatch.setattr(cli, "search_remote_skills", fake_search)
+    monkeypatch.setattr(cli, "fetch_remote_skill", fake_fetch)
+
+    result = invoke(["skill-hub", str(tmp_path), "--keyword", "install"], tmp_path)
+
+    assert result.exit_code == 3
+    assert search_calls == [None]
+    assert fetch_calls == [None, "retry-token"]
+    assert selection_calls == [1]
+    assert "still-blocked-install (Example Hub): GitHub request failed with HTTP 403" in result.output
+    assert not (tmp_path / ".agents/skills/still-blocked-install").exists()
+
+
+def test_skill_hub_install_rate_limit_without_token_does_not_reselect_or_install(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    init_result = invoke(["init", str(tmp_path), "--project-name", "Example", "--profile", "python"], tmp_path)
+    assert init_result.exit_code == 0, init_result.output
+
+    hub = SkillHub(
+        key="example",
+        name="Example Hub",
+        owner="example",
+        repo="skills",
+        branch="main",
+        skills_path="skills",
+        url="https://github.com/example/skills",
+        description="Example skills.",
+    )
+    remote_skill = RemoteSkill(
+        hub=hub,
+        name="blocked-install-skill",
+        path="skills/blocked-install-skill",
+        url="https://github.com/example/skills/tree/main/skills/blocked-install-skill",
+        description="Blocks install without token.",
+    )
+
+    search_calls: list[str | None] = []
+    fetch_calls: list[str | None] = []
+    prompt_messages: list[str] = []
+    selection_calls: list[int] = []
+
+    def fake_search(
+        _keyword: str, *, token: str | None = None, hubs: Any = None
+    ) -> list[RemoteSkill]:
+        search_calls.append(token)
+        return [remote_skill]
+
+    def fake_fetch(_skill: RemoteSkill, token: str | None = None) -> RemoteSkillPackage:
+        fetch_calls.append(token)
+        raise RuntimeError("GitHub request failed with HTTP 403")
+
+    def fake_prompt_secret(message: str) -> str:
+        prompt_messages.append(message)
+        return ""
+
+    def fake_selection(_choices: list[dict[str, Any]], on_preview: Any) -> list[str]:
+        selection_calls.append(1)
+        return ["example:blocked-install-skill"]
+
+    monkeypatch.setattr(cli, "can_prompt", lambda: True)
+    monkeypatch.setattr(cli, "prompt_secret", fake_prompt_secret)
+    monkeypatch.setattr(cli, "prompt_skill_hub_selection", fake_selection)
+    monkeypatch.setattr(cli, "search_remote_skills", fake_search)
+    monkeypatch.setattr(cli, "fetch_remote_skill", fake_fetch)
+
+    result = invoke(["skill-hub", str(tmp_path), "--keyword", "install"], tmp_path)
+
+    assert result.exit_code == 3
+    assert search_calls == [None]
+    assert fetch_calls == [None]
+    assert selection_calls == [1]
+    assert prompt_messages == [
+        "GitHub token (saved to settings.github_token, then retries download)"
+    ]
+    assert "Skill hub install blocked" in result.output
+    assert not (tmp_path / ".agents/skills/blocked-install-skill").exists()
 
 
 def test_skill_hub_failure_help_shows_shell_commands_and_json_example() -> None:
@@ -1981,6 +2164,279 @@ def test_skill_hub_preview_uses_feedback_loader(
     result = invoke(["skill-hub", str(tmp_path), "--keyword", "preview"], tmp_path)
     assert result.exit_code == 0, result.output
     assert "Loading preview for previewable-skill..." in calls
+
+
+def test_skill_hub_preview_rate_limit_reuses_token_retry_flow(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    init_result = invoke(["init", str(tmp_path), "--project-name", "Example", "--profile", "python"], tmp_path)
+    assert init_result.exit_code == 0, init_result.output
+
+    hub = SkillHub(
+        key="example",
+        name="Example Hub",
+        owner="example",
+        repo="skills",
+        branch="main",
+        skills_path="skills",
+        url="https://github.com/example/skills",
+        description="Example skills.",
+    )
+    remote_skill = RemoteSkill(
+        hub=hub,
+        name="preview-token-skill",
+        path="skills/preview-token-skill",
+        url="https://github.com/example/skills/tree/main/skills/preview-token-skill",
+        description="Retries preview with token.",
+    )
+    package = RemoteSkillPackage(
+        skill=remote_skill,
+        files=(
+            RemoteSkillFile(
+                path="SKILL.md",
+                content="\n".join(
+                    [
+                        "---",
+                        "name: preview-token-skill",
+                        "description: Retries preview with token.",
+                        "---",
+                        "",
+                        "# Preview Token Skill",
+                        "",
+                    ]
+                ),
+            ),
+        ),
+    )
+
+    search_calls: list[str | None] = []
+    fetch_calls: list[str | None] = []
+    prompt_messages: list[str] = []
+
+    def fake_search(
+        _keyword: str, *, token: str | None = None, hubs: Any = None
+    ) -> list[RemoteSkill]:
+        search_calls.append(token)
+        return [remote_skill]
+
+    def fake_fetch(_skill: RemoteSkill, token: str | None = None) -> RemoteSkillPackage:
+        fetch_calls.append(token)
+        if token is None:
+            raise RuntimeError("GitHub request failed with HTTP 403")
+        return package
+
+    def fake_prompt_secret(message: str) -> str:
+        prompt_messages.append(message)
+        return "entered-preview-token"
+
+    def fake_selection(_choices: list[dict[str, Any]], on_preview: Any) -> list[str]:
+        on_preview({"value": "example:preview-token-skill"})
+        return ["example:preview-token-skill"]
+
+    monkeypatch.setattr(cli, "can_prompt", lambda: True)
+    monkeypatch.setattr(cli, "prompt_secret", fake_prompt_secret)
+    monkeypatch.setattr(cli, "prompt_confirm", lambda _message, default=True: True)
+    monkeypatch.setattr(cli, "prompt_skill_hub_selection", fake_selection)
+    monkeypatch.setattr(cli, "search_remote_skills", fake_search)
+    monkeypatch.setattr(cli, "fetch_remote_skill", fake_fetch)
+
+    result = invoke(["skill-hub", str(tmp_path), "--keyword", "preview"], tmp_path)
+
+    assert result.exit_code == 0, result.output
+    assert search_calls == [None]
+    assert fetch_calls == [None, "entered-preview-token", "entered-preview-token"]
+    assert prompt_messages == [
+        "GitHub token (saved to settings.github_token, then retries preview)"
+    ]
+    assert (tmp_path / ".agents/skills/preview-token-skill/SKILL.md").exists()
+    config = trust_config(tmp_path)
+    assert config["settings"]["github_token"] == "entered-preview-token"
+
+
+def test_skill_hub_preview_rate_limit_without_token_still_allows_install(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    init_result = invoke(["init", str(tmp_path), "--project-name", "Example", "--profile", "python"], tmp_path)
+    assert init_result.exit_code == 0, init_result.output
+
+    hub = SkillHub(
+        key="example",
+        name="Example Hub",
+        owner="example",
+        repo="skills",
+        branch="main",
+        skills_path="skills",
+        url="https://github.com/example/skills",
+        description="Example skills.",
+    )
+    remote_skill = RemoteSkill(
+        hub=hub,
+        name="preview-cancel-skill",
+        path="skills/preview-cancel-skill",
+        url="https://github.com/example/skills/tree/main/skills/preview-cancel-skill",
+        description="Preview token canceled.",
+    )
+    package = RemoteSkillPackage(
+        skill=remote_skill,
+        files=(
+            RemoteSkillFile(
+                path="SKILL.md",
+                content="\n".join(
+                    [
+                        "---",
+                        "name: preview-cancel-skill",
+                        "description: Preview token canceled.",
+                        "---",
+                        "",
+                        "# Preview Cancel Skill",
+                        "",
+                    ]
+                ),
+            ),
+        ),
+    )
+
+    search_calls: list[str | None] = []
+    fetch_calls: list[tuple[str, str | None]] = []
+    prompt_messages: list[str] = []
+
+    def fake_search(
+        _keyword: str, *, token: str | None = None, hubs: Any = None
+    ) -> list[RemoteSkill]:
+        search_calls.append(token)
+        return [remote_skill]
+
+    def fake_fetch_with_feedback(
+        skill: RemoteSkill,
+        *,
+        token: str | None,
+        message: str,
+    ) -> RemoteSkillPackage:
+        fetch_calls.append(("preview", token))
+        raise RuntimeError("GitHub request failed with HTTP 403")
+
+    def fake_fetch(_skill: RemoteSkill, token: str | None = None) -> RemoteSkillPackage:
+        fetch_calls.append(("download", token))
+        return package
+
+    def fake_prompt_secret(message: str) -> str:
+        prompt_messages.append(message)
+        return ""
+
+    def fake_selection(_choices: list[dict[str, Any]], on_preview: Any) -> list[str]:
+        on_preview({"value": "example:preview-cancel-skill"})
+        return ["example:preview-cancel-skill"]
+
+    monkeypatch.setattr(cli, "can_prompt", lambda: True)
+    monkeypatch.setattr(cli, "prompt_secret", fake_prompt_secret)
+    monkeypatch.setattr(cli, "prompt_confirm", lambda _message, default=True: True)
+    monkeypatch.setattr(cli, "prompt_skill_hub_selection", fake_selection)
+    monkeypatch.setattr(cli, "search_remote_skills", fake_search)
+    monkeypatch.setattr(cli, "_fetch_remote_skill_with_feedback", fake_fetch_with_feedback)
+    monkeypatch.setattr(cli, "fetch_remote_skill", fake_fetch)
+
+    result = invoke(["skill-hub", str(tmp_path), "--keyword", "preview"], tmp_path)
+
+    assert result.exit_code == 0, result.output
+    assert search_calls == [None]
+    assert fetch_calls == [("preview", None), ("download", None)]
+    assert prompt_messages == [
+        "GitHub token (saved to settings.github_token, then retries preview)"
+    ]
+    assert "Skill preview blocked" in result.output
+    assert (tmp_path / ".agents/skills/preview-cancel-skill/SKILL.md").exists()
+    assert trust_config(tmp_path)["settings"]["github_token"] == ""
+
+
+def test_skill_hub_preview_token_retry_failure_does_not_repeat_search(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    init_result = invoke(["init", str(tmp_path), "--project-name", "Example", "--profile", "python"], tmp_path)
+    assert init_result.exit_code == 0, init_result.output
+
+    hub = SkillHub(
+        key="example",
+        name="Example Hub",
+        owner="example",
+        repo="skills",
+        branch="main",
+        skills_path="skills",
+        url="https://github.com/example/skills",
+        description="Example skills.",
+    )
+    remote_skill = RemoteSkill(
+        hub=hub,
+        name="preview-still-blocked",
+        path="skills/preview-still-blocked",
+        url="https://github.com/example/skills/tree/main/skills/preview-still-blocked",
+        description="Preview remains blocked.",
+    )
+    package = RemoteSkillPackage(
+        skill=remote_skill,
+        files=(
+            RemoteSkillFile(
+                path="SKILL.md",
+                content="\n".join(
+                    [
+                        "---",
+                        "name: preview-still-blocked",
+                        "description: Preview remains blocked.",
+                        "---",
+                        "",
+                        "# Preview Still Blocked",
+                        "",
+                    ]
+                ),
+            ),
+        ),
+    )
+
+    search_calls: list[str | None] = []
+    preview_calls: list[str | None] = []
+    download_calls: list[str | None] = []
+
+    def fake_search(
+        _keyword: str, *, token: str | None = None, hubs: Any = None
+    ) -> list[RemoteSkill]:
+        search_calls.append(token)
+        return [remote_skill]
+
+    def fake_fetch_with_feedback(
+        skill: RemoteSkill,
+        *,
+        token: str | None,
+        message: str,
+    ) -> RemoteSkillPackage:
+        preview_calls.append(token)
+        raise RuntimeError("GitHub request failed with HTTP 403")
+
+    def fake_fetch(_skill: RemoteSkill, token: str | None = None) -> RemoteSkillPackage:
+        download_calls.append(token)
+        return package
+
+    def fake_selection(_choices: list[dict[str, Any]], on_preview: Any) -> list[str]:
+        on_preview({"value": "example:preview-still-blocked"})
+        return ["example:preview-still-blocked"]
+
+    monkeypatch.setattr(cli, "can_prompt", lambda: True)
+    monkeypatch.setattr(cli, "prompt_secret", lambda _message: "preview-token")
+    monkeypatch.setattr(cli, "prompt_confirm", lambda _message, default=True: True)
+    monkeypatch.setattr(cli, "prompt_skill_hub_selection", fake_selection)
+    monkeypatch.setattr(cli, "search_remote_skills", fake_search)
+    monkeypatch.setattr(cli, "_fetch_remote_skill_with_feedback", fake_fetch_with_feedback)
+    monkeypatch.setattr(cli, "fetch_remote_skill", fake_fetch)
+
+    result = invoke(["skill-hub", str(tmp_path), "--keyword", "preview"], tmp_path)
+
+    assert result.exit_code == 0, result.output
+    assert search_calls == [None]
+    assert preview_calls == [None, "preview-token"]
+    assert download_calls == ["preview-token"]
+    assert "Skill preview blocked" in result.output
+    assert (tmp_path / ".agents/skills/preview-still-blocked/SKILL.md").exists()
 
 
 def test_skill_hub_token_config_falls_back_to_user_home_without_env(

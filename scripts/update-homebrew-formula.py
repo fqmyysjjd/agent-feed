@@ -12,6 +12,7 @@ import tempfile
 import urllib.parse
 import urllib.request
 from pathlib import Path
+from typing import cast
 
 
 def canonical_resource_name(name: str) -> str:
@@ -33,7 +34,10 @@ def build_pip_report(package_spec: str, python_bin: str) -> dict[str, object]:
         ],
         check=True,
     )
-    return json.loads(report_path.read_text())
+    report = json.loads(report_path.read_text())
+    if not isinstance(report, dict):
+        raise RuntimeError("pip report must be a JSON object")
+    return cast(dict[str, object], report)
 
 
 def fetch_release_file(package_name: str, version: str) -> tuple[str, str]:
@@ -110,6 +114,9 @@ def update_formula_text(
     source_sha256: str,
     resource_blocks: str,
 ) -> str:
+    def replace_resource_blocks(match: re.Match[str]) -> str:
+        return f"{match.group(1)}{resource_blocks}\n{match.group(3)}"
+
     updated = re.sub(
         r'(?m)^  url ".*"$',
         f'  url "{source_url}"',
@@ -124,7 +131,7 @@ def update_formula_text(
     )
     updated, count = re.subn(
         r'(?ms)(depends_on "python@[^"]+"\n\n)(.*?)(\n  def install)',
-        lambda match: f'{match.group(1)}{resource_blocks}\n{match.group(3)}',
+        replace_resource_blocks,
         updated,
         count=1,
     )
