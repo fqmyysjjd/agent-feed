@@ -430,26 +430,35 @@ Files:
 
 Handling:
 
-1. Read `.agents/project/README.md` first because it indexes project-specific
-   constraints.
-2. Use project files for repository-specific architecture, placement,
-   verification, and milestone rules.
-3. Use domain files for stable project concepts, public contracts, and durable
+1. Read `.agents/project/README.md` first because it is the recall index for
+   project-specific constraints. Choose the relevant indexed file by matching
+   the current task against each file's description and trigger; do not load all
+   project files by default.
+2. Read `.agents/domain/README.md` when domain facts, contracts, durable
+   ownership, or source-of-truth rules may matter. Choose the relevant indexed
+   domain file the same way; do not load all domain files by default.
+3. Use project files for repository-specific architecture, placement,
+   verification, milestone, release, dependency, and security rules.
+4. Use domain files for stable project concepts, public contracts, and durable
    source-of-truth ownership.
-4. If a required public contract is missing from the canonical contract index,
+5. If a required public contract is missing from the canonical contract index,
    stop and ask unless the change is purely local implementation detail.
-5. Treat generated project/domain files as scaffolds until repository evidence
+6. Treat generated project/domain files as scaffolds until repository evidence
    supports concrete guidance. When evidence is clear, replace scaffold-only
    sections with project-specific facts; ask the user only when the missing
    decision could affect future development results.
-6. If `.feed-backup/` exists, read the newest backup's migration guide and
+7. If `.feed-backup/` exists, read the newest backup's migration guide and
    manifest before project-specific development. Preserve decisive legacy AI
    workflows and project rules by migrating supported facts into project/domain
    files. Stop for the user when a legacy rule conflicts with Agent Feed,
    overlaps but could change the AI-development loop, or lacks enough evidence.
-7. After feature, architecture, source layout, verification, persistence,
+8. After feature, architecture, source layout, verification, persistence,
    security, public contract, domain, or ownership changes, review related
    project/domain files and update stale guidance in the same task.
+9. If a project or domain markdown file is added, removed, renamed, or
+   materially changed, update the corresponding README index in the same task.
+   The docs verification gate checks that direct `.agents/project/*.md` and
+   `.agents/domain/*.md` files are indexed.
 
 Effect:
 
@@ -760,7 +769,8 @@ responsibility.
 | A gap affects future behavior | `decision-gates` | Stop, present options, wait for confirmation | Human owns contract/scope/protocol decisions |
 | Work touches external facts or dependencies | `evidence-gates` | Use source priority and separate facts from inference | Reduces stale or generic recommendations |
 | Work touches public contract or durable fact | `domain/contracts`, `source-of-truth` | Read canonical contract owner or stop if missing | Prevents hallucinated contracts |
-| Work touches project architecture or structure | `.agents/project/*` | Read project constraint index and relevant file | Project-specific ownership stays local |
+| Work touches project architecture, structure, release, verification, dependency, or security rules | `.agents/project/README.md` | Read the project index, then the relevant indexed file only | Project-specific ownership stays local without full-context loading |
+| Work touches domain concepts, public contracts, durable facts, or source-of-truth ownership | `.agents/domain/README.md` | Read the domain index, then the relevant indexed file only | Domain facts are recoverable without loading every domain document |
 | AI uses built-in or reviewed skills | `check-agent-trust.sh`, `$AGENT_FEED_HOME/config.json` | Stop if a managed skill or protocol script hash changed unexpectedly | Prevents silently following tampered trusted guidance |
 | User imports, edits, or removes a skill | `skill-hub`, `skills`, `index-skills`, `.agents/skills/README.md` | Fill missing metadata, remove stale index/trust entries, and keep custom skills advisory | Extends capability without letting external guidance override core rules |
 | User proposes a concrete implementation plan | User-proposed approach gate | Assess against code, contracts, and decision gates before editing | Avoids turning partial solution sketches into hidden product decisions |

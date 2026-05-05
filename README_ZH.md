@@ -28,6 +28,7 @@
   <a href="#-解决的核心痛点">痛点</a> ·
   <a href="#-快速开始">快速开始</a> ·
   <a href="#️-工作原理">工作原理</a> ·
+  <a href="docs/ai-protocol-usage-guide.md">使用手册</a> ·
   <a href="#-常用命令">命令</a> ·
   <a href="#-文档导航">文档</a>
 </p>
@@ -165,6 +166,7 @@ agent-feed --help          # 查看完整的 CLI 命令帮助
 ## 📚 文档导航
 
 - **[AI Development Protocol Flow (协议工作流解析)](docs/ai-development-protocol-flow.md)**：端到端的 AI 治理循环、触发点、文件职责以及解决的痛点。
+- **[AI Protocol Usage Guide (协议使用维护手册)](docs/ai-protocol-usage-guide.md)**：如何使用、定制、索引和维护仓库级 AI 规范。
 - **[Template Model (模板模型)](docs/template-model.md)**：标准目录结构、适配器边界、技能索引、项目设置以及信任状态归属。
 - [Basic Generated Output (基础生成示例)](examples/basic-output.md)：`agent-feed init` 初始化的目录结构示例。
 - [Live Protocol Example (真实协议示例)](examples/live-protocol/README.md)：开发本仓库时实际使用的 `AGENTS.md`、`CLAUDE.md`、项目规则及技能索引。

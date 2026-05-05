@@ -28,6 +28,7 @@
   <a href="#-problems-it-solves">Problems</a> ·
   <a href="#-quick-start">Quick Start</a> ·
   <a href="#-how-it-works">How It Works</a> ·
+  <a href="https://github.com/fqmyysjjd/agent-feed/blob/main/docs/ai-protocol-usage-guide.md">Usage Guide</a> ·
   <a href="#-common-commands">Commands</a> ·
   <a href="#-documentation">Docs</a>
 </p>
@@ -166,6 +167,7 @@ All path arguments are optional. When omitted, commands operate on the current d
 ## 📚 Documentation
 
 - **[AI Development Protocol Flow](https://github.com/fqmyysjjd/agent-feed/blob/main/docs/ai-development-protocol-flow.md)**: the full governance loop, trigger points, file responsibilities, and pain points solved.
+- **[AI Protocol Usage Guide](https://github.com/fqmyysjjd/agent-feed/blob/main/docs/ai-protocol-usage-guide.md)**: how to use, customize, index, and maintain repository-specific AI rules.
 - **[Template Model](https://github.com/fqmyysjjd/agent-feed/blob/main/docs/template-model.md)**: canonical structure, adapters, skill index, project settings, and trust-state ownership.
 - [Basic Generated Output](https://github.com/fqmyysjjd/agent-feed/blob/main/examples/basic-output.md): the directory layout created by `agent-feed init`.
 - [Live Protocol Example](https://github.com/fqmyysjjd/agent-feed/blob/main/examples/live-protocol/README.md): the real `AGENTS.md`, `CLAUDE.md`, `.agents/project/`, `.agents/domain/`, and skill index used to develop this repository.

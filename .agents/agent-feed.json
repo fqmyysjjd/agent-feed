@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "agent_feed_version": "1.0.0",
+  "agent_feed_version": "1.0.1",
   "template": "standard",
   "project_name": "agent-feed",
   "verification_profile": "python",

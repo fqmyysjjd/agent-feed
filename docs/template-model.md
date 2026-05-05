@@ -167,7 +167,20 @@ Project customization layer:
 
 `.agents/project/` is generated because it gives users a clear, editable lane for repository-specific constraints. Without this scaffold, users tend to place project-specific facts into reusable rules or leave them only in chat, which weakens cross-project reuse and context recovery.
 
-The generated `.agents/project/README.md` is mandatory. It must explain the directory boundary, list every project constraint file, and be updated whenever `.agents/project/*` changes.
+The generated `.agents/project/README.md` is mandatory. It is the recall index
+for project-specific constraints. It must explain the directory boundary, list
+every project constraint file, describe the boundary each file owns, and state
+when an AI agent should read it. AI agents should read the README first and then
+load only the relevant indexed file instead of loading every project file by
+default.
+
+The generated `.agents/domain/README.md` follows the same model for stable
+domain facts. It must index every `.agents/domain/*.md` file with enough
+description and trigger detail for task-specific recall.
+
+`sh .agents/scripts/verify-agent-dev.sh docs` checks that direct markdown files
+under `.agents/project/` and `.agents/domain/` are listed in their corresponding
+README indexes.
 
 ## Brownfield Migration
 

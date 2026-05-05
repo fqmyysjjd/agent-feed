@@ -4,6 +4,14 @@ All notable changes to Agent Feed are tracked here.
 
 This project uses semantic versioning. Patch releases preserve the public command surface and generated-template contracts unless the changelog calls out a migration.
 
+## 1.0.1 - 2026-05-05
+
+### Fixed
+
+- Published the npm wrapper as `@yysjjd/agent-feed` because npm blocks the unscoped `agent-feed` package name as too similar to an existing package.
+- Updated English and Chinese install instructions to use `npm install -g @yysjjd/agent-feed` while keeping the installed CLI command as `agent-feed`.
+- Removed source-checkout development instructions from the user-facing Quick Start.
+
 ## 1.0.0 - 2026-05-03
 
 ### Added

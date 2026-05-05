@@ -31,8 +31,31 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Sync release version
+        run: python scripts/sync-release-version.py "$GITHUB_REF_NAME"
+
       - name: Install dependencies
         run: uv sync --all-extras --dev
+
+      - name: Check release version
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import tomllib
+          from pathlib import Path
+
+          tag = os.environ["GITHUB_REF_NAME"]
+          expected = tag.removeprefix("v")
+          pyproject_version = tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"]
+          npm_version = json.loads(Path("package.json").read_text())["version"]
+
+          if pyproject_version != expected or npm_version != expected:
+              raise SystemExit(
+                  "Release tag and package versions must match: "
+                  f"tag={tag}, pyproject={pyproject_version}, package.json={npm_version}"
+              )
+          PY
 
       - name: Run tests
         run: uv run python -m pytest
@@ -68,11 +91,19 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
+
+      - name: Sync release version
+        run: python scripts/sync-release-version.py "$GITHUB_REF_NAME"
 
       - name: Check npm package contents
         run: npm run pack:dry-run
@@ -101,10 +132,8 @@ jobs:
         run: |
           python - <<'PY'
           import os
-          import tomllib
-          from pathlib import Path
 
-          version = tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"]
+          version = os.environ["GITHUB_REF_NAME"].removeprefix("v")
 
           with open(os.environ["GITHUB_ENV"], "a") as env:
               print(f"AGENT_FEED_VERSION={version}", file=env)

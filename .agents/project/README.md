@@ -38,6 +38,25 @@ After project-specific development:
 3. Keep the file concise enough that a future AI turn can load it before coding.
 4. Run `sh .agents/scripts/verify-agent-dev.sh docs` when project/domain guidance changes.
 
+## Custom Rule Entry
+
+Human-maintained project rules become active through this README. AI agents
+must read this README as the recall index for `.agents/project/`, then choose
+the most relevant indexed files by matching the current task against each
+file's description and trigger. Do not load every project file by default.
+
+If a user adds or changes a project-specific rule under `.agents/project/`, the
+same change must update the "Current Project Constraints" index below with:
+
+1. The file path.
+2. The decision boundary it owns.
+3. The trigger that tells an AI agent when to read it.
+
+AI agents must read this README before project-specific work and then read the
+indexed file for the affected boundary. A file under `.agents/project/` that is
+not listed here is preserved as repository content, but it is not a reliable
+routing entry for future AI sessions.
+
 ## Boundary
 
 Use this directory for:
@@ -64,4 +83,5 @@ Do not use this directory for generic AI development workflow rules, session-loc
 1. `architecture-boundaries.md`: owns repository architecture boundaries and stop rules; read before module ownership, dependency, adapter, or template responsibility decisions.
 2. `project-structure.md`: owns source layout and placement rules; read before adding, moving, or importing files.
 3. `milestones.md`: owns implementation milestone or phase route; read before planning scope, sequencing, or release-facing work.
-4. `verification-commands.sh`: owns project-specific custom code verification commands; read or edit only when `.agents/agent-feed.json` sets `verification_profile` to `custom`.
+4. `release-publishing.md`: owns release version and publishing automation constraints for PyPI, npm, and Homebrew; read before release workflow, version metadata, package name, registry, or tap update changes.
+5. `verification-commands.sh`: owns project-specific custom code verification commands; read or edit only when `.agents/agent-feed.json` sets `verification_profile` to `custom`.

@@ -250,11 +250,23 @@ project_readme = (root / ".agents/project/README.md").read_text(encoding="utf-8"
 for heading in ("## Boundary", "## Maintenance Contract", "## Current Project Constraints"):
     if heading not in project_readme:
         errors.append(f".agents/project/README.md missing required heading {heading}")
-for project_file in sorted((root / ".agents/project").glob("*.md")):
-    if project_file.name == "README.md":
-        continue
-    if project_file.name not in project_readme:
-        errors.append(f".agents/project/README.md does not list {project_file.name}")
+
+
+def check_indexed_md_files(directory: str, readme_text: str) -> None:
+    for indexed_file in sorted((root / directory).glob("*.md")):
+        if indexed_file.name == "README.md":
+            continue
+        if indexed_file.name not in readme_text:
+            errors.append(f"{directory}/README.md does not list {indexed_file.name}")
+
+
+check_indexed_md_files(".agents/project", project_readme)
+
+domain_readme = (root / ".agents/domain/README.md").read_text(encoding="utf-8")
+for heading in ("## Core Concepts", "## Use Cases"):
+    if heading not in domain_readme:
+        errors.append(f".agents/domain/README.md missing required heading {heading}")
+check_indexed_md_files(".agents/domain", domain_readme)
 
 if errors:
     print("check-agent-assets: ERROR: structural checks failed", file=sys.stderr)

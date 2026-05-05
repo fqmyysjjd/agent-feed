@@ -109,7 +109,7 @@ Manual fallback for a failed tap update:
 
 7. Commit and push to `main`.
 8. Confirm GitHub CI is green.
-9. Create a GitHub Release with a tag matching the version, for example `v1.0.0`.
+9. Create a GitHub Release with a semantic version tag, for example `v1.0.1`.
 10. PyPI publishing starts automatically when the GitHub Release is published.
 11. The npm wrapper publish and Homebrew tap update start automatically after
     the PyPI job succeeds.
@@ -118,7 +118,7 @@ Manual fallback for a failed tap update:
 
     ```sh
     brew install fqmyysjjd/tap/agent-feed
-    npm install -g agent-feed
+    npm install -g @yysjjd/agent-feed
     uv tool install agent-feed
     agent-feed --version
     agent-feed --help
@@ -127,7 +127,9 @@ Manual fallback for a failed tap update:
 ## Notes
 
 - PyPI and npm versions are immutable. Do not publish until the version, README, and package metadata are final.
-- Keep `pyproject.toml` and root `package.json` versions identical. The npm
-  wrapper installs the matching PyPI version from `package.json`.
+- The publish workflow syncs `pyproject.toml`, `src/agent_feed/__init__.py`,
+  `package.json`, and `package-lock.json` from the GitHub Release tag before
+  building. Local version bumps are useful for review, but release artifacts use
+  the tag as the final source of truth.
 - Do not commit local `dist/` contents or private deploy keys.
 - Use a new patch version for any follow-up fix after publishing.
