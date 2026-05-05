@@ -23,12 +23,13 @@ pending publisher.
 
 ## One-Time npm Setup
 
-Prepare npm trusted publishing for the `agent-feed` wrapper package:
+Prepare npm trusted publishing for the `@yysjjd/agent-feed` wrapper package:
 
-1. Package name: `agent-feed`
+1. Package name: `@yysjjd/agent-feed`
 2. Owner: `fqmyysjjd`
 3. Repository: `agent-feed`
 4. Workflow: `publish.yml`
+5. Environment: `npm`
 
 npm trusted publishing requires GitHub Actions OIDC, npm CLI 11.5.1 or newer,
 and Node 22.14.0 or newer. Keep the release publish job on Node 24 even though

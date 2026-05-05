@@ -76,7 +76,7 @@ uv tool install agent-feed
 # 或使用
 pipx install agent-feed
 # 或使用
-npm install -g agent-feed
+npm install -g @yysjjd/agent-feed
 ```
 
 npm 包只是 Python CLI 的薄包装器。使用 npm 安装时，本机仍需要 Python
@@ -94,12 +94,6 @@ agent-feed status    # 查看当前状态及下一步推荐操作
 `.feed-backup/<timestamp>/`，再安装 Agent Feed，避免直接覆盖旧工作流。
 生成的迁移说明会要求 AI 把决定性的旧规则迁移到 `.agents/project/` 和
 `.agents/domain/`，遇到冲突或无法判断时必须询问用户。
-
-从源码本地开发运行:
-
-```sh
-uv run agent-feed
-```
 
 ## 🤝 开始 AI 辅助开发
 

@@ -76,7 +76,7 @@ uv tool install agent-feed
 # or
 pipx install agent-feed
 # or
-npm install -g agent-feed
+npm install -g @yysjjd/agent-feed
 ```
 
 The npm package is a thin wrapper around the Python CLI. It requires Python
@@ -94,12 +94,6 @@ If the project already has AI instructions, `init` backs them up into
 `.feed-backup/<timestamp>/` and installs Agent Feed without destroying the old
 workflow. The generated migration guide tells your AI assistant how to preserve
 decisive legacy rules into `.agents/project/` and `.agents/domain/`.
-
-For local development from this checkout:
-
-```sh
-uv run agent-feed
-```
 
 ## 🤝 Start AI-Assisted Development
 

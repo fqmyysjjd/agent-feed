@@ -1,5 +1,5 @@
 {
-  "name": "agent-feed",
+  "name": "@yysjjd/agent-feed",
   "version": "1.0.0",
   "description": "Repository-owned workflow governance for AI coding agents.",
   "license": "MIT",
