@@ -118,7 +118,7 @@ First, review the development guidelines for the project, and then, start to car
 
 The core workflow enforces a strict, linear pipeline instead of an open-ended chat:
 
-[![Agent Feed Workflow Pipeline](https://raw.githubusercontent.com/fqmyysjjd/agent-feed/main/docs/assets/agent-feed-workflow.svg)](https://github.com/fqmyysjjd/agent-feed/blob/main/docs/assets/agent-feed-workflow.mp4)
+[![Agent Feed Workflow Pipeline](https://raw.githubusercontent.com/fqmyysjjd/agent-feed/main/docs/assets/agent-feed-workflow.png)](https://github.com/fqmyysjjd/agent-feed/blob/main/docs/assets/agent-feed-workflow.mp4)
 
 The protocol is intentionally split by responsibility while remaining customizable:
 

@@ -118,7 +118,7 @@ agent-feed status    # 查看当前状态及下一步推荐操作
 
 核心工作流强制执行严格的线性管道，而非开放式的闲聊：
 
-[![Agent Feed Workflow Pipeline](docs/assets/agent-feed-workflow.svg)](docs/assets/agent-feed-workflow.mp4)
+[![Agent Feed Workflow Pipeline](docs/assets/agent-feed-workflow.png)](docs/assets/agent-feed-workflow.mp4)
 
 该协议在保持高度可定制性的同时，在职责上进行了明确的拆分：
 
