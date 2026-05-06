@@ -10,6 +10,7 @@ Run `agent-feed index-skills` or `sh .agents/scripts/index-skills.sh` after addi
 | --- | --- | --- | --- |
 | `concept-review` | Use when reviewing naming, vocabulary drift, invented concepts, misleading abstractions, or unclear domain language. | `agent-feed` | `core` |
 | `design-review` | Use when reviewing design documents, architecture plans, implementation routes, gap analyses, README, AGENTS, rules, domain docs, or skills. | `agent-feed` | `core` |
+| `engineering-planning` | Use before implementation, fix, refactor, tests, file creation, or project-structure changes to decide placement, reuse, ownership, and maintainable integration before editing. | `agent-feed` | `core` |
 | `guidance-promoter` | Use when user corrections, repeated AI failures, or session-state conclusions should be promoted into stable AI development guidance. | `agent-feed` | `core` |
 | `project-architecture` | Use at the start of every project session, after context compression, and before architecture, module, runtime, or requirement decisions. | `agent-feed` | `core` |
 | `project-development` | Use before implementation, refactor, tests, project-structure changes, or coding tasks. | `agent-feed` | `core` |

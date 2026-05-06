@@ -62,8 +62,10 @@ Use these routes:
 1. Architecture, module ownership, runtime behavior, or requirement decisions:
    - `.agents/skills/project-architecture/SKILL.md`
 2. Coding, refactor, tests, or project structure changes:
+   - `.agents/skills/engineering-planning/SKILL.md`
    - `.agents/skills/project-development/SKILL.md`
 3. Bug fixes, regressions, failed tests, or review finding fixes:
+   - `.agents/skills/engineering-planning/SKILL.md`
    - `.agents/skills/project-fix/SKILL.md`
 4. Code review, diff review, commit review, or merge review:
    - `.agents/skills/project-review/SKILL.md`
@@ -90,6 +92,7 @@ When a task matches multiple routes, apply every relevant gate instead of choosi
 Use the primary execution skill first, then add only the gates that the changed surface requires:
 
 1. Code or implementation changed:
+   - use `.agents/skills/engineering-planning/SKILL.md` before editing to decide owner, reuse, placement, boundaries, and verification
    - start with `.agents/skills/project-development/SKILL.md` or `.agents/skills/project-fix/SKILL.md`
    - then run `.agents/skills/project-review/SKILL.md`
 2. README, AGENTS, rules, project/domain docs, or other design/protocol docs changed:
