@@ -14,7 +14,12 @@ from typer.testing import CliRunner
 
 import agent_feed.cli as cli
 import agent_feed.skill_hub as skill_hub
-from agent_feed.asset_trust import configured_github_token, recommended_agent_feed_home
+from agent_feed.asset_trust import (
+    check_asset_trust,
+    configured_github_token,
+    recommended_agent_feed_home,
+    sync_asset_trust,
+)
 from agent_feed.checks import validate_references_and_indexes
 from agent_feed.cli import app
 from agent_feed.console import diff_line_style, render_diff
@@ -32,6 +37,12 @@ from agent_feed.skill_hub import (
 
 
 runner = CliRunner()
+REAL_GITHUB_CLI_TOKEN = cli._github_cli_token
+
+
+@pytest.fixture(autouse=True)
+def disable_github_cli_token_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(cli, "_github_cli_token", lambda: None)
 
 
 def normalized_output(output: str) -> str:
@@ -90,6 +101,74 @@ def test_trust_home_is_required_and_external(tmp_path: Path) -> None:
     assert local_result.exit_code == 3, local_result.output
     assert "points inside the current project" in local_result.output
     assert not (tmp_path / "AGENTS.md").exists()
+
+
+def test_asset_trust_detects_and_accepts_changed_skill_hash(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project = tmp_path / "project"
+    trust_home = tmp_path / "agent-feed-home"
+    skill_file = project / ".agents/skills/demo/SKILL.md"
+    skill_file.parent.mkdir(parents=True)
+    skill_file.write_text(
+        "\n".join(
+            [
+                "---",
+                "name: demo",
+                "description: Use when testing direct trust state.",
+                "source: agent-feed",
+                "trust: core",
+                "---",
+                "",
+                "# Demo",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("AGENT_FEED_HOME", str(trust_home))
+
+    actions, errors = sync_asset_trust(
+        project,
+        dry_run=False,
+        accept_changed=True,
+        project_name="Example",
+    )
+
+    assert not errors
+    assert actions[0].action == "create"
+    assert check_asset_trust(project).ok
+
+    skill_file.write_text(
+        skill_file.read_text(encoding="utf-8") + "\nAdditional trusted guidance.\n",
+        encoding="utf-8",
+    )
+    report = check_asset_trust(project)
+    assert not report.ok
+    assert len(report.issues) == 1
+    assert report.issues[0].path.as_posix() == ".agents/skills/demo/SKILL.md"
+    assert report.issues[0].reason == "trusted hash mismatch"
+
+    actions, errors = sync_asset_trust(
+        project,
+        dry_run=False,
+        accept_changed=False,
+        project_name="Example",
+    )
+    assert not actions
+    assert errors
+    assert "trusted hash changed" in errors[0]
+
+    actions, errors = sync_asset_trust(
+        project,
+        dry_run=False,
+        accept_changed=True,
+        project_name="Example",
+    )
+    assert not errors
+    assert actions[0].action == "update"
+    assert check_asset_trust(project).ok
 
 
 def test_init_can_auto_setup_missing_env_without_confirmation(
@@ -1038,6 +1117,28 @@ def test_status_and_preview_default_to_installed_clients(tmp_path: Path) -> None
     assert ".cursor/rules/agent-feed.mdc" not in upgrade_result.output
 
 
+def test_upgrade_is_idempotent_after_managed_assets_are_current(tmp_path: Path) -> None:
+    init_result = invoke(
+        ["init", str(tmp_path), "--project-name", "Example", "--clients", "none", "--profile", "python"],
+        tmp_path,
+    )
+    assert init_result.exit_code == 0, init_result.output
+
+    first_upgrade = invoke(["upgrade", str(tmp_path), "--clients", "none"], tmp_path)
+    assert first_upgrade.exit_code == 0, first_upgrade.output
+
+    second_upgrade = invoke(["upgrade", str(tmp_path), "--clients", "none"], tmp_path)
+    assert second_upgrade.exit_code == 0, second_upgrade.output
+    assert "upgrade complete" in second_upgrade.output
+    assert "would update" not in second_upgrade.output
+    assert "would create" not in second_upgrade.output
+
+    preview_result = invoke(["preview", str(tmp_path), "--clients", "none"], tmp_path)
+    assert preview_result.exit_code == 0, preview_result.output
+    assert "would update" not in preview_result.output
+    assert "would create" not in preview_result.output
+
+
 def test_upgrade_reports_source_specific_update_notice(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1717,6 +1818,107 @@ def test_skill_hub_uses_saved_user_level_github_token(
     result = invoke(["skill-hub", str(tmp_path), "--keyword", "saved", "--no-input"], tmp_path)
     assert result.exit_code == 0, result.output
     assert captured["token"] == "saved-token"
+
+
+def test_skill_hub_prefers_tokens_before_github_cli_fallback(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config_path = trust_config_path(tmp_path)
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "agent_feed_version": "0.1.1",
+                "settings": {"github_token": "saved-token"},
+                "projects": {},
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(cli, "_github_cli_token", lambda: "gh-token")
+    monkeypatch.setenv("AGENT_FEED_HOME", str(config_path.parent))
+    monkeypatch.setenv("GITHUB_TOKEN", "env-token")
+
+    assert cli._preferred_github_token(tmp_path) == "env-token"
+
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+
+    assert cli._preferred_github_token(tmp_path) == "saved-token"
+
+
+def test_github_cli_token_returns_none_when_gh_is_not_installed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_run(*_args: Any, **_kwargs: Any) -> subprocess.CompletedProcess[str]:
+        raise OSError("missing gh")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    assert REAL_GITHUB_CLI_TOKEN() is None
+
+
+def test_skill_hub_uses_github_cli_token_when_no_saved_token(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, str | None] = {"token": None}
+    remote_skill = RemoteSkill(
+        hub=SkillHub(
+            key="example",
+            name="Example Hub",
+            owner="example",
+            repo="skills",
+            branch="main",
+            skills_path="skills",
+            url="https://github.com/example/skills",
+            description="Example skills.",
+        ),
+        name="gh-token-skill",
+        path="skills/gh-token-skill",
+        url="https://github.com/example/skills/tree/main/skills/gh-token-skill",
+        description="Uses gh token.",
+    )
+
+    def fake_search(
+        _keyword: str, *, token: str | None = None, hubs: Any = None
+    ) -> list[RemoteSkill]:
+        captured["token"] = token
+        return [remote_skill]
+
+    package = RemoteSkillPackage(
+        skill=remote_skill,
+        files=(
+            RemoteSkillFile(
+                path="SKILL.md",
+                content="\n".join(
+                    [
+                        "---",
+                        "name: gh-token-skill",
+                        "description: Uses gh token.",
+                        "---",
+                        "",
+                        "# GitHub CLI Token Skill",
+                        "",
+                    ]
+                ),
+            ),
+        ),
+    )
+
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    monkeypatch.setattr(cli, "_github_cli_token", lambda: "gh-cli-token")
+    monkeypatch.setattr(cli, "search_remote_skills", fake_search)
+    monkeypatch.setattr(cli, "fetch_remote_skill", lambda _skill, token=None: package)
+
+    init_result = invoke(["init", str(tmp_path), "--project-name", "Example", "--profile", "python"], tmp_path)
+    assert init_result.exit_code == 0, init_result.output
+
+    result = invoke(["skill-hub", str(tmp_path), "--keyword", "gh", "--no-input"], tmp_path)
+    assert result.exit_code == 0, result.output
+    assert captured["token"] == "gh-cli-token"
 
 
 def test_skill_hub_prompts_for_token_and_saves_it(

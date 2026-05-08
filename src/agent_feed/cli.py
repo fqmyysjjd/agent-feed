@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 from typing import Annotated
@@ -2020,7 +2021,29 @@ def _preferred_github_token(target: Path) -> str | None:
         )
         for error in errors:
             console.print(f"- {error}")
-        console.print("[dim]Continuing with GITHUB_TOKEN or anonymous GitHub API access.[/dim]")
+        console.print("[dim]Trying GitHub CLI token fallback or anonymous GitHub API access.[/dim]")
+    elif token:
+        return token
+
+    gh_token = _github_cli_token()
+    if gh_token:
+        return gh_token
+    return None
+
+
+def _github_cli_token() -> str | None:
+    try:
+        result = subprocess.run(
+            ["gh", "auth", "token"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=2.5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    token = result.stdout.strip()
+    if result.returncode != 0 or not token:
         return None
     return token
 
@@ -2303,6 +2326,7 @@ def _skill_hub_failure_help(error: str) -> str:
     return (
         f"{error}\n"
         "Skill hub uses the GitHub API.\n"
+        "If you already use GitHub CLI, run `gh auth login`; Agent Feed will automatically reuse `gh auth token`.\n"
         "Set a GitHub token in your current shell and rerun the command:\n"
         'macOS/Linux: `export GITHUB_TOKEN="ghp_your_token_here"`\n'
         'Windows PowerShell: `$env:GITHUB_TOKEN = "ghp_your_token_here"`\n'

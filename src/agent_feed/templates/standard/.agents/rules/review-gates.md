@@ -33,10 +33,11 @@ After every design document, architecture plan, module plan, implementation rout
 1. Rebuild the current task result boundary from `.agents/rules/outcome-boundary.md`.
 2. Use `.agents/skills/design-review/SKILL.md`.
 3. Verify the document produces a usable next action and can support the next development step without invented decisions.
-4. Fix only blocking findings that can be resolved from existing source-of-truth and the current Task Brief.
-5. If a blocking finding requires an unconfirmed contract, architecture, adapter, verification, source-of-truth, or product-scope choice, apply `.agents/rules/decision-gates.md` before editing.
-6. If any file under `.agents/skills/` changed, run `agent-feed index-skills` or `sh .agents/scripts/index-skills.sh`, then run `sh .agents/scripts/sync-agent-assets.sh` before final handoff.
-7. If the change affects AI engineering protocol, `.agents/`, skill names, rule names, project constraint names, document links, or session-state JSON, run `sh .agents/scripts/verify-agent-dev.sh docs`.
+4. Verify the document serves the user's stated or clearly inferred result, covers the real problem it claims to solve, exposes result-affecting gaps, and does not optimize for documentation polish over the user's essential goal.
+5. Fix only blocking findings that can be resolved from existing source-of-truth and the current Task Brief.
+6. If a blocking finding requires an unconfirmed contract, architecture, adapter, verification, source-of-truth, product-scope, or user-goal interpretation choice, apply `.agents/rules/decision-gates.md` before editing.
+7. If any file under `.agents/skills/` changed, run `agent-feed index-skills` or `sh .agents/scripts/index-skills.sh`, then run `sh .agents/scripts/sync-agent-assets.sh` before final handoff.
+8. If the change affects AI engineering protocol, `.agents/`, skill names, rule names, project constraint names, document links, or session-state JSON, run `sh .agents/scripts/verify-agent-dev.sh docs`.
 
 ## Skill Naming Gate
 

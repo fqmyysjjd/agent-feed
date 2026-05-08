@@ -30,6 +30,14 @@ The review's highest-priority question is:
 
 Can the next development step proceed from this design without inventing missing decisions?
 
+Before judging readiness, verify result fit:
+
+1. The document addresses the user's stated or clearly inferred goal, not just the visible artifact format.
+2. The document explains the real problem, outcome, or workflow it claims to support.
+3. Any missing decision, evidence, boundary, or user assumption that could change the result is called out as a gap.
+4. The document does not hide weak support behind polished wording, broad framing, or generic best practices.
+5. The proposed next action would actually move the user toward the intended result.
+
 If yes, state that the design is ready for the next development step and stop.
 
 If no, identify the blocking gaps. Close a gap directly only when all of these are true:

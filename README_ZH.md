@@ -29,6 +29,7 @@
   <a href="#-快速开始">快速开始</a> ·
   <a href="#️-工作原理">工作原理</a> ·
   <a href="docs/usage-guide.md">使用手册</a> ·
+  <a href="docs/trust-model.md">信任模型</a> ·
   <a href="#-常用命令">命令</a> ·
   <a href="#-文档导航">文档</a>
 </p>
@@ -174,6 +175,7 @@ agent-feed --help          # 查看完整的 CLI 命令帮助
 - **[AI Development Protocol Flow (协议工作流解析)](docs/ai-development-protocol-flow.md)**：端到端的 AI 治理循环、触发点、文件职责以及解决的痛点。
 - **[Agent Feed Usage Guide (使用手册)](docs/usage-guide.md)**：实际安装、初始化、日常工作流、定制规则、技能、升级和排查。
 - **[Template Model (模板模型)](docs/template-model.md)**：标准目录结构、适配器边界、技能索引、项目设置以及信任状态归属。
+- **[Trust Model (信任模型)](docs/trust-model.md)**：外部哈希存储、技能信任等级以及自定义技能的安全边界。
 - [Basic Generated Output (基础生成示例)](examples/basic-output.md)：`agent-feed init` 初始化的目录结构示例。
 - [Live Protocol Example (真实协议示例)](examples/live-protocol/README.md)：开发本仓库时实际使用的 `AGENTS.md`、`CLAUDE.md`、项目规则及技能索引。
 

@@ -17,7 +17,8 @@ Use this guide when you want to answer practical questions such as:
 
 For the internal protocol model and design rationale, read
 [AI Development Protocol Flow](ai-development-protocol-flow.md) and
-[Template Model](template-model.md).
+[Template Model](template-model.md). For the external hash and custom-skill
+safety model, read [Trust Model](trust-model.md).
 
 ## Quick Path
 
@@ -399,6 +400,12 @@ Check the environment:
 agent-feed env status
 ```
 
+Print the shell command for manual setup:
+
+```sh
+agent-feed env print
+```
+
 Create and persist it:
 
 ```sh
@@ -408,6 +415,22 @@ agent-feed env setup
 If initialization detects that `AGENT_FEED_HOME` is missing, it can set it up
 for you. If setup fails, run `agent-feed env setup` manually and then retry the
 original command.
+
+Remove the shell binding when you no longer want this machine to use Agent Feed
+trust state:
+
+```sh
+agent-feed env uninstall
+```
+
+Remove both the shell binding and the user-level config home:
+
+```sh
+agent-feed env uninstall --remove-home -y
+```
+
+Use `--remove-home` carefully. It deletes saved user-level Agent Feed settings
+such as accepted asset hashes and `settings.github_token`.
 
 ## Use Skills
 
@@ -425,6 +448,13 @@ If GitHub rate limits anonymous requests, use a token:
 
 ```sh
 export GITHUB_TOKEN="ghp_your_token_here"
+agent-feed skill-hub
+```
+
+If you already use GitHub CLI, Agent Feed can reuse its token automatically:
+
+```sh
+gh auth login
 agent-feed skill-hub
 ```
 
@@ -509,12 +539,13 @@ Uninstall removes managed assets without deleting unmanaged user files.
 | Symptom | What to do |
 | --- | --- |
 | `AGENT_FEED_HOME` is missing | Run `agent-feed env setup`, then retry the original command. |
+| You need to remove Agent Feed from this shell | Run `agent-feed env uninstall`. Add `--remove-home -y` only when you also want to delete user-level settings and accepted hashes. |
 | `check` reports stale project records | Run `agent-feed config prune`, then `agent-feed config check`. |
 | Custom verification is not configured | Edit `.agents/project/verification-commands.sh`, then run `sh .agents/scripts/verify-agent-dev.sh code`. |
 | A skill or script trust check fails | Inspect the changed files. If the change is intentional, run `agent-feed index-skills -y`. |
 | Claude or Cursor files look stale | Run `agent-feed sync -a`. |
 | A manually added project/domain rule is not being used | Add the file to `.agents/project/README.md` or `.agents/domain/README.md` with a clear read trigger. |
-| `skill-hub` is rate limited | Set `GITHUB_TOKEN` or save `settings.github_token` in the user-level config. |
+| `skill-hub` is rate limited | Run `gh auth login`, set `GITHUB_TOKEN`, or save `settings.github_token` in the user-level config. |
 | You want to see what would change before writing | Run `agent-feed preview` or use `--dry-run` on supported commands. |
 
 ## What To Remember

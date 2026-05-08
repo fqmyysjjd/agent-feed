@@ -4,6 +4,35 @@ All notable changes to Agent Feed are tracked here.
 
 This project uses semantic versioning. Patch releases preserve the public command surface and generated-template contracts unless the changelog calls out a migration.
 
+## Unreleased
+
+### Added
+
+- Added a public trust model document explaining external hash storage, skill trust levels, custom-skill boundaries, and GitHub token lookup order.
+- Added automatic `gh auth token` fallback for `agent-feed skill-hub` when `GITHUB_TOKEN` and saved `settings.github_token` are not available.
+- Added direct regression coverage for asset trust drift, missing GitHub CLI fallback, and upgrade idempotency.
+
+### Changed
+
+- Expanded the usage guide with `env print`, `env uninstall`, and GitHub CLI token setup guidance.
+- Tightened the design review gate so document reviews must check user-goal fit, result support, and result-affecting gaps instead of only polish or next-step readiness.
+
+## 1.1.5 - 2026-05-08
+
+### Added
+
+- Added install-source-aware update notices so `upgrade` can recommend npm,
+  uv, pipx, or Homebrew update commands.
+- Added the `specialist-router` skill for selecting optional, imported, custom,
+  or specialized skills without letting them override the core protocol.
+
+### Changed
+
+- Tightened project/domain recall indexes and review guidance so custom
+  repository rules can be loaded by trigger instead of by reading everything.
+- Kept the npm package as a thin Python CLI wrapper instead of maintaining a
+  second CLI implementation.
+
 ## 1.1.4 - 2026-05-05
 
 ### Fixed

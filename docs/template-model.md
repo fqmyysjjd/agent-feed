@@ -101,7 +101,7 @@ agent-feed skill-hub
 
 Imported skills stay lower-priority than the canonical protocol. When a skill is missing frontmatter, Agent Feed fills metadata from project settings; imported skills should default to `trust: custom` unless the user deliberately changes that state after review. The specialist router may use imported skills as methods, but it must return to Agent Feed's normal verification, review, and handoff gates.
 
-Skill and managed-script sha256 values are kept in `$AGENT_FEED_HOME/config.json`, not in the project directory or user-facing skill index. By default, Agent Feed uses a user-level persistent home: `~/.agent-feed` on macOS/Linux and `%APPDATA%\agent-feed` on Windows. Use `agent-feed env setup` to create and persist that external home, `agent-feed env print` to print the shell command for manual configuration, or `agent-feed env uninstall --remove-home -y` to remove it. `status`, `preview`, and `check` read current files directly, so they can report drift without requiring a prior indexing step.
+Skill and managed-script sha256 values are kept in `$AGENT_FEED_HOME/config.json`, not in the project directory or user-facing skill index. By default, Agent Feed uses a user-level persistent home: `~/.agent-feed` on macOS/Linux and `%APPDATA%\agent-feed` on Windows. Use `agent-feed env setup` to create and persist that external home, `agent-feed env print` to print the shell command for manual configuration, or `agent-feed env uninstall --remove-home -y` to remove it. `status`, `preview`, and `check` read current files directly, so they can report drift without requiring a prior indexing step. See [Trust Model](trust-model.md) for the external hash store, trust levels, and custom-skill safety boundary.
 
 ## Project Settings
 

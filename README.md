@@ -29,6 +29,7 @@
   <a href="#-quick-start">Quick Start</a> ·
   <a href="#-how-it-works">How It Works</a> ·
   <a href="https://github.com/fqmyysjjd/agent-feed/blob/main/docs/usage-guide.md">Usage Guide</a> ·
+  <a href="https://github.com/fqmyysjjd/agent-feed/blob/main/docs/trust-model.md">Trust Model</a> ·
   <a href="#-common-commands">Commands</a> ·
   <a href="#-documentation">Docs</a>
 </p>
@@ -175,6 +176,7 @@ All path arguments are optional. When omitted, commands operate on the current d
 - **[AI Development Protocol Flow](https://github.com/fqmyysjjd/agent-feed/blob/main/docs/ai-development-protocol-flow.md)**: the full governance loop, trigger points, file responsibilities, and pain points solved.
 - **[Agent Feed Usage Guide](https://github.com/fqmyysjjd/agent-feed/blob/main/docs/usage-guide.md)**: practical setup, daily workflow, customization, skills, upgrades, and troubleshooting.
 - **[Template Model](https://github.com/fqmyysjjd/agent-feed/blob/main/docs/template-model.md)**: canonical structure, adapters, skill index, project settings, and trust-state ownership.
+- **[Trust Model](https://github.com/fqmyysjjd/agent-feed/blob/main/docs/trust-model.md)**: external hash storage, skill trust levels, and custom-skill safety boundaries.
 - [Basic Generated Output](https://github.com/fqmyysjjd/agent-feed/blob/main/examples/basic-output.md): the directory layout created by `agent-feed init`.
 - [Live Protocol Example](https://github.com/fqmyysjjd/agent-feed/blob/main/examples/live-protocol/README.md): the real `AGENTS.md`, `CLAUDE.md`, `.agents/project/`, `.agents/domain/`, and skill index used to develop this repository.
 

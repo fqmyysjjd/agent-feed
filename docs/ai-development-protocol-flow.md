@@ -718,12 +718,15 @@ For design:
 1. Rebuild the task boundary.
 2. Check whether the document can drive the next development step without
    invented decisions.
-3. Fix only blocking findings already supported by source-of-truth and inside
+3. Check whether the document serves the user's stated or inferred result,
+   covers the real problem, exposes result-affecting gaps, and avoids polished
+   but non-actionable content.
+4. Fix only blocking findings already supported by source-of-truth and inside
    the Task Brief.
-4. Apply decision gates when a fix would require an unconfirmed contract,
-   architecture, adapter, verification, source-of-truth, or product-scope
-   choice.
-5. Check whether README or project indexes need maintenance.
+5. Apply decision gates when a fix would require an unconfirmed contract,
+   architecture, adapter, verification, source-of-truth, product-scope, or
+   user-goal interpretation choice.
+6. Check whether README or project indexes need maintenance.
 
 Effect:
 
@@ -822,7 +825,7 @@ responsibility.
 | User asks for bug fix | `project-fix` | Reproduce or trace, locate owner, smallest fix | Fix addresses root cause, not symptom only |
 | User asks for code review | `project-review` | Pure review mode, findings first, no edits | Review does not mutate code unexpectedly |
 | AI changes code as part of work | `review-gates` code review gate | Run checks and review boundaries/tests/security | Implementation has internal quality gate |
-| AI edits README, rules, domain, project docs, or plans | `design-review` | Check if next development can proceed without invented decisions | Design becomes actionable, not just polished |
+| AI edits README, rules, domain, project docs, or plans | `design-review` | Check if next development can proceed without invented decisions and whether the document supports the user's intended result | Design becomes actionable and goal-fit, not just polished |
 | A gap affects future behavior | `decision-gates` | Stop, present options, wait for confirmation | Human owns contract/scope/protocol decisions |
 | Work touches external facts or dependencies | `evidence-gates` | Use source priority and separate facts from inference | Reduces stale or generic recommendations |
 | Work touches network, dependencies, environment, database, credentials, deployment, destructive actions, or security-sensitive behavior | `change-risk-gates` | Apply risk classes and non-negotiable safety lines before acting | Prevents convenience-driven unsafe changes |
@@ -865,8 +868,9 @@ responsibility.
 This document explains the workflow loop itself. The adjacent public docs are:
 
 1. `docs/template-model.md`: canonical structure, adapters, settings, trust ownership, and skill import boundaries.
-2. `examples/basic-output.md`: the generated repository shape after `agent-feed init`.
-3. `examples/live-protocol/README.md`: the actual protocol files used to build Agent Feed itself.
+2. `docs/trust-model.md`: external hash storage, skill trust levels, and custom-skill safety boundaries.
+3. `examples/basic-output.md`: the generated repository shape after `agent-feed init`.
+4. `examples/live-protocol/README.md`: the actual protocol files used to build Agent Feed itself.
 
 ## Practical Reading Order
 
