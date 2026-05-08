@@ -367,6 +367,26 @@ def print_recommended_command(message: str, command: str, *, path: str | None = 
     console.print(text)
 
 
+def print_update_notice(
+    *,
+    current_version: str,
+    latest_version: str,
+    source_label: str,
+    command: str,
+) -> None:
+    text = Text()
+    text.append("Update available:", style="bold yellow")
+    text.append(" agent-feed ")
+    text.append(current_version, style="dim")
+    text.append(" -> ")
+    text.append(latest_version, style="bold green")
+    text.append(f" from {source_label}.")
+    text.append("\nRun ")
+    text.append(command, style="bold green")
+    text.append(".")
+    console.print(text)
+
+
 def print_markdown_panel(title: str, body: str, *, border_style: str = "blue") -> None:
     console.print(Panel(Markdown(body), title=title, border_style=border_style, expand=False))
 

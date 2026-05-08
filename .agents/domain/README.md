@@ -6,9 +6,11 @@ It describes the project being built, but it is still development context for AI
 
 ## Core Concepts
 
-1. [Concepts](concepts.md): project target, non-goals, and core vocabulary.
-2. [Contracts](contracts.md): public API, persistence contracts, module ports, and canonical contract docs.
-3. [Source Of Truth](source-of-truth.md): durable facts and ownership rules.
+| File | Owns | Read when | Evidence expectation |
+| --- | --- | --- | --- |
+| `concepts.md` | Project target, non-goals, and core vocabulary. | Before product positioning, README language, user-facing feature names, protocol terminology, skill naming, or docs that define what Agent Feed is or is not. | README, protocol docs, template docs, skill index, and existing user-facing terminology. |
+| `contracts.md` | Public CLI command families, generated template contracts, upgrade/preview behavior, project settings ownership, and contract-change rules. | Before CLI command, generated layout, template boundary, config ownership, validation, upgrade/preview, or public command-family documentation changes. | CLI source, generated template files, checks, tests, and public template docs. |
+| `source-of-truth.md` | Durable source-of-truth mapping for CLI behavior, generated templates, product positioning, local AI rules, client adapters, and recovery behavior. | Before moving canonical ownership, changing generated asset recovery, adapter generation, product/doc ownership, or durable fact placement. | CLI source, template source, README/docs, root AGENTS/.agents, and generated adapters. |
 
 ## Custom Domain Entry
 
@@ -19,7 +21,8 @@ description and trigger. Do not load every domain file by default.
 
 If a user adds or changes a domain file under `.agents/domain/`, the same change
 must update the "Core Concepts" index above or another explicit index section
-with the file path, owned domain boundary, and read trigger. A file under
+with the file path, owned domain boundary, read trigger, and evidence
+expectation. A file under
 `.agents/domain/` that is not listed here is preserved as repository content,
 but it is not a reliable routing entry for future AI sessions.
 

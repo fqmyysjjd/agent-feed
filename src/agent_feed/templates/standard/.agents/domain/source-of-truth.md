@@ -4,6 +4,22 @@ Define durable fact ownership for {{PROJECT_NAME}}.
 
 Source-of-truth docs help AI assistants recover where durable facts live before changing behavior. Replace scaffold rows with repository-backed owners as soon as the project has evidence.
 
+## Owns
+
+This file owns durable fact ownership, recovery/update rules, and canonical
+source-of-truth locations for the project.
+
+## Read When
+
+Read this before moving canonical ownership, changing recovery behavior,
+changing generated/projection ownership, modifying configuration ownership, or
+deciding where a durable fact belongs.
+
+## Evidence
+
+Replace scaffold evidence with owner docs, source modules, storage schemas,
+config files, generated assets, audit/event docs, tests, or recovery scripts.
+
 ## Ownership
 
 | Fact category | Owner document/module | Evidence | Recovery/update rule |

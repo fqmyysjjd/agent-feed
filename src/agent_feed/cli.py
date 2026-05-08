@@ -50,11 +50,13 @@ from agent_feed.console import (
     print_recommended_command,
     print_status,
     print_stale_project_cleanup,
+    print_update_notice,
     print_welcome,
     print_write_plan,
     print_write_plan_with_title,
 )
 from agent_feed.fs import has_existing_content
+from agent_feed.install_source import latest_update_notice
 from agent_feed.legacy_migration import backup_actions_include, backup_legacy_ai_assets
 from agent_feed.models import (
     DEFAULT_CHECKS,
@@ -184,6 +186,18 @@ def print_version() -> None:
     console.print(f"executable: {Path(sys.argv[0]).resolve()}")
     if agent_feed.__file__:
         console.print(f"package: {Path(agent_feed.__file__).resolve().parent}")
+
+
+def maybe_print_update_notice() -> None:
+    notice = latest_update_notice()
+    if notice is None or not notice.source.update_command:
+        return
+    print_update_notice(
+        current_version=notice.current_version,
+        latest_version=notice.latest_version,
+        source_label=notice.source.label,
+        command=notice.source.update_command,
+    )
 
 
 @app.command("version", hidden=True)
@@ -1335,6 +1349,7 @@ def upgrade_cmd(
         console.print("[cyan]agent-feed: upgrade preview complete; no files changed[/cyan]")
     else:
         console.print("[green]agent-feed: upgrade complete[/green]")
+    maybe_print_update_notice()
 
 
 @app.command("check")

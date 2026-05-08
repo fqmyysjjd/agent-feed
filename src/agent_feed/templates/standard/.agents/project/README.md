@@ -51,6 +51,7 @@ same change must update the "Current Project Constraints" index below with:
 1. The file path.
 2. The decision boundary it owns.
 3. The trigger that tells an AI agent when to read it.
+4. The evidence expectation that keeps the rule repository-backed.
 
 AI agents must read this README before project-specific work and then read the
 indexed file for the affected boundary. A file under `.agents/project/` that is
@@ -74,13 +75,21 @@ Do not use this directory for generic AI development workflow rules, session-loc
 
 1. `README.md` is the required index for every file in `.agents/project/`.
 2. When a project constraint file is added, removed, renamed, or materially changed, update this README in the same task.
-3. Each listed file must explain what decision boundary it owns and when an AI agent should read it.
-4. Keep reusable AI workflow rules in `.agents/rules/`; keep task procedures in `.agents/skills/`.
-5. If a project constraint becomes generic and reusable across projects, promote it to `.agents/rules/` through the decision gate.
+3. Each listed file must explain what decision boundary it owns, when an AI agent should read it, and what evidence should support changes.
+4. Each direct markdown file under `.agents/project/` must include `## Owns`, `## Read When`, and `## Evidence` sections.
+5. Keep reusable AI workflow rules in `.agents/rules/`; keep task procedures in `.agents/skills/`.
+6. If a project constraint becomes generic and reusable across projects, promote it to `.agents/rules/` through the decision gate.
 
 ## Current Project Constraints
 
-1. `architecture-boundaries.md`: owns repository architecture boundaries and stop rules; read before module ownership, dependency, adapter, or template responsibility decisions.
-2. `project-structure.md`: owns source layout and placement rules; read before adding, moving, or importing files.
-3. `milestones.md`: owns implementation milestone or phase route; read before planning scope, sequencing, or release-facing work.
-4. `verification-commands.sh`: owns project-specific custom code verification commands; read or edit only when `.agents/agent-feed.json` sets `verification_profile` to `custom`.
+| File | Owns | Read when | Evidence expectation |
+| --- | --- | --- | --- |
+| `architecture-boundaries.md` | Repository architecture boundaries and stop rules. | Before module ownership, dependency, adapter, template responsibility, or network/offline behavior decisions. | README, package metadata, source layout, generated template paths, tests, and docs that prove the boundary. |
+| `project-structure.md` | Source layout, placement rules, and generated-template ownership. | Before adding, moving, importing, generating, or deleting files. | Source tree, package config, adapters, generated assets, tests, and documented owners. |
+| `milestones.md` | Implementation milestone or phase route. | Before planning scope, sequencing, or release-facing work. | Roadmap docs, release docs, tests, CLI behavior, and current implementation state. |
+
+## Verification Hook
+
+| File | Owns | Read when | Evidence expectation |
+| --- | --- | --- | --- |
+| `verification-commands.sh` | Project-specific custom code verification commands. | Read or edit only when `.agents/agent-feed.json` sets `verification_profile` to `custom`. | Project package/build/test files and commands that prove the custom verification profile. |

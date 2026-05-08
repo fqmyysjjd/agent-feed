@@ -57,6 +57,20 @@ If the conversation is long-running, has been context-compressed, or contains se
 
 ## Task Routing
 
+Use this quick trigger map before detailed routing. If a trigger matches, load the listed owner before acting.
+
+| Trigger | Required owner | Why |
+| --- | --- | --- |
+| Architecture, module, runtime, requirement, contract, or ownership decision | `.agents/skills/project-architecture/SKILL.md` | Prevents the AI from inventing project structure or future-facing decisions. |
+| Implementation, refactor, test, file creation, or project-structure change | `.agents/skills/engineering-planning/SKILL.md`, then `project-development` | Forces owner, reuse, placement, write set, boundaries, and verification before edits. |
+| Bug, regression, failed test, or review finding fix | `.agents/skills/engineering-planning/SKILL.md`, then `project-fix` | Keeps fixes rooted in the failing behavior and existing owner. |
+| Code, diff, commit, or merge review | `project-review`, `git-collaboration` | Keeps review read-only unless the user asks for fixes. |
+| README, AGENTS, rule, project/domain doc, plan, or skill review | `design-review`, plus `concept-review` when wording or concepts changed | Checks whether the next development step can proceed without invented decisions. |
+| Optional, imported, custom, or specialized skill may match the task, diff, failure, or review finding | `.agents/skills/specialist-router/SKILL.md` | Routes to useful external or specialist methods without letting them override core gates. |
+| Network, dependency, environment, database, destructive, credential, deployment, or security-sensitive action | `.agents/rules/change-risk-gates.md` | Applies risk classes and non-negotiable safety lines before the action. |
+| External facts, current ecosystem behavior, public standards, or web-sourced recommendations | `.agents/rules/evidence-gates.md` | Separates sourced facts from project inference. |
+| Long-running handoff, context compression risk, or final response | `.agents/rules/session-state.md` | Preserves active conclusions without turning session state into noisy memory. |
+
 Use these routes:
 
 1. Architecture, module ownership, runtime behavior, or requirement decisions:
@@ -70,7 +84,7 @@ Use these routes:
 4. Code review, diff review, commit review, or merge review:
    - `.agents/skills/project-review/SKILL.md`
    - `.agents/rules/git-collaboration.md`
-   - Check `.agents/skills/README.md` for specialized review skills that match the concrete risk.
+   - Use `.agents/skills/specialist-router/SKILL.md` when optional, imported, custom, or specialized review skills may match the concrete risk.
 5. Design document, plan, protocol, README, AGENTS, rule, domain, or skill review:
    - `.agents/skills/design-review/SKILL.md`
    - Use `.agents/skills/concept-review/SKILL.md` when the work introduces or changes concepts, vocabulary, naming, abstraction, or skill terminology.
@@ -84,6 +98,9 @@ Use these routes:
    - `.agents/rules/change-risk-gates.md`
 10. Naming, concept, terminology, abstraction, or vocabulary drift review:
     - `.agents/skills/concept-review/SKILL.md`
+11. Optional, imported, custom, or specialized skill selection:
+    - `.agents/skills/specialist-router/SKILL.md`
+    - Read only candidate skills that directly match the task boundary.
 
 ## Mixed Task Routing
 
@@ -99,12 +116,14 @@ Use the primary execution skill first, then add only the gates that the changed 
    - run `.agents/skills/design-review/SKILL.md`
 3. `.agents/skills/` changed:
    - run `.agents/skills/skill-maintainer/SKILL.md`
-4. Naming, vocabulary, concepts, abstractions, or public terminology changed:
+4. Optional, imported, custom, or specialized skill may apply:
+   - run `.agents/skills/specialist-router/SKILL.md`
+5. Naming, vocabulary, concepts, abstractions, or public terminology changed:
    - run `.agents/skills/concept-review/SKILL.md`
-5. Any changed surface needs verification:
+6. Any changed surface needs verification:
    - let `.agents/rules/testing-gates.md` choose evidence
    - let `.agents/rules/review-gates.md` own review routing
-6. Final handoff:
+7. Final handoff:
    - route only through `.agents/rules/session-state.md`
 
 If the user asked for pure review, stay read-only unless they also asked for fixes.

@@ -3,6 +3,26 @@
 This file defines Agent Feed's repository-specific release and package
 publishing constraints.
 
+## Owns
+
+This file owns release version source of truth, package names, publish workflow
+order, trusted-publisher requirements, provenance, and partial-release rerun
+safety for PyPI, npm, and Homebrew.
+
+## Read When
+
+Read this before changing release workflow files, version metadata, package
+names, registry behavior, trusted publishers, provenance, npm package scope,
+PyPI publishing, Homebrew tap updates, or release rollback/rerun behavior.
+
+## Evidence
+
+1. `.github/workflows/publish.yml`: release job order and publishing behavior.
+2. `scripts/sync-release-version.py`: release-tag version synchronization.
+3. `pyproject.toml`: PyPI package metadata.
+4. `package.json` and `package-lock.json`: npm package metadata.
+5. `README.md` and `README_ZH.md`: public install commands.
+
 ## Version Source Of Truth
 
 The GitHub Release tag is the release version source of truth.

@@ -38,9 +38,11 @@ After domain-affecting work:
 
 ## Core Concepts
 
-1. [Concepts](concepts.md): project target, non-goals, and core vocabulary.
-2. [Contracts](contracts.md): public API, persistence contracts, module ports, and canonical contract docs.
-3. [Source Of Truth](source-of-truth.md): durable facts and ownership rules.
+| File | Owns | Read when | Evidence expectation |
+| --- | --- | --- | --- |
+| `concepts.md` | Project target, non-goals, and core vocabulary. | Before changing product language, domain terminology, concept names, feature names, or docs that define what the project is or is not. | README, product docs, source modules, schemas, tests, user-facing docs, or existing naming conventions. |
+| `contracts.md` | Public APIs, persistence contracts, module ports, status/event vocabulary, verification contracts, and project config/trust ownership. | Before creating or changing public types, CLI/API/SDK behavior, persistence records, schemas, IDs, statuses, events, module ports, adapters, or host-facing results. | API docs, schemas, migrations, exported modules, CLI help, tests, contract docs, source files, or integration boundaries. |
+| `source-of-truth.md` | Durable fact ownership, recovery/update rules, and canonical source-of-truth locations. | Before moving canonical ownership, changing recovery behavior, generated/projection ownership, configuration ownership, or durable fact placement. | Owner docs, source modules, storage schemas, config files, generated assets, audit/event docs, tests, or recovery scripts. |
 
 ## Custom Domain Entry
 
@@ -51,7 +53,8 @@ description and trigger. Do not load every domain file by default.
 
 If a user adds or changes a domain file under `.agents/domain/`, the same change
 must update the "Core Concepts" index above or another explicit index section
-with the file path, owned domain boundary, and read trigger. A file under
+with the file path, owned domain boundary, read trigger, and evidence
+expectation. A file under
 `.agents/domain/` that is not listed here is preserved as repository content,
 but it is not a reliable routing entry for future AI sessions.
 

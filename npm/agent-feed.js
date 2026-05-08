@@ -7,6 +7,10 @@ import { spawnSync } from "node:child_process";
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const packageRoot = dirname(scriptDir);
 const args = process.argv.slice(2);
+const runtimeEnv = {
+  ...process.env,
+  AGENT_FEED_INSTALL_SOURCE: process.env.AGENT_FEED_INSTALL_SOURCE || "npm",
+};
 
 const sourceCli = join(packageRoot, "src", "agent_feed", "cli.py");
 const sourceRoot = join(packageRoot, "src");
@@ -33,7 +37,7 @@ function pythonCandidates() {
   return candidates;
 }
 
-function run(command, commandArgs, env = process.env) {
+function run(command, commandArgs, env = runtimeEnv) {
   const result = spawnSync(command, commandArgs, {
     stdio: "inherit",
     env,
@@ -45,7 +49,7 @@ function run(command, commandArgs, env = process.env) {
   process.exit(result.status ?? 1);
 }
 
-function canImport(candidate, env = process.env) {
+function canImport(candidate, env = runtimeEnv) {
   const result = spawnSync(
     candidate.command,
     [...candidate.prefix, "-c", "import agent_feed.cli"],
@@ -56,7 +60,7 @@ function canImport(candidate, env = process.env) {
 
 if (existsSync(sourceCli)) {
   const env = {
-    ...process.env,
+    ...runtimeEnv,
     PYTHONPATH: process.env.PYTHONPATH
       ? `${sourceRoot}${delimiter}${process.env.PYTHONPATH}`
       : sourceRoot,
@@ -68,12 +72,12 @@ if (existsSync(sourceCli)) {
 }
 
 if (existsSync(venvPython)) {
-  run(venvPython, ["-m", "agent_feed.cli", ...args]);
+  run(venvPython, ["-m", "agent_feed.cli", ...args], runtimeEnv);
 }
 
-const candidate = pythonCandidates().find((item) => canImport(item));
+const candidate = pythonCandidates().find((item) => canImport(item, runtimeEnv));
 if (candidate) {
-  run(candidate.command, [...candidate.prefix, "-m", "agent_feed.cli", ...args]);
+  run(candidate.command, [...candidate.prefix, "-m", "agent_feed.cli", ...args], runtimeEnv);
 }
 
 console.error("Agent Feed npm wrapper could not find the Python Agent Feed package.");

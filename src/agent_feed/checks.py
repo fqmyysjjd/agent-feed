@@ -29,6 +29,8 @@ SESSION_CARRY_FORWARD_TYPES = {"decision", "constraint", "blocker", "handoff"}
 SESSION_EXPIRY_PATTERN = re.compile(
     r"\b\d{4}-\d{2}-\d{2}(?:[T ][0-9]{2}:[0-9]{2}(?::[0-9]{2})?(?:Z|[+-][0-9]{2}:?[0-9]{2})?)?\b"
 )
+RECALL_INDEX_REQUIRED_TERMS = ("owns", "read when", "evidence")
+RECALL_FILE_REQUIRED_HEADINGS = ("## Owns", "## Read When", "## Evidence")
 
 
 def run_checks(root: Path, checks: tuple[Check, ...]) -> CheckReport:
@@ -290,9 +292,30 @@ def validate_references_and_indexes(root: Path) -> list[str]:
         ]:
             if heading not in project_readme_text:
                 errors.append(f".agents/project/README.md missing required heading {heading}")
-        for project_file in sorted((root / ".agents/project").glob("*.md")):
-            if project_file.name != "README.md" and project_file.name not in project_readme_text:
-                errors.append(f".agents/project/README.md does not list {project_file.name}")
+        errors.extend(
+            validate_recall_index(
+                root=root,
+                directory=".agents/project",
+                readme_text=project_readme_text,
+            )
+        )
+
+    domain_readme = root / ".agents/domain/README.md"
+    if domain_readme.exists():
+        domain_readme_text = domain_readme.read_text(encoding="utf-8")
+        for heading in [
+            "## Core Concepts",
+            "## Use Cases",
+        ]:
+            if heading not in domain_readme_text:
+                errors.append(f".agents/domain/README.md missing required heading {heading}")
+        errors.extend(
+            validate_recall_index(
+                root=root,
+                directory=".agents/domain",
+                readme_text=domain_readme_text,
+            )
+        )
 
     agents_md = root / "AGENTS.md"
     if agents_md.exists():
@@ -308,6 +331,45 @@ def validate_references_and_indexes(root: Path) -> list[str]:
                 errors.append(f"AGENTS.md does not reference required rule {required_rule}")
 
     return errors
+
+
+def validate_recall_index(*, root: Path, directory: str, readme_text: str) -> list[str]:
+    errors: list[str] = []
+    readme_lower = readme_text.lower()
+    for term in RECALL_INDEX_REQUIRED_TERMS:
+        if term not in readme_lower:
+            errors.append(f"{directory}/README.md missing recall index term {term!r}")
+
+    for indexed_file in sorted((root / directory).glob("*.md")):
+        if indexed_file.name == "README.md":
+            continue
+        index_entry = recall_index_entry(readme_text, indexed_file.name)
+        if index_entry is None:
+            errors.append(f"{directory}/README.md does not list {indexed_file.name}")
+        elif not recall_index_entry_is_structured(index_entry):
+            errors.append(
+                f"{directory}/README.md entry for {indexed_file.name} must be a "
+                "table row with File, Owns, Read when, and Evidence expectation"
+            )
+        file_text = indexed_file.read_text(encoding="utf-8")
+        for heading in RECALL_FILE_REQUIRED_HEADINGS:
+            if heading not in file_text:
+                errors.append(f"{directory}/{indexed_file.name} missing required heading {heading}")
+    return errors
+
+
+def recall_index_entry(readme_text: str, file_name: str) -> str | None:
+    for line in readme_text.splitlines():
+        if file_name in line:
+            return line.strip()
+    return None
+
+
+def recall_index_entry_is_structured(line: str) -> bool:
+    if not line.startswith("|") or not line.endswith("|"):
+        return False
+    cells = [cell.strip() for cell in line.strip("|").split("|")]
+    return len(cells) >= 4 and all(cells[:4])
 
 
 def active_reference_markdown_files(root: Path, reference_roots: set[Path]) -> list[Path]:

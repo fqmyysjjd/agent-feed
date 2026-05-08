@@ -20,6 +20,27 @@ Choose the narrowest tests that prove the current task boundary, then broaden wh
 4. Bug fix, review finding fix, or regression fix:
    - Prefer a test that would fail before the fix and pass after it.
 
+## New Code Test Gate
+
+When new code, tests, commands, modules, public behavior, or implementation paths are added, the AI assistant must define the concrete test flow before claiming the task is complete.
+
+For every non-trivial code addition, answer:
+
+```md
+| Item | Content |
+| --- | --- |
+| Changed behavior | What user-visible, internal, or contract behavior changed |
+| Existing test pattern | Existing test, fixture, helper, or command pattern reused |
+| New or updated test | Test file/function or reason no test change is needed |
+| Proof | Why this test proves the changed behavior and not only that code executes |
+| Command | Exact command that must be run |
+| Broader verification | Whether targeted tests are enough or code/full verification is required |
+```
+
+Do not add tests only to exercise implementation details. Prefer tests that prove behavior, boundary preservation, error handling, regression prevention, or integration with an existing command/profile.
+
+If no test is added for new code, state the reason and run the narrowest existing verification that proves the changed behavior. If no existing verification proves it, add or request a test before final completion.
+
 ## Failure Handling
 
 When a test or verification command fails:

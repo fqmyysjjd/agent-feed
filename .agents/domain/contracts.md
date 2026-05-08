@@ -2,6 +2,26 @@
 
 Contracts are the strongest anti-hallucination boundary in AI-assisted development.
 
+## Owns
+
+This file owns public CLI command families, generated template contracts,
+upgrade/preview behavior, project settings ownership, and contract-change rules
+for Agent Feed.
+
+## Read When
+
+Read this before changing CLI commands, generated file layout, template
+responsibility boundaries, project/user config ownership, validation behavior,
+upgrade/preview behavior, or public documentation of command families.
+
+## Evidence
+
+1. `src/agent_feed/cli.py`: public command wiring.
+2. `src/agent_feed/templates/standard/`: generated file layout.
+3. `src/agent_feed/checks.py`: validation behavior.
+4. `tests/`: public command and generated asset behavior tests.
+5. `docs/template-model.md`: public template and contract explanation.
+
 ## Public CLI Contract
 
 The public command families are:

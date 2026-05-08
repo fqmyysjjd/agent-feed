@@ -23,6 +23,7 @@ github_common.pub
 /AGENTS.local.md
 /.agents/session-state/*.json
 /.codex/
+/.claude/settings.local.json
 /.feed-backup/
 
 # Keep the repository's published protocol and adapters tracked.

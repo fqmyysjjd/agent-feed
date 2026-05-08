@@ -4,6 +4,21 @@ This file defines repository-specific architecture boundaries for {{PROJECT_NAME
 
 Replace scaffold rows with concrete constraints before major implementation work. Every durable boundary should point to evidence in code, docs, tests, config, or generated assets.
 
+## Owns
+
+This file owns repository architecture boundaries and stop rules.
+
+## Read When
+
+Read this before module ownership, dependency, adapter, template
+responsibility, persistence, security, public-contract, or source-of-truth
+boundary decisions.
+
+## Evidence
+
+Replace scaffold evidence with README, docs, source files, tests, config, API
+schemas, generated assets, or other repository-backed proof.
+
 ## AI Maintenance
 
 Before feature, architecture, dependency, persistence, security, public-contract, or adapter work, read this file and verify whether it still matches the repository.

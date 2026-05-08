@@ -2,6 +2,27 @@
 
 Define durable fact ownership for Agent Feed.
 
+## Owns
+
+This file owns durable source-of-truth mapping for CLI behavior, generated
+templates, product positioning, local AI development rules, client adapters,
+and recovery behavior.
+
+## Read When
+
+Read this before moving canonical ownership, changing generated asset recovery,
+changing adapter generation, changing product/documentation ownership, or
+deciding whether a fact belongs in source code, docs, `.agents/project/`,
+`.agents/domain/`, or generated adapters.
+
+## Evidence
+
+1. `src/agent_feed/cli.py`: Python CLI behavior owner.
+2. `src/agent_feed/templates/standard/`: generated template owner.
+3. `README.md` and `docs/`: public product and protocol docs.
+4. `AGENTS.md` and `.agents/`: local AI development rules for this repo.
+5. `CLAUDE.md`, `.claude/skills`, and `.cursor/rules/agent-feed.mdc`: generated client adapters.
+
 ## Ownership
 
 1. CLI command behavior:

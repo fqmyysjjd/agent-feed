@@ -157,6 +157,7 @@ agent-feed                 # interactive menu in a TTY
 agent-feed init            # initialize the current project; backs up old AI instructions
 agent-feed status          # compact health and drift summary
 agent-feed check -a        # run every protocol and adapter check
+agent-feed upgrade         # refresh managed assets and report source-specific CLI updates
 agent-feed sync -a         # update all supported client adapters
 agent-feed index-skills    # regenerate the skill index after local or imported skill changes
 agent-feed skills list     # inspect installed local skills

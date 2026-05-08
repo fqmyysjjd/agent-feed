@@ -270,11 +270,31 @@ for heading in ("## Boundary", "## Maintenance Contract", "## Current Project Co
 
 
 def check_indexed_md_files(directory: str, readme_text: str) -> None:
+    readme_lower = readme_text.lower()
+    for term in ("owns", "read when", "evidence"):
+        if term not in readme_lower:
+            errors.append(f"{directory}/README.md missing recall index term {term!r}")
     for indexed_file in sorted((root / directory).glob("*.md")):
         if indexed_file.name == "README.md":
             continue
-        if indexed_file.name not in readme_text:
+        index_entry = None
+        for line in readme_text.splitlines():
+            if indexed_file.name in line:
+                index_entry = line.strip()
+                break
+        if index_entry is None:
             errors.append(f"{directory}/README.md does not list {indexed_file.name}")
+        else:
+            cells = [cell.strip() for cell in index_entry.strip("|").split("|")]
+            if not index_entry.startswith("|") or not index_entry.endswith("|") or len(cells) < 4 or not all(cells[:4]):
+                errors.append(
+                    f"{directory}/README.md entry for {indexed_file.name} must be a "
+                    "table row with File, Owns, Read when, and Evidence expectation"
+                )
+        indexed_text = indexed_file.read_text(encoding="utf-8")
+        for heading in ("## Owns", "## Read When", "## Evidence"):
+            if heading not in indexed_text:
+                errors.append(f"{directory}/{indexed_file.name} missing required heading {heading}")
 
 
 check_indexed_md_files(".agents/project", project_readme)

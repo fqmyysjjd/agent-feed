@@ -157,6 +157,7 @@ agent-feed                 # 在终端中打开交互式菜单
 agent-feed init            # 初始化当前项目；自动备份旧 AI 规范
 agent-feed status          # 查看精简的健康度与偏移状态摘要
 agent-feed check -a        # 运行所有的协议及适配器检查
+agent-feed upgrade         # 刷新受管资产，并提示对应安装源的 CLI 更新
 agent-feed sync -a         # 更新所有支持的客户端适配器
 agent-feed index-skills    # 在修改/导入技能后，重新生成技能索引
 agent-feed skills list     # 查看当前安装的本地技能

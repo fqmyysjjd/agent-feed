@@ -4,6 +4,25 @@ This file defines repository-specific architecture boundaries for Agent Feed.
 
 Agent Feed is a local CLI and template package for installing AI engineering protocol assets into other repositories.
 
+## Owns
+
+This file owns repository architecture boundaries, generated-template ownership,
+client-adapter ownership, offline command boundaries, and architecture stop
+rules for Agent Feed.
+
+## Read When
+
+Read this before module ownership, dependency, adapter, template
+responsibility, network/offline behavior, or source-of-truth boundary decisions.
+
+## Evidence
+
+1. `src/agent_feed/templates/standard/`: canonical generated protocol template.
+2. `src/agent_feed/`: Python CLI implementation.
+3. `npm/`: thin npm wrapper around the Python CLI.
+4. `tests/`: CLI and protocol behavior tests.
+5. `docs/template-model.md`: public template responsibility model.
+
 ## Non-Negotiable Boundaries
 
 1. `agent-feed` is the CLI entry point and must remain usable with standard Python packaging; npm is allowed only as a thin wrapper that delegates to the Python CLI.

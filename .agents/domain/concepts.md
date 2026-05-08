@@ -2,6 +2,25 @@
 
 Define the stable project vocabulary for Agent Feed.
 
+## Owns
+
+This file owns stable Agent Feed product vocabulary, target definition, and
+non-goals used by AI assistants during design, implementation, review, docs,
+and release work.
+
+## Read When
+
+Read this before changing product positioning, README language, user-facing
+feature names, protocol terminology, skill naming, or docs that define what
+Agent Feed is or is not.
+
+## Evidence
+
+1. `README.md`: public positioning and feature language.
+2. `docs/ai-development-protocol-flow.md`: workflow and protocol terminology.
+3. `docs/template-model.md`: template and adapter model terminology.
+4. `.agents/skills/README.md`: current skill vocabulary.
+
 ## Target
 
 Agent Feed installs a reusable AI engineering protocol into software repositories.

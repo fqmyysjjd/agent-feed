@@ -17,6 +17,7 @@ Run `agent-feed index-skills` or `sh .agents/scripts/index-skills.sh` after addi
 | `project-fix` | Use when fixing bugs, review findings, regressions, failed tests, merge issues, contract drift, or behavior defects. | `agent-feed` | `core` |
 | `project-review` | Use when reviewing modified code, git diffs, commits, merges, PR-like changes, or implementation output. | `agent-feed` | `core` |
 | `skill-maintainer` | Use when creating, updating, reviewing, renaming, deleting, or syncing .agents skills. | `agent-feed` | `core` |
+| `specialist-router` | Use when a task, diff, failure, or review finding may benefit from an optional, imported, custom, or specialized skill; selects candidate skills from the skill index, explains fit and risk, and routes only after higher-priority gates and needed confirmation. | `agent-feed` | `core` |
 
 ## Use Rules
 

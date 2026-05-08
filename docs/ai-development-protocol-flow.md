@@ -58,13 +58,13 @@ compression.
 | `.agents/README.md` | `.agents/README.md` | Index of the AI engineering system and the rule layer. |
 | `.agents/rules/outcome-boundary.md` | same | Highest-priority working rule: current task boundary, Task Brief, task class gate, design readiness, anti-drift. |
 | `.agents/rules/decision-gates.md` | same | Human confirmation gate for choices that affect future development results. |
-| `.agents/rules/context-loading.md` | same | Startup loading order, task routing, mixed-task sequencing, context budget. |
+| `.agents/rules/context-loading.md` | same | Startup loading order, quick trigger map, task routing, mixed-task sequencing, context budget. |
 | `.agents/rules/session-state.md` | same | Final handoff gate, Context Capsule format, and compact handoff-card policy for long-running sessions and context compression. |
 | `.agents/rules/testing-gates.md` | same | Test and verification selection, failure classification, verification evidence rules. |
 | `.agents/rules/development-workflow.md` | same | Implementation addendum, reuse-before-build, scoped implementation, comments, gap handling. |
 | `.agents/rules/review-gates.md` | same | Code review gate, design review gate, README/project index maintenance, and final handoff routing. |
 | `.agents/rules/evidence-gates.md` | same | Source priority and adoption filter for external facts and research. |
-| `.agents/rules/change-risk-gates.md` | same | Risk classes for local edits, environment changes, destructive/security-sensitive actions. |
+| `.agents/rules/change-risk-gates.md` | same | Risk classes and non-negotiable safety lines for local edits, environment changes, destructive/security-sensitive actions. |
 | `.agents/rules/git-collaboration.md` | same | Diff, commit, merge, and PR handoff rules. |
 | `.agents/project/README.md` | same | Index for user-maintained project-specific constraints. |
 | `.agents/project/architecture-boundaries.md` | same | Project architecture stop rules and non-negotiable boundaries. |
@@ -76,6 +76,7 @@ compression.
 | `.agents/domain/contracts.md` | same | Canonical contract index and contract-change stop rule. |
 | `.agents/domain/source-of-truth.md` | same | Durable fact ownership and recovery principle. |
 | `.agents/skills/*/SKILL.md` | same | Task-specific workflows for architecture, development, fix, review, design review, guidance promotion, and skill maintenance. |
+| `.agents/skills/specialist-router/SKILL.md` | same | Routing gate for optional, imported, custom, or specialized skills. |
 | `.agents/session-state/README.md` | same | Human-facing explanation of local session handoff files. |
 | `.agents/session-state/schema.json` | same | Shape contract for session-state JSON. |
 | `.agents/agents/README.md` | same | Optional narrow specialist agent profile rules. |
@@ -347,8 +348,8 @@ Handling:
    use `design-review`.
 6. User corrections and repeated AI failures use `guidance-promoter`.
 7. Skill creation, update, rename, delete, or sync uses `skill-maintainer`.
-8. Read `.agents/skills/README.md` before selecting optional, imported, or
-   specialized skills.
+8. Optional, imported, custom, or specialized skill selection uses
+   `specialist-router`.
 9. If an imported skill lacks `source` or `trust`, `agent-feed index-skills`
    adds `source: unknow` and `trust: custom` so the skill can be used as an
    advisory method without becoming authoritative.
@@ -364,7 +365,54 @@ Pain point solved:
 Without task-specific workflows, AI development collapses into generic
 "read, edit, summarize" behavior. Skills make each work type explicit.
 
-### 5.1. Assess User-Proposed Approaches
+### 5.1. Route Optional And Imported Skills
+
+Trigger:
+
+1. A task, diff, failed check, review finding, or user request appears to match
+   a specialized skill.
+2. Multiple skills could apply and the AI needs to choose one without loading
+   every skill.
+3. A custom or externally imported skill may help the current result.
+
+Files:
+
+1. `.agents/skills/specialist-router/SKILL.md`
+2. `.agents/skills/README.md`
+3. Candidate `SKILL.md` files selected from the index.
+4. `.agents/rules/change-risk-gates.md`
+
+Handling:
+
+1. Recover the Task Brief and stop condition.
+2. Read the skill index first, then inspect only the top candidate skills.
+3. Exclude skills that do not serve the current task boundary or that conflict
+   with higher-priority rules, project/domain source of truth, or the user
+   request.
+4. Classify each candidate's `source` and `trust`.
+5. Treat `trust: custom` skills as advisory methods only.
+6. Apply the change-risk gate before following a skill that suggests commands,
+   network access, destructive changes, credential handling, persistence
+   changes, dependency changes, or writes outside the Task Brief.
+7. Ask for confirmation when using the skill would change scope, write set,
+   public behavior, risk class, or future development results.
+
+Effect:
+
+1. External skills become useful extension points instead of competing rule
+   systems.
+2. The AI can find a language, framework, review, release, document, or team
+   method without reading every skill.
+3. Custom guidance stays below Agent Feed's core gates.
+
+Pain point solved:
+
+Imported skills can improve one task but also introduce command, scope, or
+instruction-injection risk. The specialist router gives them a controlled path:
+select, inspect, classify trust, apply risk gates, then return to the normal
+verification and review loop.
+
+### 5.2. Assess User-Proposed Approaches
 
 Trigger:
 
@@ -523,23 +571,29 @@ Files:
 
 1. `.agents/skills/project-development/SKILL.md`
 2. `.agents/skills/project-fix/SKILL.md`
-3. `.agents/rules/development-workflow.md`
-4. `.agents/rules/change-risk-gates.md`
-5. `.agents/domain/contracts.md`
+3. `.agents/skills/engineering-planning/SKILL.md`
+4. `.agents/rules/development-workflow.md`
+5. `.agents/rules/change-risk-gates.md`
+6. `.agents/domain/contracts.md`
 
 Handling:
 
 1. Complete the Task Brief first.
-2. Add implementation-specific fields: milestone, task type, owner module,
+2. Use engineering planning to decide owner, reuse, placement, write set,
+   boundaries, and verification before editing.
+3. Add implementation-specific fields: milestone, task type, owner module,
    public API touched, persistence touched, tests expected, comment impact, and
    forbidden changes.
-3. Search for existing owners, helpers, adapters, tests, fixtures, validators,
+4. Search for existing owners, helpers, adapters, tests, fixtures, validators,
    command patterns, or dependencies before building new code.
-4. Trace upstream callers and downstream consumers before replacing behavior.
-5. Implement the smallest scoped change.
-6. Add or update tests for changed behavior, failure paths, boundaries, or
+5. Apply the non-negotiable safety lines before network, dependency,
+   environment, database, destructive, credential, deployment, or
+   security-sensitive actions.
+6. Trace upstream callers and downstream consumers before replacing behavior.
+7. Implement the smallest scoped change.
+8. Add or update tests for changed behavior, failure paths, boundaries, or
    invariants.
-7. Stop if a new write target, contract boundary, verification gate, or
+9. Stop if a new write target, contract boundary, verification gate, or
    out-of-scope change appears.
 
 Effect:
@@ -616,6 +670,9 @@ Handling:
    issue, sandbox/permission issue, or unrelated pre-existing failure.
 7. Do not weaken or delete tests unless the source of truth proves the test is
    stale.
+8. For new code, define the changed behavior, reused test pattern, new or
+   updated test, proof, command, and whether broader verification is needed
+   before claiming completion.
 
 Effect:
 
@@ -768,11 +825,13 @@ responsibility.
 | AI edits README, rules, domain, project docs, or plans | `design-review` | Check if next development can proceed without invented decisions | Design becomes actionable, not just polished |
 | A gap affects future behavior | `decision-gates` | Stop, present options, wait for confirmation | Human owns contract/scope/protocol decisions |
 | Work touches external facts or dependencies | `evidence-gates` | Use source priority and separate facts from inference | Reduces stale or generic recommendations |
+| Work touches network, dependencies, environment, database, credentials, deployment, destructive actions, or security-sensitive behavior | `change-risk-gates` | Apply risk classes and non-negotiable safety lines before acting | Prevents convenience-driven unsafe changes |
 | Work touches public contract or durable fact | `domain/contracts`, `source-of-truth` | Read canonical contract owner or stop if missing | Prevents hallucinated contracts |
 | Work touches project architecture, structure, release, verification, dependency, or security rules | `.agents/project/README.md` | Read the project index, then the relevant indexed file only | Project-specific ownership stays local without full-context loading |
 | Work touches domain concepts, public contracts, durable facts, or source-of-truth ownership | `.agents/domain/README.md` | Read the domain index, then the relevant indexed file only | Domain facts are recoverable without loading every domain document |
 | AI uses built-in or reviewed skills | `check-agent-trust.sh`, `$AGENT_FEED_HOME/config.json` | Stop if a managed skill or protocol script hash changed unexpectedly | Prevents silently following tampered trusted guidance |
 | User imports, edits, or removes a skill | `skill-hub`, `skills`, `index-skills`, `.agents/skills/README.md` | Fill missing metadata, remove stale index/trust entries, and keep custom skills advisory | Extends capability without letting external guidance override core rules |
+| Optional, imported, custom, or specialized skill may match the work | `specialist-router` | Select candidates from the skill index, inspect trust/risk, and ask when scope or risk changes | Skills extend the workflow without becoming higher-priority rules |
 | User proposes a concrete implementation plan | User-proposed approach gate | Assess against code, contracts, and decision gates before editing | Avoids turning partial solution sketches into hidden product decisions |
 | Work changes AI protocol assets | `testing-gates`, `review-gates` | Verify links, names, mirrors, indexes, session JSON | Protocol health is evidence-backed |
 | Work involves git review or commit handoff | `git-collaboration` | Review diff, keep commit scope clean, use concise imperative messages | Supports team development without mixing unrelated changes |
@@ -794,6 +853,7 @@ responsibility.
 | Project facts pollute reusable rules | `.agents/project/` | Repository-specific constraints have a user-maintained lane. |
 | Public contracts are buried in code or chat | `.agents/domain/contracts.md` | Contract changes must point to an authoritative owner or stop. |
 | AI rebuilds existing helpers | `development-workflow` reuse-before-build | Existing owners, dependencies, and patterns are checked first. |
+| AI makes risky changes for convenience | `change-risk-gates` safety lines | Secrets, auth/security, destructive actions, unexpected network/persistence, sensitive leakage, and weakened verification are blocked unless explicitly scoped and confirmed. |
 | Verification is vague | `testing-gates` | Tests are selected by task boundary and failures must be classified. |
 | Review is skipped | `review-gates` and review skills | Code and design changes have mandatory post-change review. |
 | Context compression loses decisions | `session-state` | Every final handoff decides whether active facts must be preserved and later cleaned. |

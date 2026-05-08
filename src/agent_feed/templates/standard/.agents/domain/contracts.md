@@ -2,6 +2,22 @@
 
 Contracts are the strongest anti-hallucination boundary in AI-assisted development.
 
+## Owns
+
+This file owns public APIs, persistence contracts, module ports, status/event
+vocabulary, verification contracts, and project config/trust ownership.
+
+## Read When
+
+Read this before creating or changing public types, CLI/API/SDK behavior,
+persistence records, schemas, IDs, statuses, events, module ports, adapters, or
+host-facing results.
+
+## Evidence
+
+Replace scaffold evidence with API docs, schemas, migrations, exported modules,
+CLI help, tests, contract docs, source files, or integration boundaries.
+
 ## Canonical Index
 
 Before creating or changing a public type, store protocol, module port, ID, status, event, record, or host-facing result, read the project canonical contract document.

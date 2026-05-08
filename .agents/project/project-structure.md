@@ -2,6 +2,24 @@
 
 This file defines repository-specific source layout and placement constraints for Agent Feed.
 
+## Owns
+
+This file owns source layout, file placement, generated-template placement,
+adapter placement, and test placement constraints for Agent Feed.
+
+## Read When
+
+Read this before adding, moving, importing, generating, deleting, or relocating
+files, modules, tests, docs, protocol assets, or client adapters.
+
+## Evidence
+
+1. `src/agent_feed/`: Python package and CLI modules.
+2. `src/agent_feed/templates/standard/`: canonical generated template assets.
+3. `npm/`: npm wrapper package files.
+4. `tests/`: public CLI and behavior tests.
+5. `docs/`: public user and protocol documentation.
+
 ```txt
 src/agent_feed/             Python CLI, checks, prompts, adapters, trust, settings, and templates
 npm/                        thin npm wrapper that delegates to the Python CLI

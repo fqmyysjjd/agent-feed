@@ -4,6 +4,21 @@ This file defines repository-specific source layout and placement constraints fo
 
 Replace scaffold rows with concrete source-tree ownership rules. Use evidence paths so future AI turns can verify placement decisions quickly.
 
+## Owns
+
+This file owns source layout, file placement, generated-file ownership,
+adapter/integration placement, and import-direction constraints.
+
+## Read When
+
+Read this before adding, moving, importing, generating, deleting, or relocating
+files, modules, tests, docs, protocol assets, or client adapters.
+
+## Evidence
+
+Replace scaffold evidence with package config, source tree paths, imports,
+tests, fixtures, generator scripts, managed markers, or documented owners.
+
 ## AI Maintenance
 
 Before adding, moving, importing, generating, or deleting files, read this file and confirm the target path has a documented owner. If the source tree changes, update the affected row in the same task.

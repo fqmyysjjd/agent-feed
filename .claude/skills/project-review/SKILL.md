@@ -34,14 +34,34 @@ If a finding requires an unconfirmed decision outside the current Task Brief, st
 6. `.agents/rules/review-gates.md`
 7. `.agents/domain/contracts.md`
 8. `.agents/skills/README.md`
+9. `.agents/skills/specialist-router/SKILL.md` when an optional, imported, custom, or specialized skill may match the diff or risk.
 
 ## Review Scope
 
 Findings should prioritize correctness, contract drift, module ownership, tests, error handling, security/secret handling, and maintainability.
 
-Before finalizing findings, check `.agents/skills/README.md` for specialized review or fix skills that match the changed language, architecture, framework, persistence layer, or risk category. Use only the skills that directly serve the current review boundary.
+Before finalizing findings, check `.agents/skills/README.md` for specialized review or fix skills that match the changed language, architecture, framework, persistence layer, or risk category. Use `.agents/skills/specialist-router/SKILL.md` when the match is not obvious, when a custom skill is involved, or when multiple skills could apply. Use only the skills that directly serve the current review boundary.
 
 Use `.agents/skills/concept-review/SKILL.md` when the diff introduces or changes names, concepts, abstractions, protocol terms, user-facing language, or skill vocabulary.
+
+## Module Understanding Review
+
+For every affected module, command, adapter, protocol asset, or public surface, review whether the change proves the AI understood the path it modified.
+
+Check for evidence of:
+
+1. Affected entrypoints, owners, and outputs: the changed files cover the actual requirement path and do not miss a relevant caller, adapter, command, generated template, or user-visible surface.
+2. Flow closure: input or trigger -> orchestration/state -> output, write, generated asset, or side effect is complete.
+3. Contract consistency: function signatures, CLI arguments, config keys, schemas, generated file paths, adapter expectations, and documented behavior stay aligned.
+4. Boundary and failure handling: validation, permissions, error messages, cleanup, rollback expectations, and logging/audit anchors are handled at the owning layer.
+5. State and data safety: defaults, empty/null cases, async or repeated execution, durable state, secrets, and trust/config boundaries remain safe.
+6. Reuse and duplication: existing helpers, patterns, tests, adapters, or template owners were reused before adding parallel behavior.
+7. Maintainability cost: new concepts, abstractions, branches, or files add only necessary complexity.
+8. Minimal implementation: the diff does not introduce future-facing machinery, broad rewrites, or unrelated formatting/noise to satisfy a narrow task.
+9. Style consistency: similar existing behavior uses compatible naming, layering, errors, output style, comments, and verification patterns.
+10. Shared or deletion risk: global files, shared helpers, generated assets, removed paths, and adapter mirrors were checked for other consumers.
+
+If a relevant item has no evidence, report it as a finding or residual risk. Do not replace missing evidence with a general "looks fine" statement.
 
 ## Severity Model
 

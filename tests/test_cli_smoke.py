@@ -15,8 +15,10 @@ from typer.testing import CliRunner
 import agent_feed.cli as cli
 import agent_feed.skill_hub as skill_hub
 from agent_feed.asset_trust import configured_github_token, recommended_agent_feed_home
+from agent_feed.checks import validate_references_and_indexes
 from agent_feed.cli import app
 from agent_feed.console import diff_line_style, render_diff
+from agent_feed.install_source import InstallSource, UpdateNotice
 from agent_feed.models import DEFAULT_CLIENTS, Client
 from agent_feed.skill_hub import (
     RemoteSkill,
@@ -711,6 +713,7 @@ def test_init_and_check(tmp_path: Path) -> None:
     assert (tmp_path / ".agents/rules/outcome-boundary.md").exists()
     assert (tmp_path / ".agents/skills/README.md").exists()
     assert (tmp_path / ".agents/skills/concept-review/SKILL.md").exists()
+    assert (tmp_path / ".agents/skills/specialist-router/SKILL.md").exists()
     assert (tmp_path / ".agents/scripts/index-skills.sh").exists()
     assert (tmp_path / ".agents/scripts/check-agent-trust.sh").exists()
     assert not (tmp_path / ".agents/scripts/sync-skill-index.sh").exists()
@@ -718,6 +721,21 @@ def test_init_and_check(tmp_path: Path) -> None:
     project_readme = (tmp_path / ".agents/project/README.md").read_text(encoding="utf-8")
     assert "user-maintained project customization layer" in project_readme
     assert "## Maintenance Contract" in project_readme
+    assert "| File | Owns | Read when | Evidence expectation |" in project_readme
+    assert "`architecture-boundaries.md`" in project_readme
+    project_rule = (tmp_path / ".agents/project/architecture-boundaries.md").read_text(
+        encoding="utf-8"
+    )
+    assert "## Owns" in project_rule
+    assert "## Read When" in project_rule
+    assert "## Evidence" in project_rule
+    domain_readme = (tmp_path / ".agents/domain/README.md").read_text(encoding="utf-8")
+    assert "| File | Owns | Read when | Evidence expectation |" in domain_readme
+    assert "`concepts.md`" in domain_readme
+    domain_rule = (tmp_path / ".agents/domain/concepts.md").read_text(encoding="utf-8")
+    assert "## Owns" in domain_rule
+    assert "## Read When" in domain_rule
+    assert "## Evidence" in domain_rule
     verify_script = (tmp_path / ".agents/scripts/verify-agent-dev.sh").read_text(encoding="utf-8")
     assert "Reads .agents/agent-feed.json verification_profile at runtime." in verify_script
     assert "docs      Same as protocol" not in verify_script
@@ -730,6 +748,7 @@ def test_init_and_check(tmp_path: Path) -> None:
     skill_index = (tmp_path / ".agents/skills/README.md").read_text(encoding="utf-8")
     assert "`concept-review`" in skill_index
     assert "`project-review`" in skill_index
+    assert "`specialist-router`" in skill_index
     assert "`agent-feed`" in skill_index
     assert "`core`" in skill_index
     assert "agent-feed:skill-fingerprint" not in skill_index
@@ -1017,6 +1036,57 @@ def test_status_and_preview_default_to_installed_clients(tmp_path: Path) -> None
     assert upgrade_result.exit_code == 0, upgrade_result.output
     assert "CLAUDE.md" not in upgrade_result.output
     assert ".cursor/rules/agent-feed.mdc" not in upgrade_result.output
+
+
+def test_upgrade_reports_source_specific_update_notice(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    init_result = invoke(
+        ["init", str(tmp_path), "--project-name", "Example", "--clients", "none", "--profile", "python"],
+        tmp_path,
+    )
+    assert init_result.exit_code == 0, init_result.output
+    monkeypatch.setattr(
+        cli,
+        "latest_update_notice",
+        lambda: UpdateNotice(
+            current_version="1.1.5",
+            latest_version="1.2.0",
+            source=InstallSource(
+                kind="npm",
+                label="npm",
+                registry="npm",
+                update_command="npm install -g @yysjjd/agent-feed@latest",
+            ),
+        ),
+    )
+
+    upgrade_result = invoke(["upgrade", str(tmp_path), "--clients", "none"], tmp_path)
+
+    assert upgrade_result.exit_code == 0, upgrade_result.output
+    assert "Update available:" in upgrade_result.output
+    assert "1.1.5 -> 1.2.0" in upgrade_result.output
+    assert "npm install -g @yysjjd/agent-feed@latest" in upgrade_result.output
+
+
+def test_upgrade_does_not_block_when_latest_check_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    init_result = invoke(
+        ["init", str(tmp_path), "--project-name", "Example", "--clients", "none", "--profile", "python"],
+        tmp_path,
+    )
+    assert init_result.exit_code == 0, init_result.output
+
+    monkeypatch.setattr(cli, "latest_update_notice", lambda: None)
+
+    upgrade_result = invoke(["upgrade", str(tmp_path), "--clients", "none"], tmp_path)
+
+    assert upgrade_result.exit_code == 0, upgrade_result.output
+    assert "upgrade complete" in upgrade_result.output
+    assert "Update available:" not in upgrade_result.output
 
 
 def test_diff_rendering_uses_red_green_styles() -> None:
@@ -2783,6 +2853,71 @@ def test_check_ignores_root_readme_history_reference_noise(tmp_path: Path) -> No
     check_result = invoke(["check", str(tmp_path), "--checks", "references"], tmp_path)
     assert check_result.exit_code == 0, check_result.output
     assert "README.md: missing referenced path" not in check_result.output
+
+
+def test_check_requires_project_domain_recall_structure(tmp_path: Path) -> None:
+    init_result = invoke(["init", str(tmp_path), "--project-name", "Example", "--profile", "python"], tmp_path)
+    assert init_result.exit_code == 0, init_result.output
+
+    project_rule = tmp_path / ".agents/project/project-structure.md"
+    project_rule.write_text(
+        "# Project Structure\n\n## Owns\n\nSource layout only.\n",
+        encoding="utf-8",
+    )
+
+    result = invoke(["check", str(tmp_path), "--checks", "references"], tmp_path)
+
+    assert result.exit_code == 1, result.output
+    assert ".agents/project/project-structure.md" in result.output
+    assert "missing required heading" in result.output
+    assert "## Read When" in result.output
+    assert "## Evidence" in result.output
+
+
+def test_check_requires_project_domain_recall_index_terms(tmp_path: Path) -> None:
+    init_result = invoke(["init", str(tmp_path), "--project-name", "Example", "--profile", "python"], tmp_path)
+    assert init_result.exit_code == 0, init_result.output
+
+    project_readme = tmp_path / ".agents/project/README.md"
+    project_readme.write_text(
+        "# Project Constraints\n\n"
+        "## Boundary\n\n"
+        "## Maintenance Contract\n\n"
+        "## Current Project Constraints\n\n"
+        "- architecture-boundaries.md\n"
+        "- project-structure.md\n"
+        "- milestones.md\n",
+        encoding="utf-8",
+    )
+
+    result = invoke(["check", str(tmp_path), "--checks", "references"], tmp_path)
+
+    assert result.exit_code == 1, result.output
+    assert ".agents/project/README.md missing recall index term 'owns'" in result.output
+    assert ".agents/project/README.md missing recall index term 'read when'" in result.output
+    assert ".agents/project/README.md missing recall index term 'evidence'" in result.output
+
+
+def test_check_requires_project_domain_recall_index_table_rows(tmp_path: Path) -> None:
+    init_result = invoke(["init", str(tmp_path), "--project-name", "Example", "--profile", "python"], tmp_path)
+    assert init_result.exit_code == 0, init_result.output
+
+    project_readme = tmp_path / ".agents/project/README.md"
+    original = project_readme.read_text(encoding="utf-8")
+    project_readme.write_text(
+        original.replace(
+            "| `project-structure.md` | Source layout, placement rules, and generated-template ownership. | Before adding, moving, importing, generating, or deleting files. | Source tree, package config, adapters, generated assets, tests, and documented owners. |",
+            "- `project-structure.md`: owns source layout; read when changing files; evidence should be source tree and tests.",
+        ),
+        encoding="utf-8",
+    )
+
+    errors = validate_references_and_indexes(tmp_path)
+
+    assert (
+        ".agents/project/README.md entry for project-structure.md must be a table row "
+        "with File, Owns, Read when, and Evidence expectation"
+    ) in errors
 
 
 def test_preview_and_upgrade_diff_installed_protocol(tmp_path: Path) -> None:

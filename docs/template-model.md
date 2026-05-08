@@ -78,7 +78,7 @@ Do not duplicate `.agents/rules/`; update the canonical files under `.agents/`.
 
 ## Skill Index And Public Skill Import
 
-`.agents/skills/README.md` is generated from skill frontmatter and is the first stop for optional, custom, or imported skill discovery.
+`.agents/skills/README.md` is generated from skill frontmatter and is the first stop for optional, custom, or imported skill discovery. The AI should route ambiguous, external, or specialized skill selection through `.agents/skills/specialist-router/SKILL.md` so candidate skills are selected from the index, inspected for trust/risk, and kept below the canonical protocol.
 
 After manually adding, copying, importing, renaming, or editing a skill, run:
 
@@ -99,13 +99,18 @@ Curated public skill import goes through:
 agent-feed skill-hub
 ```
 
-Imported skills stay lower-priority than the canonical protocol. When a skill is missing frontmatter, Agent Feed fills metadata from project settings; imported skills should default to `trust: custom` unless the user deliberately changes that state after review.
+Imported skills stay lower-priority than the canonical protocol. When a skill is missing frontmatter, Agent Feed fills metadata from project settings; imported skills should default to `trust: custom` unless the user deliberately changes that state after review. The specialist router may use imported skills as methods, but it must return to Agent Feed's normal verification, review, and handoff gates.
 
 Skill and managed-script sha256 values are kept in `$AGENT_FEED_HOME/config.json`, not in the project directory or user-facing skill index. By default, Agent Feed uses a user-level persistent home: `~/.agent-feed` on macOS/Linux and `%APPDATA%\agent-feed` on Windows. Use `agent-feed env setup` to create and persist that external home, `agent-feed env print` to print the shell command for manual configuration, or `agent-feed env uninstall --remove-home -y` to remove it. `status`, `preview`, and `check` read current files directly, so they can report drift without requiring a prior indexing step.
 
 ## Project Settings
 
 `.agents/agent-feed.json` owns project-visible Agent Feed metadata and non-secret settings. Template rendering preserves existing settings during `upgrade`.
+
+`agent-feed upgrade` compares installed project assets with the bundled
+template and may also report a newer Agent Feed CLI version from the detected
+installation source. The update notice is advisory and non-blocking; the command
+must remain usable without network access.
 
 Supported settings:
 
@@ -214,6 +219,12 @@ Rules:
 2. Unmanaged client files must stop writes and ask for user action.
 3. `--force-generated` may overwrite managed generated files only.
 4. `AGENTS.md`, `.agents/rules/`, `.agents/project/`, and `.agents/domain/` are canonical and should not be auto-overwritten by sync.
+
+The reusable rule layer also carries generic safety red lines in
+`.agents/rules/change-risk-gates.md`. Project-specific safety rules may be
+stricter, but they should not weaken the defaults for secrets,
+auth/security checks, destructive actions, unexpected network or persistence
+behavior, sensitive internal leakage, or verification integrity.
 
 ## Validation Contract
 

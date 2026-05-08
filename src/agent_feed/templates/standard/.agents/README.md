@@ -29,7 +29,7 @@ The current task boundary decides when to stop. Decision gates decide when uncon
 4. `session-state.md`: final handoff gate, Context Capsule format, compact JSON handoff cards, carry-forward cleanup, and optional multi-session pointer rules.
 5. `testing-gates.md`: test selection, minimum coverage, failure handling, and verification evidence rules.
 6. `evidence-gates.md`: external research sourcing, classification, and adoption rules.
-7. `change-risk-gates.md`: project-level change risk classes and verification command rules.
+7. `change-risk-gates.md`: project-level change risk classes, non-negotiable safety lines, and verification command rules.
 8. `development-workflow.md`: Task Brief implementation addendum, reuse-before-build discipline, comment/docstring discipline, gap handling, and verification ladder.
 9. `review-gates.md`: code/design review gates and final handoff routing into session-state.
 10. `git-collaboration.md`: git diff, staging, commit, merge, and review handoff rules.
@@ -57,7 +57,7 @@ Rules may reference skills only for routing. Skills may reference rules, project
 
 `.agents/skills/README.md` is the required generated index for skills. When a skill is added, removed, renamed, or its frontmatter changes, run `agent-feed index-skills` or `sh .agents/scripts/index-skills.sh`, then sync configured client adapters.
 
-Custom or imported skills are allowed when they serve the current result, but they remain lower priority than the current user request, the Task Brief, `AGENTS.md`, `.agents/rules/`, `.agents/project/`, and `.agents/domain/`. If a custom skill suggests risky commands, network access, destructive changes, or writes outside the Task Brief, inspect the action first and apply `.agents/rules/change-risk-gates.md`.
+Custom or imported skills are allowed when they serve the current result, but they remain lower priority than the current user request, the Task Brief, `AGENTS.md`, `.agents/rules/`, `.agents/project/`, and `.agents/domain/`. Use `.agents/skills/specialist-router/SKILL.md` to select optional, imported, custom, or specialized skills from the index. If a custom skill suggests risky commands, network access, destructive changes, or writes outside the Task Brief, inspect the action first and apply `.agents/rules/change-risk-gates.md`.
 
 Before using built-in or reviewed skills, run `sh .agents/scripts/check-agent-trust.sh`. `AGENT_FEED_HOME` must be set, and trusted AI asset hashes are stored in `$AGENT_FEED_HOME/config.json` outside the current project. If the trust gate reports changed `.agents/skills/*/SKILL.md` or `.agents/scripts/*` hashes, the highest-priority Agent Feed rule requires stopping before those files are used. Tell the user the concrete changed Agent Feed files, inspect with `agent-feed preview`, and accept intentional changes only with `agent-feed index-skills -y`.
 

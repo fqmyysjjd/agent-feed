@@ -201,8 +201,8 @@ facts.
 
 Only write facts supported by repository evidence. Mark uncertain assumptions
 instead of guessing. Update `.agents/project/README.md` and
-`.agents/domain/README.md` so every custom file has a short topic summary and a
-clear read trigger. Run the docs verification gate afterward.
+`.agents/domain/README.md` so every custom file has `Owns`, `Read when`, and
+`Evidence expectation` index fields. Run the docs verification gate afterward.
 ```
 
 Good output from the AI should include:
@@ -211,7 +211,8 @@ Good output from the AI should include:
 2. Evidence paths such as README sections, package files, source files, tests,
    or docs.
 3. Clear uncertainty notes when a decision is not proven.
-4. Updated README indexes for project and domain files.
+4. Updated README indexes for project and domain files, including `Owns`, `Read
+   when`, and `Evidence expectation`.
 5. Verification evidence.
 
 ### Migrate Old AI Instructions From `.feed-backup/`
@@ -234,8 +235,8 @@ workflow, or rules that conflict with the new protocol. If an old rule is
 decisive but conflicts with Agent Feed, overlaps in a way that could change the
 AI development loop, or lacks enough repository evidence, stop and ask me.
 
-After migration, update the project/domain README indexes with topic summaries
-and read triggers, then run docs verification.
+After migration, update the project/domain README indexes with `Owns`, `Read
+when`, and `Evidence expectation` fields, then run docs verification.
 ```
 
 This keeps old useful knowledge while preventing a new repository protocol from
@@ -256,7 +257,8 @@ read it.
 Then update `.agents/project/README.md` with:
 1. the file path,
 2. the decision boundary it owns,
-3. the trigger that tells future AI sessions when to read it.
+3. the trigger that tells future AI sessions when to read it,
+4. the evidence expectation that keeps the rule repository-backed.
 
 Run `sh .agents/scripts/verify-agent-dev.sh docs`.
 ```
@@ -287,16 +289,16 @@ file. Keep temporary notes out of domain docs. Only record stable concepts,
 contracts, business rules, ownership, or source-of-truth facts supported by the
 repository.
 
-Update `.agents/domain/README.md` with the file path, short topic summary, owned
-domain boundary, and read trigger. Run docs verification afterward.
+Update `.agents/domain/README.md` with the file path, owned domain boundary,
+read trigger, and evidence expectation. Run docs verification afterward.
 ```
 
 Example index entry:
 
 ```md
-4. [Billing Contracts](billing-contracts.md): billing contracts, payment state
-   transitions, and invoice ownership; read before billing behavior or public
-   billing field changes.
+| File | Owns | Read when | Evidence expectation |
+| --- | --- | --- | --- |
+| `billing-contracts.md` | Billing contracts, payment state transitions, and invoice ownership. | Before billing behavior or public billing field changes. | Billing API docs, schema/migration files, tests, and source modules. |
 ```
 
 ### Ask The AI To Keep Indexes Current
@@ -308,9 +310,9 @@ index:
 I changed files under `.agents/project/` or `.agents/domain/`.
 
 Check whether each direct markdown file is listed in the corresponding README.
-For every listed file, make sure the index explains the topic, owned boundary,
-and read trigger clearly enough for a future AI session to choose it without
-loading every file.
+For every listed file, make sure the index explains the owned boundary, read
+trigger, and evidence expectation clearly enough for a future AI session to
+choose it without loading every file.
 
 If an index entry is missing or vague, update it. Then run
 `sh .agents/scripts/verify-agent-dev.sh docs`.
@@ -325,6 +327,8 @@ Prefer this structure:
 
 ```md
 # [Rule Name]
+
+## Owns
 
 This file owns [specific boundary].
 
@@ -353,6 +357,8 @@ Avoid:
 3. Long transcripts.
 4. Rules without evidence.
 5. Index entries that say only "read when relevant".
+6. Project/domain markdown files without `## Owns`, `## Read When`, and
+   `## Evidence`.
 
 ## Common Commands
 
@@ -444,6 +450,25 @@ Custom or imported skills are lower priority than the current user request,
 `AGENTS.md`, `.agents/rules/`, `.agents/project/`, and `.agents/domain/`. They
 can guide a task, but they cannot override the repository's source of truth.
 
+When a task may benefit from a specialized or imported skill, the AI should use
+`.agents/skills/specialist-router/SKILL.md`. That router reads the skill index,
+chooses only the skills that match the current task, checks `source` and
+`trust`, applies risk gates for commands or risky actions, and then returns to
+the normal Agent Feed verification and review loop.
+
+Use this prompt when you want the AI to consider imported skills without giving
+them control of the whole task:
+
+```text
+Check `.agents/skills/README.md` and use `specialist-router` to see whether any
+custom or imported skill directly helps this task.
+
+Only use skills that fit the current Task Brief. Treat custom skills as advisory
+methods, apply change-risk gates before commands or risky actions, and keep
+`AGENTS.md`, `.agents/rules/`, `.agents/project/`, and `.agents/domain/` higher
+priority.
+```
+
 ## Upgrade, Sync, And Uninstall
 
 Use `upgrade` when Agent Feed itself has new managed assets:
@@ -451,6 +476,13 @@ Use `upgrade` when Agent Feed itself has new managed assets:
 ```sh
 agent-feed upgrade
 ```
+
+`upgrade` also checks the detected install source for a newer Agent Feed CLI
+version when network access is available. If you installed with npm, it checks
+npm and recommends `npm install -g @yysjjd/agent-feed@latest`. If you installed
+with uv, pipx, or Homebrew, it recommends the matching update command for that
+source. This update notice is non-blocking; project asset upgrades still work
+offline.
 
 Agent Feed does not overwrite user-maintained `.agents/project/` or
 `.agents/domain/` content just because the template changed. Those files are
