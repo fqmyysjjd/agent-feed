@@ -162,7 +162,7 @@ agent-feed upgrade         # refresh managed assets and report source-specific C
 agent-feed sync -a         # update all supported client adapters
 agent-feed index-skills    # regenerate the skill index after local or imported skill changes
 agent-feed skills list     # inspect installed local skills
-agent-feed skills remove   # remove one installed skill and refresh derived assets
+agent-feed skills remove   # remove one or more installed skills and refresh derived assets
 agent-feed skill-hub       # browse and import curated public skills for team-specific workflows
 agent-feed config check    # validate project and user-level config
 agent-feed config prune    # remove stale user-level project records

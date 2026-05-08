@@ -1438,6 +1438,85 @@ def test_skills_list_and_remove_refreshes_index_and_trust(
     assert ".agents/skills/remote-remove/SKILL.md" not in project_assets
 
 
+def test_skills_remove_supports_multiple_names(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    init_result = invoke(
+        ["init", str(tmp_path), "--project-name", "Example", "--profile", "python"],
+        tmp_path,
+    )
+    assert init_result.exit_code == 0, init_result.output
+
+    skill_a = tmp_path / ".agents/skills/demo-a/SKILL.md"
+    skill_b = tmp_path / ".agents/skills/demo-b/SKILL.md"
+    for skill_file, name in [(skill_a, "demo-a"), (skill_b, "demo-b")]:
+        skill_file.parent.mkdir(parents=True, exist_ok=True)
+        skill_file.write_text(
+            f"---\nname: {name}\ndescription: Disposable test skill.\nsource: test\ntrust: custom\n---\n\n# {name}\n",
+            encoding="utf-8",
+        )
+    invoke(["index-skills", str(tmp_path), "-y"], tmp_path)
+
+    remove_result = invoke(
+        ["skills", "remove", "demo-a", "demo-b", "--path", str(tmp_path), "-y"],
+        tmp_path,
+    )
+    assert remove_result.exit_code == 0, remove_result.output
+    assert not skill_a.parent.exists()
+    assert not skill_b.parent.exists()
+    assert "2 skill(s) removed" in remove_result.output
+
+
+def test_skills_remove_blocks_all_deletions_when_any_name_is_invalid(tmp_path: Path) -> None:
+    init_result = invoke(
+        ["init", str(tmp_path), "--project-name", "Example", "--profile", "python"],
+        tmp_path,
+    )
+    assert init_result.exit_code == 0, init_result.output
+
+    skill_file = tmp_path / ".agents/skills/valid-remove/SKILL.md"
+    skill_file.parent.mkdir(parents=True, exist_ok=True)
+    skill_file.write_text(
+        "---\nname: valid-remove\ndescription: Disposable test skill.\nsource: test\ntrust: custom\n---\n\n# valid-remove\n",
+        encoding="utf-8",
+    )
+    invoke(["index-skills", str(tmp_path), "-y"], tmp_path)
+
+    remove_result = invoke(
+        ["skills", "remove", "valid-remove", "missing-remove", "--path", str(tmp_path), "-y"],
+        tmp_path,
+    )
+    assert remove_result.exit_code == 3, remove_result.output
+    assert "installed skill not found: missing-remove" in remove_result.output
+    assert skill_file.parent.exists()
+
+
+def test_skills_remove_rejects_mixed_path_forms(tmp_path: Path) -> None:
+    init_result = invoke(
+        ["init", str(tmp_path), "--project-name", "Example", "--profile", "python"],
+        tmp_path,
+    )
+    assert init_result.exit_code == 0, init_result.output
+
+    skill_file = tmp_path / ".agents/skills/mixed-path/SKILL.md"
+    skill_file.parent.mkdir(parents=True, exist_ok=True)
+    skill_file.write_text(
+        "---\nname: mixed-path\ndescription: Disposable test skill.\nsource: test\ntrust: custom\n---\n\n# mixed-path\n",
+        encoding="utf-8",
+    )
+    invoke(["index-skills", str(tmp_path), "-y"], tmp_path)
+
+    remove_result = invoke(
+        ["skills", "remove", "mixed-path", str(tmp_path), "--path", str(tmp_path), "-y"],
+        tmp_path,
+    )
+    assert remove_result.exit_code == 3, remove_result.output
+    assert "Skill removal blocked" in remove_result.output
+    assert "either as --path" in remove_result.output
+    assert skill_file.parent.exists()
+
+
 def test_index_skills_prunes_manual_skill_deletion_from_index(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -3092,12 +3171,13 @@ def test_check_requires_project_domain_recall_index_terms(tmp_path: Path) -> Non
         encoding="utf-8",
     )
 
-    result = invoke(["check", str(tmp_path), "--checks", "references"], tmp_path)
+    result = invoke(["check", str(tmp_path), "--checks", "references", "--json"], tmp_path)
 
     assert result.exit_code == 1, result.output
-    assert ".agents/project/README.md missing recall index term 'owns'" in result.output
-    assert ".agents/project/README.md missing recall index term 'read when'" in result.output
-    assert ".agents/project/README.md missing recall index term 'evidence'" in result.output
+    errors = json.loads(result.output)["errors"]
+    assert ".agents/project/README.md missing recall index term 'owns'" in errors
+    assert ".agents/project/README.md missing recall index term 'read when'" in errors
+    assert ".agents/project/README.md missing recall index term 'evidence'" in errors
 
 
 def test_check_requires_project_domain_recall_index_table_rows(tmp_path: Path) -> None:

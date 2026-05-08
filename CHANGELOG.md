@@ -11,11 +11,13 @@ This project uses semantic versioning. Patch releases preserve the public comman
 - Added a public trust model document explaining external hash storage, skill trust levels, custom-skill boundaries, and GitHub token lookup order.
 - Added automatic `gh auth token` fallback for `agent-feed skill-hub` when `GITHUB_TOKEN` and saved `settings.github_token` are not available.
 - Added direct regression coverage for asset trust drift, missing GitHub CLI fallback, and upgrade idempotency.
+- Added multi-skill removal for `agent-feed skills remove`, including interactive checkbox selection when no names are passed.
 
 ### Changed
 
 - Expanded the usage guide with `env print`, `env uninstall`, and GitHub CLI token setup guidance.
 - Tightened the design review gate so document reviews must check user-goal fit, result support, and result-affecting gaps instead of only polish or next-step readiness.
+- Documented `agent-feed skills remove <name> [name ...] --path /path/to/project` while keeping the older final path argument form compatible.
 
 ## 1.1.5 - 2026-05-08
 

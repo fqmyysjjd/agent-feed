@@ -278,6 +278,20 @@ def prompt_skill_hub_selection(
     return [str(item) for item in result]
 
 
+def prompt_skills_to_remove(choices: list[dict[str, Any]]) -> list[str]:
+    prompt = inquirer.checkbox(
+        message="Select skills to remove",
+        instruction=CHECKBOX_INSTRUCTION,
+        choices=choices,
+        mandatory=False,
+        keybindings={"skip": [{"key": Keys.Escape}]},
+    )
+    result = tune_escape_key(prompt).execute()
+    if result is None:
+        return []
+    return [str(item) for item in result]
+
+
 def prompt_confirm(message: str, default: bool = True) -> bool:
     return bool(
         inquirer.confirm(

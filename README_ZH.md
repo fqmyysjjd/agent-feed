@@ -162,7 +162,7 @@ agent-feed upgrade         # 刷新受管资产，并提示对应安装源的 CL
 agent-feed sync -a         # 更新所有支持的客户端适配器
 agent-feed index-skills    # 在修改/导入技能后，重新生成技能索引
 agent-feed skills list     # 查看当前安装的本地技能
-agent-feed skills remove   # 删除一个已安装技能并刷新相关资产
+agent-feed skills remove   # 删除一个或多个已安装技能，并刷新相关资产
 agent-feed skill-hub       # 浏览并导入官方精选的公共技能，打造团队专属工作流
 agent-feed config check    # 校验项目级与用户级的配置
 agent-feed config prune    # 清理用户级配置里的失效项目记录

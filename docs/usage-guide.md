@@ -373,7 +373,7 @@ Avoid:
 | Regenerate the skill index | `agent-feed index-skills` |
 | Browse and import public skills | `agent-feed skill-hub` |
 | List installed skills | `agent-feed skills list` |
-| Remove an installed skill | `agent-feed skills remove <name>` |
+| Remove installed skills | `agent-feed skills remove <name> [name ...]` |
 | Validate user-level config and project config | `agent-feed config check` |
 | Remove stale user-level project records | `agent-feed config prune` |
 | Upgrade Agent Feed-managed assets | `agent-feed upgrade` |
@@ -473,8 +473,14 @@ List and remove installed skills:
 
 ```sh
 agent-feed skills list
-agent-feed skills remove <name>
+agent-feed skills remove <name> [name ...]
+agent-feed skills remove <name> [name ...] --path /path/to/project
 ```
+
+When no names are provided in an interactive terminal, Agent Feed opens a
+checkbox selector. The older `agent-feed skills remove <name> /path/to/project`
+form remains accepted for compatibility, but `--path` is the recommended form
+when removing multiple skills.
 
 Custom or imported skills are lower priority than the current user request,
 `AGENTS.md`, `.agents/rules/`, `.agents/project/`, and `.agents/domain/`. They

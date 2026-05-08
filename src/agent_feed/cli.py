@@ -90,6 +90,7 @@ from agent_feed.prompts import (
     prompt_secret,
     prompt_skill_hub_keyword,
     prompt_skill_hub_selection,
+    prompt_skills_to_remove,
     prompt_text_step,
     prompt_verification_profile_step,
     prompt_view_diff_key,
@@ -103,7 +104,7 @@ from agent_feed.skill_hub import (
     preview_skill_tree,
     search_remote_skills,
 )
-from agent_feed.skill_index import discover_skills, index_skill_metadata
+from agent_feed.skill_index import SkillMetadata, discover_skills, index_skill_metadata
 from agent_feed.templates import canonical_write_plan, write_text
 from agent_feed.uninstall import apply_uninstall_plan, has_deletions, uninstall_plan
 from agent_feed.upgrade import (
@@ -745,16 +746,25 @@ def skills_list_cmd(
 
 @skills_app.command("remove")
 def skills_remove_cmd(
-    name: Annotated[str, typer.Argument(help="Installed skill directory name to remove.")],
+    names: Annotated[
+        list[str] | None,
+        typer.Argument(
+            help=(
+                "Installed skill directory names to remove. Omit for interactive selection. "
+                "For compatibility, a final path-like value is treated as the target project path."
+            )
+        ),
+    ] = None,
     path: Annotated[
-        Path | None, typer.Argument(help="Target project path. Defaults to cwd.")
+        Path | None,
+        typer.Option("--path", help="Target project path. Defaults to cwd."),
     ] = None,
     dry_run: Annotated[
         bool, typer.Option("--dry-run", help="Preview skill removal without deleting files.")
     ] = False,
     yes: Annotated[
         bool,
-        typer.Option("-y", help="Remove the skill and refresh derived assets without asking."),
+        typer.Option("-y", help="Remove the skills and refresh derived assets without asking."),
     ] = False,
     no_input: Annotated[
         bool, typer.Option("--no-input", help="Never prompt; require -y for removal.")
@@ -764,56 +774,104 @@ def skills_remove_cmd(
         typer.Option("--force", help="Allow removal of bundled core skills after review."),
     ] = False,
 ) -> None:
-    """Remove an installed local skill and refresh indexes."""
+    """Remove one or more installed local skills and refresh indexes."""
+    raw_names = list(names or ())
+    if path is not None and len(raw_names) >= 2 and _looks_like_project_path(Path(raw_names[-1]).expanduser()):
+        _print_errors(
+            "Skill removal blocked",
+            ["pass the target project path either as --path or as the final legacy argument, not both"],
+        )
+        raise typer.Exit(3)
+    selected_names, legacy_path = _resolve_skill_remove_args(raw_names)
+    path = path or legacy_path
     target = (path or Path(".")).resolve()
     skill_root = target / ".agents/skills"
-    if not _safe_skill_name(name):
-        _print_errors("Skill removal blocked", [f"unsafe skill name: {name}"])
-        raise typer.Exit(3)
     if not skill_root.exists():
         _print_errors("Skill removal blocked", ["missing .agents/skills; run agent-feed init first"])
         raise typer.Exit(3)
 
-    skill_dir = skill_root / name
-    skill_file = skill_dir / "SKILL.md"
-    if not skill_dir.exists() or not skill_dir.is_dir():
-        _print_errors("Skill removal blocked", [f"installed skill not found: {name}"])
-        raise typer.Exit(3)
-    if not skill_file.exists():
-        _print_errors("Skill removal blocked", [f"{skill_dir} does not contain SKILL.md"])
-        raise typer.Exit(3)
-
-    skill_metadata = next(
-        (skill for skill in discover_skills(target) if skill.path.parent.name == name),
-        None,
-    )
-    if (
-        skill_metadata
-        and not force
-        and (skill_metadata.source == "agent-feed" or skill_metadata.trust == "core")
-    ):
-        _print_errors(
-            "Skill removal blocked",
-            [
-                f"{name} is a bundled core skill. Review the impact first, then rerun with --force if intentional."
-            ],
+    all_skills = discover_skills(target)
+    if not all_skills:
+        print_action_result(
+            title="Skills",
+            message="No installed skills found",
+            kind="warning",
+            detail=f"Checked {skill_root}",
         )
+        return
+
+    if selected_names:
+        selected_names = list(selected_names)
+    elif not no_input and can_prompt():
+        selected_names = _prompt_skills_to_remove(all_skills)
+        if not selected_names:
+            print_action_result(
+                title="Skills",
+                message="Canceled",
+                kind="warning",
+                detail="No skills were selected for removal.",
+            )
+            return
+    else:
+        _print_errors("Skill removal blocked", ["pass skill names or use an interactive terminal"])
         raise typer.Exit(3)
 
-    delete_action = WriteAction(
-        path=skill_dir,
-        action="would delete" if dry_run else "delete",
-        detail="installed skill",
-    )
+    errors: list[str] = []
+    validated_names: list[str] = []
+    for name in selected_names:
+        if not _safe_skill_name(name):
+            errors.append(f"unsafe skill name: {name}")
+            continue
+        skill_dir = skill_root / name
+        skill_file = skill_dir / "SKILL.md"
+        if not skill_dir.exists() or not skill_dir.is_dir():
+            errors.append(f"installed skill not found: {name}")
+            continue
+        if not skill_file.exists():
+            errors.append(f"{skill_dir} does not contain SKILL.md")
+            continue
+        skill_metadata = next(
+            (skill for skill in all_skills if skill.path.parent.name == name),
+            None,
+        )
+        if (
+            skill_metadata
+            and not force
+            and (skill_metadata.source == "agent-feed" or skill_metadata.trust == "core")
+        ):
+            errors.append(
+                f"{name} is a bundled core skill. Review the impact first, then rerun with --force if intentional."
+            )
+            continue
+        validated_names.append(name)
+
+    if errors:
+        _print_errors("Skill removal blocked", errors)
+        raise typer.Exit(3)
+
+    if not validated_names:
+        _print_errors("Skill removal blocked", ["no valid skills to remove"])
+        raise typer.Exit(3)
+
+    delete_actions = [
+        WriteAction(
+            path=skill_root / name,
+            action="would delete" if dry_run else "delete",
+            detail="installed skill",
+        )
+        for name in validated_names
+    ]
     if dry_run:
-        print_write_plan([delete_action])
-        print_recommended_command("Preview complete", f"agent-feed skills remove {name} {target} -y")
+        print_write_plan(delete_actions)
+        names_arg = " ".join(validated_names)
+        print_recommended_command("Preview complete", f"agent-feed skills remove {names_arg} --path {target} -y")
         return
     if not yes:
         if no_input or not can_prompt():
-            _print_errors("Skill removal blocked", ["pass -y to remove a skill without prompts"])
+            _print_errors("Skill removal blocked", ["pass -y to remove skills without prompts"])
             raise typer.Exit(3)
-        if not prompt_confirm(f"Remove skill {name} from {target}?", default=False):
+        label = ", ".join(validated_names)
+        if not prompt_confirm(f"Remove {len(validated_names)} skill(s) ({label}) from {target}?", default=False):
             print_action_result(
                 title="Skills",
                 message="Canceled",
@@ -822,7 +880,8 @@ def skills_remove_cmd(
             )
             return
 
-    shutil.rmtree(skill_dir)
+    for name in validated_names:
+        shutil.rmtree(skill_root / name)
     index_actions, index_errors = index_skill_metadata(target, dry_run=False)
     adapter_actions, adapter_errors = sync_clients(
         target,
@@ -836,18 +895,46 @@ def skills_remove_cmd(
         accept_changed=True,
         project_name=infer_project_name(target),
     )
-    actions = [delete_action, *index_actions, *adapter_actions, *trust_actions]
-    errors = [*index_errors, *adapter_errors, *trust_errors]
+    actions = [*delete_actions, *index_actions, *adapter_actions, *trust_actions]
+    refresh_errors = [*index_errors, *adapter_errors, *trust_errors]
     if actions:
         print_write_plan(actions)
-    if errors:
-        _print_errors("Skill removal blocked", errors)
+    if refresh_errors:
+        _print_errors("Skill removal blocked", refresh_errors)
         raise typer.Exit(3)
+    count = len(validated_names)
     print_action_result(
         title="Skills",
-        message="Skill removed",
+        message=f"{count} skill(s) removed",
         kind="success",
         detail="The skill index, client adapters, and trust state were refreshed.",
+    )
+
+
+def _resolve_skill_remove_args(
+    names: tuple[str, ...] | list[str],
+) -> tuple[list[str], Path | None]:
+    selected_names = list(names)
+    legacy_path: Path | None = None
+    if len(selected_names) >= 2:
+        candidate = Path(selected_names[-1]).expanduser()
+        if _looks_like_project_path(candidate):
+            legacy_path = candidate
+            selected_names = selected_names[:-1]
+    return selected_names, legacy_path
+
+
+def _looks_like_project_path(path: Path) -> bool:
+    text = str(path)
+    if path.exists() and path.is_dir() and (path / ".agents").exists():
+        return True
+    return (
+        "/" in text
+        or "\\" in text
+        or path.is_absolute()
+        or text in {".", ".."}
+        or text.startswith(".")
+        or text.startswith("~")
     )
 
 
@@ -1763,6 +1850,17 @@ def installed_clients(root: Path) -> tuple[Client, ...]:
     if (root / ".cursor/rules/agent-feed.mdc").exists():
         clients.append(Client.CURSOR)
     return tuple(clients)
+
+
+def _prompt_skills_to_remove(skills: list[SkillMetadata]) -> list[str]:
+    choices = [
+        {
+            "name": f"{skill.name}  [{skill.trust}] {skill.source}  {skill.path.parent.as_posix()}",
+            "value": skill.path.parent.name,
+        }
+        for skill in skills
+    ]
+    return prompt_skills_to_remove(choices)
 
 
 def _safe_skill_name(name: str) -> bool:

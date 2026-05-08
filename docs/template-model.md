@@ -85,7 +85,7 @@ After manually adding, copying, importing, renaming, or editing a skill, run:
 ```sh
 agent-feed index-skills
 agent-feed skills list
-agent-feed skills remove <name>
+agent-feed skills remove <name> [name ...]
 ```
 
 Then run client adapter sync when generated clients are configured.

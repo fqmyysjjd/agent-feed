@@ -53,20 +53,24 @@ def detect_install_source(
 
     executable = executable or Path(sys.argv[0]).resolve()
     package_file = package_file or agent_feed_package_path()
-    candidates = (str(executable), str(package_file))
-    joined = "\n".join(candidates).lower()
+    candidates = tuple(normalized_path_text(path) for path in (executable, package_file) if path)
+    joined = "\n".join(candidates)
 
     if package_file and is_source_checkout(package_file):
         return source_from_kind("source")
     if "node_modules/@yysjjd/agent-feed" in joined:
         return source_from_kind("npm")
-    if "/.local/share/uv/tools/agent-feed/" in joined or "\\uv\\tools\\agent-feed\\" in joined:
+    if "/.local/share/uv/tools/agent-feed/" in joined or "/uv/tools/agent-feed/" in joined:
         return source_from_kind("uv")
-    if "/pipx/venvs/agent-feed/" in joined or "\\pipx\\venvs\\agent-feed\\" in joined:
+    if "/pipx/venvs/agent-feed/" in joined:
         return source_from_kind("pipx")
-    if "/cellar/agent-feed/" in joined or "\\cellar\\agent-feed\\" in joined:
+    if "/cellar/agent-feed/" in joined:
         return source_from_kind("brew")
     return source_from_kind("pypi")
+
+
+def normalized_path_text(path: Path) -> str:
+    return str(path).replace("\\", "/").lower()
 
 
 def source_from_kind(kind: str) -> InstallSource:

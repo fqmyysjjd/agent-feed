@@ -60,6 +60,31 @@ def test_detect_install_source_from_common_paths(tmp_path: Path) -> None:
     )
 
 
+def test_detect_install_source_from_windows_style_paths() -> None:
+    assert (
+        detect_install_source(
+            env={},
+            executable=Path(r"C:\Users\dev\AppData\Roaming\npm\agent-feed.cmd"),
+            package_file=Path(
+                r"C:\Users\dev\AppData\Roaming\npm\node_modules\@yysjjd\agent-feed"
+                r"\.agent-feed-python\Lib\site-packages\agent_feed\__init__.py"
+            ),
+        ).kind
+        == "npm"
+    )
+    assert (
+        detect_install_source(
+            env={},
+            executable=Path(r"C:\Users\dev\.local\bin\agent-feed.exe"),
+            package_file=Path(
+                r"C:\Users\dev\.local\share\uv\tools\agent-feed\Lib\site-packages"
+                r"\agent_feed\__init__.py"
+            ),
+        ).kind
+        == "uv"
+    )
+
+
 def test_detect_install_source_from_source_checkout(tmp_path: Path) -> None:
     package_file = tmp_path / "src/agent_feed/__init__.py"
     package_file.parent.mkdir(parents=True)
