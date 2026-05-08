@@ -190,14 +190,28 @@ def parse_brew_formula_version(formula: str) -> str | None:
 
 
 def is_newer_version(candidate: str, current: str) -> bool:
+    comparison = compare_versions(candidate, current)
+    return comparison is not None and comparison > 0
+
+
+def is_older_version(candidate: str, current: str) -> bool:
+    comparison = compare_versions(candidate, current)
+    return comparison is not None and comparison < 0
+
+
+def compare_versions(candidate: str, current: str) -> int | None:
     candidate_parts = version_parts(candidate)
     current_parts = version_parts(current)
     if not candidate_parts or not current_parts:
-        return False
+        return None
     width = max(len(candidate_parts), len(current_parts))
     candidate_parts = candidate_parts + (0,) * (width - len(candidate_parts))
     current_parts = current_parts + (0,) * (width - len(current_parts))
-    return candidate_parts > current_parts
+    if candidate_parts < current_parts:
+        return -1
+    if candidate_parts > current_parts:
+        return 1
+    return 0
 
 
 def version_parts(version: str) -> tuple[int, ...]:

@@ -8,9 +8,11 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
+from agent_feed import __version__
 from agent_feed.adapters import claude, codex, cursor
 from agent_feed.asset_trust import asset_trust_errors
 from agent_feed.config import check_config
+from agent_feed.install_source import is_older_version
 from agent_feed.models import Check, CheckReport, ProjectStatus
 from agent_feed.project_settings import (
     DEFAULT_SKILL_TRUST,
@@ -82,6 +84,7 @@ def collect_status(root: Path) -> ProjectStatus:
     else:
         cursor_errors, cursor_warnings = [], []
     warnings = [
+        *downgrade_warnings(root),
         *skill_warnings,
         *codex_warnings,
         *claude_warnings,
@@ -105,6 +108,32 @@ def collect_status(root: Path) -> ProjectStatus:
         errors=tuple(errors),
         warnings=tuple(warnings),
     )
+
+
+def downgrade_warnings(root: Path) -> list[str]:
+    version = installed_agent_feed_version(root)
+    if not version or not is_older_version(__version__, version):
+        return []
+    return [
+        (
+            f"Downgrade risk: project was managed by Agent Feed {version}, "
+            f"but this CLI is {__version__}. Update the CLI before running upgrade."
+        )
+    ]
+
+
+def installed_agent_feed_version(root: Path) -> str | None:
+    metadata_file = root / ".agents/agent-feed.json"
+    if not metadata_file.is_file():
+        return None
+    try:
+        data = json.loads(metadata_file.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(data, dict):
+        return None
+    version = data.get("agent_feed_version")
+    return version if isinstance(version, str) and version else None
 
 
 def configured_clients(root: Path) -> set[str]:

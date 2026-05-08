@@ -520,6 +520,14 @@ with uv, pipx, or Homebrew, it recommends the matching update command for that
 source. This update notice is non-blocking; project asset upgrades still work
 offline.
 
+`upgrade` will not use an older Agent Feed CLI to rewrite a project that was
+last managed by a newer Agent Feed version. Update the CLI first. If you really
+intend to downgrade the managed assets, run:
+
+```sh
+agent-feed upgrade --allow-downgrade
+```
+
 Agent Feed does not overwrite user-maintained `.agents/project/` or
 `.agents/domain/` content just because the template changed. Those files are
 your repository-specific layer.

@@ -8,6 +8,12 @@ This project uses semantic versioning. Patch releases preserve the public comman
 
 ### Added
 
+- Added an `upgrade` downgrade guard so older Agent Feed CLIs cannot rewrite projects last managed by newer versions unless `--allow-downgrade` is passed.
+
+## 1.1.6 - 2026-05-08
+
+### Added
+
 - Added a public trust model document explaining external hash storage, skill trust levels, custom-skill boundaries, and GitHub token lookup order.
 - Added automatic `gh auth token` fallback for `agent-feed skill-hub` when `GITHUB_TOKEN` and saved `settings.github_token` are not available.
 - Added direct regression coverage for asset trust drift, missing GitHub CLI fallback, and upgrade idempotency.

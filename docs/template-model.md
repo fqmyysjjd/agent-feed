@@ -112,6 +112,10 @@ template and may also report a newer Agent Feed CLI version from the detected
 installation source. The update notice is advisory and non-blocking; the command
 must remain usable without network access.
 
+The `agent_feed_version` field is also used as a downgrade guard. If a project
+was last managed by a newer Agent Feed version than the current CLI, `upgrade`
+blocks writes unless the user explicitly passes `--allow-downgrade`.
+
 Supported settings:
 
 1. `settings.session_state.max_carry_forwards`: rendered into `.agents/session-state/schema.json` and used by session checks.

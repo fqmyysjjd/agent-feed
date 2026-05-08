@@ -34,7 +34,7 @@ from agent_feed.asset_trust import (
     trust_preview_actions,
     validate_config_shape,
 )
-from agent_feed.checks import collect_status, run_checks
+from agent_feed.checks import collect_status, downgrade_warnings, run_checks
 from agent_feed.choices import parse_choice_csv
 from agent_feed.config import check_config, get_config_value, set_config_value
 from agent_feed.console import (
@@ -57,7 +57,7 @@ from agent_feed.console import (
     print_write_plan_with_title,
 )
 from agent_feed.fs import has_existing_content
-from agent_feed.install_source import latest_update_notice
+from agent_feed.install_source import is_older_version, latest_update_notice
 from agent_feed.legacy_migration import backup_actions_include, backup_legacy_ai_assets
 from agent_feed.models import (
     DEFAULT_CHECKS,
@@ -110,6 +110,7 @@ from agent_feed.uninstall import apply_uninstall_plan, has_deletions, uninstall_
 from agent_feed.upgrade import (
     infer_project_name,
     infer_verification_profile,
+    installed_version,
     is_installed,
     settings_asset_plan as build_settings_asset_plan,
     upgrade_plan as build_upgrade_plan,
@@ -925,6 +926,11 @@ def _resolve_skill_remove_args(
 
 
 def _looks_like_project_path(path: Path) -> bool:
+    """Heuristic for backward-compatible ``skills remove <name> <path>`` parsing.
+
+    False positives (e.g. a skill name containing ``/``) are safe because
+    ``_safe_skill_name`` rejects those values before any deletion occurs.
+    """
     text = str(path)
     if path.exists() and path.is_dir() and (path / ".agents").exists():
         return True
@@ -1373,6 +1379,13 @@ def upgrade_cmd(
             help="Use detected/default upgrade choices and apply writes without prompts.",
         ),
     ] = False,
+    allow_downgrade: Annotated[
+        bool,
+        typer.Option(
+            "--allow-downgrade",
+            help="Allow an older Agent Feed CLI to write older managed assets. Interactive terminals can also confirm inline.",
+        ),
+    ] = False,
     dry_run: Annotated[
         bool, typer.Option("--dry-run", help="Preview upgrade diff without changing files.")
     ] = False,
@@ -1413,6 +1426,15 @@ def upgrade_cmd(
     if trust_errors:
         _print_errors("Upgrade blocked", trust_errors)
         raise typer.Exit(3)
+
+    if not dry_run and not allow_downgrade:
+        downgrade_errors = downgrade_preflight_errors(
+            target=target,
+            interactive=not no_input and not yes and can_prompt(),
+        )
+        if downgrade_errors:
+            _print_errors("Upgrade blocked", downgrade_errors)
+            raise typer.Exit(3)
 
     actions, errors = upgrade_project(
         target=target,
@@ -1751,6 +1773,9 @@ def preview_actions(
             dry_run=True,
         )
         actions.extend(trust_preview_actions(target))
+        downgrade_warning = _downgrade_warning(target)
+        if downgrade_warning:
+            actions.insert(0, downgrade_warning)
         return actions, errors
 
     selected_verification_profile = _parse_verification_profile(
@@ -1765,6 +1790,40 @@ def preview_actions(
         ),
         [],
     )
+
+
+def _downgrade_warning(target: Path) -> WriteAction | None:
+    """Return a visible warning action when the CLI is older than the project."""
+    warnings = downgrade_warnings(target)
+    if not warnings:
+        return None
+    return WriteAction(
+        path=target / ".agents/agent-feed.json",
+        action="review",
+        detail=warnings[0],
+    )
+
+
+def downgrade_preflight_errors(*, target: Path, interactive: bool) -> list[str]:
+    project_version = installed_version(target)
+    if not project_version or not is_older_version(__version__, project_version):
+        return []
+
+    message = (
+        f"This project was last managed by Agent Feed {project_version}, "
+        f"but this CLI is {__version__}. Running upgrade with an older CLI can "
+        "rewrite managed assets to older templates."
+    )
+    if interactive and prompt_confirm(
+        f"{message} Continue with a downgrade?",
+        default=False,
+    ):
+        return []
+
+    return [
+        message,
+        "Update this CLI first, or rerun with --allow-downgrade if this downgrade is intentional.",
+    ]
 
 
 def upgrade_project(
@@ -2705,7 +2764,7 @@ def print_skill_preview(package: RemoteSkillPackage) -> None:
 
 
 def main() -> None:
-    app()
+    app(prog_name="agent-feed")
 
 
 if __name__ == "__main__":

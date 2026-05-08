@@ -4,6 +4,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -708,6 +709,21 @@ def test_init_and_check(tmp_path: Path) -> None:
     assert short_help_result.exit_code == 0, short_help_result.output
     assert "index-skills" in short_help_result.output
 
+    module_help_result = subprocess.run(
+        [sys.executable, "-m", "agent_feed.cli", "-h"],
+        cwd=tmp_path,
+        env={
+            **os.environ,
+            "AGENT_FEED_HOME": str(tmp_path.parent / f"{tmp_path.name}-module-home"),
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert module_help_result.returncode == 0, module_help_result.stdout
+    assert "Usage: agent-feed [OPTIONS] COMMAND [ARGS]..." in module_help_result.stdout
+    assert "Usage: python -m agent_feed.cli" not in module_help_result.stdout
+
     index_help = invoke(["index-skills", "--help"], tmp_path)
     assert index_help.exit_code == 0, index_help.output
     assert "-y" in index_help.output
@@ -1188,6 +1204,90 @@ def test_upgrade_does_not_block_when_latest_check_fails(
     assert upgrade_result.exit_code == 0, upgrade_result.output
     assert "upgrade complete" in upgrade_result.output
     assert "Update available:" not in upgrade_result.output
+
+
+def test_upgrade_blocks_older_cli_from_downgrading_project_assets(tmp_path: Path) -> None:
+    init_result = invoke(
+        ["init", str(tmp_path), "--project-name", "Example", "--clients", "none", "--profile", "python"],
+        tmp_path,
+    )
+    assert init_result.exit_code == 0, init_result.output
+
+    metadata_path = tmp_path / ".agents/agent-feed.json"
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    metadata["agent_feed_version"] = "999.0.0"
+    metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+
+    upgrade_result = invoke(["upgrade", str(tmp_path), "--clients", "none", "-y"], tmp_path)
+
+    assert upgrade_result.exit_code == 3, upgrade_result.output
+    assert "Upgrade blocked" in upgrade_result.output
+    assert "Agent Feed 999.0.0" in upgrade_result.output
+    assert "--allow-downgrade" in upgrade_result.output
+
+
+def test_upgrade_allows_explicit_project_downgrade(tmp_path: Path) -> None:
+    init_result = invoke(
+        ["init", str(tmp_path), "--project-name", "Example", "--clients", "none", "--profile", "python"],
+        tmp_path,
+    )
+    assert init_result.exit_code == 0, init_result.output
+
+    metadata_path = tmp_path / ".agents/agent-feed.json"
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    metadata["agent_feed_version"] = "999.0.0"
+    metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+
+    upgrade_result = invoke(
+        ["upgrade", str(tmp_path), "--clients", "none", "-y", "--allow-downgrade"],
+        tmp_path,
+    )
+
+    assert upgrade_result.exit_code == 0, upgrade_result.output
+    assert "upgrade complete" in upgrade_result.output
+
+
+def test_upgrade_dry_run_allows_downgrade_preview(tmp_path: Path) -> None:
+    init_result = invoke(
+        ["init", str(tmp_path), "--project-name", "Example", "--clients", "none", "--profile", "python"],
+        tmp_path,
+    )
+    assert init_result.exit_code == 0, init_result.output
+
+    metadata_path = tmp_path / ".agents/agent-feed.json"
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    metadata["agent_feed_version"] = "999.0.0"
+    metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+
+    upgrade_result = invoke(["upgrade", str(tmp_path), "--clients", "none", "--dry-run"], tmp_path)
+
+    assert upgrade_result.exit_code == 0, upgrade_result.output
+    assert "Upgrade blocked" not in upgrade_result.output
+
+
+def test_preview_and_status_report_downgrade_risk(tmp_path: Path) -> None:
+    init_result = invoke(
+        ["init", str(tmp_path), "--project-name", "Example", "--clients", "none", "--profile", "python"],
+        tmp_path,
+    )
+    assert init_result.exit_code == 0, init_result.output
+
+    metadata_path = tmp_path / ".agents/agent-feed.json"
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    metadata["agent_feed_version"] = "999.0.0"
+    metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+
+    preview_result = invoke(["preview", str(tmp_path), "--clients", "none"], tmp_path)
+    status_result = invoke(["status", str(tmp_path)], tmp_path)
+    json_status_result = invoke(["status", str(tmp_path), "--json"], tmp_path)
+
+    assert preview_result.exit_code == 0, preview_result.output
+    assert "Downgrade risk" in preview_result.output
+    assert status_result.exit_code == 0, status_result.output
+    assert "Downgrade risk" in status_result.output
+    assert json_status_result.exit_code == 0, json_status_result.output
+    payload = json.loads(json_status_result.output)
+    assert any("Downgrade risk" in warning for warning in payload["warnings"])
 
 
 def test_diff_rendering_uses_red_green_styles() -> None:
@@ -1926,6 +2026,18 @@ def test_skill_hub_prefers_tokens_before_github_cli_fallback(
     monkeypatch.delenv("GITHUB_TOKEN", raising=False)
 
     assert cli._preferred_github_token(tmp_path) == "saved-token"
+
+
+def test_github_cli_token_used_when_config_has_errors(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When configured_github_token returns errors, gh auth token should still be tried."""
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    monkeypatch.setenv("AGENT_FEED_HOME", str(tmp_path / "nonexistent-home"))
+    monkeypatch.setattr(cli, "_github_cli_token", lambda: "gh-from-errors-path")
+
+    assert cli._preferred_github_token(tmp_path) == "gh-from-errors-path"
 
 
 def test_github_cli_token_returns_none_when_gh_is_not_installed(
