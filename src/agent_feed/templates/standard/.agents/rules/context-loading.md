@@ -40,12 +40,13 @@ During full startup, read:
 3. `.agents/rules/context-loading.md`
 4. `.agents/rules/session-state.md`
 5. `.agents/rules/testing-gates.md`
-6. `.agents/README.md`
-7. `.agents/skills/README.md`
-8. `.agents/project/README.md`
-9. `.agents/domain/README.md`
-10. `.agents/skills/project-architecture/SKILL.md`
-11. `.agents/skills/project-development/SKILL.md`
+6. `.agents/rules/engineering-architecture.md`
+7. `.agents/README.md`
+8. `.agents/skills/README.md`
+9. `.agents/project/README.md`
+10. `.agents/domain/README.md`
+11. `.agents/skills/project-architecture/SKILL.md`
+12. `.agents/skills/project-development/SKILL.md`
 
 If `AGENTS.local.md` exists, read it before project-wide rules and let it override local workflow details that do not violate project boundaries.
 
@@ -62,8 +63,9 @@ Use this quick trigger map before detailed routing. If a trigger matches, load t
 | Trigger | Required owner | Why |
 | --- | --- | --- |
 | Architecture, module, runtime, requirement, contract, or ownership decision | `.agents/skills/project-architecture/SKILL.md` | Prevents the AI from inventing project structure or future-facing decisions. |
-| Implementation, refactor, test, file creation, or project-structure change | `.agents/skills/engineering-planning/SKILL.md`, then `project-development` | Forces owner, reuse, placement, write set, boundaries, and verification before edits. |
-| Bug, regression, failed test, or review finding fix | `.agents/skills/engineering-planning/SKILL.md`, then `project-fix` | Keeps fixes rooted in the failing behavior and existing owner. |
+| Implementation, refactor, test, file creation, or project-structure change | `.agents/rules/engineering-architecture.md`, `.agents/skills/engineering-planning/SKILL.md`, then `project-development` | Forces repository-evidence ownership, reuse, placement, write set, boundaries, and verification before edits. |
+| New owner, abstraction, helper, dependency-direction, or structure decision | `.agents/rules/engineering-architecture.md` | Prevents template-shaped categories from replacing the repository's actual architecture. |
+| Bug, regression, failed test, or review finding fix | `.agents/rules/engineering-architecture.md` when ownership or structure is involved, then `.agents/skills/engineering-planning/SKILL.md`, then `project-fix` | Keeps fixes rooted in the failing behavior and existing owner. |
 | Code, diff, commit, or merge review | `project-review`, `git-collaboration` | Keeps review read-only unless the user asks for fixes. |
 | README, AGENTS, rule, project/domain doc, plan, or skill review | `design-review`, plus `concept-review` when wording or concepts changed | Checks whether the next development step can proceed without invented decisions. |
 | Optional, imported, custom, or specialized skill may match the task, diff, failure, or review finding | `.agents/skills/specialist-router/SKILL.md` | Routes to useful external or specialist methods without letting them override core gates. |
@@ -76,9 +78,11 @@ Use these routes:
 1. Architecture, module ownership, runtime behavior, or requirement decisions:
    - `.agents/skills/project-architecture/SKILL.md`
 2. Coding, refactor, tests, or project structure changes:
+   - `.agents/rules/engineering-architecture.md`
    - `.agents/skills/engineering-planning/SKILL.md`
    - `.agents/skills/project-development/SKILL.md`
 3. Bug fixes, regressions, failed tests, or review finding fixes:
+   - `.agents/rules/engineering-architecture.md` when ownership, placement, reuse, dependency direction, or abstraction is involved
    - `.agents/skills/engineering-planning/SKILL.md`
    - `.agents/skills/project-fix/SKILL.md`
 4. Code review, diff review, commit review, or merge review:
@@ -109,6 +113,7 @@ When a task matches multiple routes, apply every relevant gate instead of choosi
 Use the primary execution skill first, then add only the gates that the changed surface requires:
 
 1. Code or implementation changed:
+   - apply `.agents/rules/engineering-architecture.md` when the work touches ownership, file placement, dependency direction, abstraction, reuse, or project structure
    - use `.agents/skills/engineering-planning/SKILL.md` before editing to decide owner, reuse, placement, boundaries, and verification
    - start with `.agents/skills/project-development/SKILL.md` or `.agents/skills/project-fix/SKILL.md`
    - then run `.agents/skills/project-review/SKILL.md`

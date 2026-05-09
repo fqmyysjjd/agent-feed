@@ -799,6 +799,7 @@ def test_init_and_check(tmp_path: Path) -> None:
     assert "repository evidence" in agents_text
     assert "Do not stage, commit, or push" in agents_text
     assert ".agents/rules/git-collaboration.md" in agents_text
+    assert ".agents/rules/engineering-architecture.md" in agents_text
     assert (tmp_path / "AGENTS.md").exists()
     assert (tmp_path / ".agents/agent-feed.json").exists()
     assert not (tmp_path / ".agents/agent-feed.trust.json").exists()
@@ -806,6 +807,7 @@ def test_init_and_check(tmp_path: Path) -> None:
     trust_state = trust_config(tmp_path)
     assert str(tmp_path.resolve()) in trust_state["projects"]
     assert (tmp_path / ".agents/rules/outcome-boundary.md").exists()
+    assert (tmp_path / ".agents/rules/engineering-architecture.md").exists()
     assert (tmp_path / ".agents/skills/README.md").exists()
     assert (tmp_path / ".agents/skills/concept-review/SKILL.md").exists()
     assert (tmp_path / ".agents/skills/specialist-router/SKILL.md").exists()

@@ -155,6 +155,7 @@ def validate_structure(root: Path) -> list[str]:
         ".agents/rules/context-loading.md",
         ".agents/rules/session-state.md",
         ".agents/rules/testing-gates.md",
+        ".agents/rules/engineering-architecture.md",
         ".agents/rules/development-workflow.md",
         ".agents/rules/review-gates.md",
         ".agents/project/README.md",

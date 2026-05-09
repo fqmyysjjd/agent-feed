@@ -53,6 +53,7 @@ Agent Feed turns the recurring failure modes of AI coding into visible advantage
 
 - **Focused context**: the assistant loads the rules, project constraints, domain docs, and skills needed for the current task instead of flooding the prompt or guessing from stale chat.
 - **Scope control**: outcome boundaries and Task Briefs keep a small request from turning into an unsolicited redesign.
+- **Architecture discipline**: ownership, placement, dependency direction, reuse, and abstraction are checked from repository evidence before non-trivial code changes.
 - **Decision safety**: architecture, contract, verification, and source-of-truth choices stop at a human confirmation gate instead of becoming accidental code.
 - **Evidence-backed completion**: "done" is tied to the verification profile, docs checks, review gates, and the actual task boundary.
 - **Clean handoff**: Context Capsules and session-state rules preserve only result-affecting conclusions, so long sessions can resume without replaying the whole conversation.
@@ -126,7 +127,7 @@ The protocol is intentionally split by responsibility while remaining customizab
 | Layer | Responsibility |
 | --- | --- |
 | `AGENTS.md` | Repository entry contract, priority order, mandatory gates, and routing. |
-| `.agents/rules/` | Reusable workflow constraints for boundary, context, testing, review, git, and handoff. |
+| `.agents/rules/` | Reusable workflow constraints for boundary, context, engineering architecture, testing, review, git, and handoff. |
 | `.agents/project/` | User-maintained repository constraints such as architecture, layout, milestones, and verification commands. |
 | `.agents/domain/` | Stable project knowledge: concepts, contracts, and source-of-truth ownership. |
 | `.agents/skills/` | Task workflows for architecture, implementation, fixes, reviews, and imported/custom methods. |

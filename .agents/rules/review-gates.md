@@ -10,12 +10,13 @@ After every coding, refactor, fix, public contract, store contract, module port,
 2. Use `.agents/skills/project-review/SKILL.md`.
 3. Use `.agents/rules/git-collaboration.md` when the review involves diffs, commits, branches, merges, or PR-like handoff.
 4. Apply `.agents/rules/testing-gates.md` when judging verification and test coverage.
-5. Review milestone fit, project constraints, module ownership, public/internal boundaries, documented ownership, contract drift, tests, error handling, trace/audit anchors, and secret safety.
-6. Use `.agents/skills/specialist-router/SKILL.md` when optional, imported, custom, or specialized review/fix skills may directly match the risk being reviewed.
-7. Use `.agents/skills/concept-review/SKILL.md` when the change introduces or changes naming, vocabulary, concepts, abstractions, protocol terms, or public-facing language.
-8. If the user asked for a pure review, do not modify files; report findings and stop unless the user asks for fixes.
-9. If the current task includes implementation or fix work, route P0/P1 findings through `.agents/skills/project-fix/SKILL.md` before final handoff.
-10. For implementation or fix work, fix P2 findings by default unless deferring is safer and documented.
+5. Apply `.agents/rules/engineering-architecture.md` when the diff touches ownership, placement, project structure, dependency direction, reuse, or abstraction.
+6. Review milestone fit, project constraints, repository-evidence ownership, dependency direction, public/internal boundaries, documented ownership, contract drift, tests, error handling, trace/audit anchors, and secret safety.
+7. Use `.agents/skills/specialist-router/SKILL.md` when optional, imported, custom, or specialized review/fix skills may directly match the risk being reviewed.
+8. Use `.agents/skills/concept-review/SKILL.md` when the change introduces or changes naming, vocabulary, concepts, abstractions, protocol terms, or public-facing language.
+9. If the user asked for a pure review, do not modify files; report findings and stop unless the user asks for fixes.
+10. If the current task includes implementation or fix work, route P0/P1 findings through `.agents/skills/project-fix/SKILL.md` before final handoff.
+11. For implementation or fix work, fix P2 findings by default unless deferring is safer and documented.
 
 ## Review/Fix Handoff
 

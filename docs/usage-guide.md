@@ -163,6 +163,12 @@ Think of the two directories this way:
 The goal is not to make the AI read everything. The goal is to keep a clear
 index so the AI can read the right project or domain rule at the right time.
 
+Agent Feed also includes a generic engineering architecture gate. It does not
+force every repository into the same layers. Instead, it tells the AI to infer
+the current repository's real owners from files, calls, tests, docs, config, and
+generated assets before adding code, creating files, introducing abstractions,
+or changing dependency direction.
+
 ### Start A New AI Session
 
 Use this prompt when opening a new session in a repository that already has
@@ -179,7 +185,9 @@ Task:
 [Describe the concrete result I want]
 
 Before editing, tell me the task boundary, the files you need to read, and the
-verification you expect to run.
+verification you expect to run. For non-trivial code or structure changes,
+also identify the existing owner, the evidence for that owner, the intended
+placement, and the abstraction level before editing.
 ```
 
 This helps the AI avoid two bad extremes: reading the whole repository before a

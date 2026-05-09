@@ -30,9 +30,10 @@ The current task boundary decides when to stop. Decision gates decide when uncon
 5. `testing-gates.md`: test selection, minimum coverage, failure handling, and verification evidence rules.
 6. `evidence-gates.md`: external research sourcing, classification, and adoption rules.
 7. `change-risk-gates.md`: project-level change risk classes, non-negotiable safety lines, and verification command rules.
-8. `development-workflow.md`: Task Brief implementation addendum, reuse-before-build discipline, comment/docstring discipline, gap handling, and verification ladder.
-9. `review-gates.md`: code/design review gates and final handoff routing into session-state.
-10. `git-collaboration.md`: git diff, staging, commit, merge, and review handoff rules.
+8. `engineering-architecture.md`: repository-agnostic ownership, placement, dependency-direction, abstraction, and reuse gate.
+9. `development-workflow.md`: Task Brief implementation addendum, reuse-before-build discipline, comment/docstring discipline, gap handling, and verification ladder.
+10. `review-gates.md`: code/design review gates and final handoff routing into session-state.
+11. `git-collaboration.md`: git diff, staging, commit, merge, and review handoff rules.
 
 ## Reference Direction
 
@@ -43,6 +44,7 @@ AGENTS.md
   -> rules/context-loading.md
   -> rules/session-state.md
   -> rules/testing-gates.md
+  -> rules/engineering-architecture.md
   -> .agents/README.md
   -> project/*
   -> session-state/<session_id>.json when long-running session state exists

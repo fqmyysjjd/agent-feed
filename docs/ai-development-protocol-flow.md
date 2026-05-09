@@ -34,6 +34,7 @@ AGENTS.md entry contract
   -> trusted AI asset check before using built-in/reviewed skills
   -> skill workflow routing
   -> project/domain source-of-truth lookup
+  -> engineering architecture gate for ownership, placement, dependency direction, abstraction, and reuse
   -> user-proposed approach assessment when the user suggests a concrete plan
   -> decision gate when future behavior is affected
   -> scoped development/fix/review/design work
@@ -61,6 +62,7 @@ compression.
 | `.agents/rules/context-loading.md` | same | Startup loading order, quick trigger map, task routing, mixed-task sequencing, context budget. |
 | `.agents/rules/session-state.md` | same | Final handoff gate, Context Capsule format, and compact handoff-card policy for long-running sessions and context compression. |
 | `.agents/rules/testing-gates.md` | same | Test and verification selection, failure classification, verification evidence rules. |
+| `.agents/rules/engineering-architecture.md` | same | Repository-agnostic ownership, placement, dependency-direction, abstraction, and reuse gate. |
 | `.agents/rules/development-workflow.md` | same | Implementation addendum, reuse-before-build, scoped implementation, comments, gap handling. |
 | `.agents/rules/review-gates.md` | same | Code review gate, design review gate, README/project index maintenance, and final handoff routing. |
 | `.agents/rules/evidence-gates.md` | same | Source priority and adoption filter for external facts and research. |
@@ -572,33 +574,38 @@ Files:
 1. `.agents/skills/project-development/SKILL.md`
 2. `.agents/skills/project-fix/SKILL.md`
 3. `.agents/skills/engineering-planning/SKILL.md`
-4. `.agents/rules/development-workflow.md`
-5. `.agents/rules/change-risk-gates.md`
-6. `.agents/domain/contracts.md`
+4. `.agents/rules/engineering-architecture.md`
+5. `.agents/rules/development-workflow.md`
+6. `.agents/rules/change-risk-gates.md`
+7. `.agents/domain/contracts.md`
 
 Handling:
 
 1. Complete the Task Brief first.
-2. Use engineering planning to decide owner, reuse, placement, write set,
+2. Use the engineering architecture gate to infer the real owner from
+   repository evidence, preserve dependency direction, and choose the smallest
+   useful abstraction level.
+3. Use engineering planning to decide owner, reuse, placement, write set,
    boundaries, and verification before editing.
-3. Add implementation-specific fields: milestone, task type, owner module,
-   public API touched, persistence touched, tests expected, comment impact, and
-   forbidden changes.
-4. Search for existing owners, helpers, adapters, tests, fixtures, validators,
-   command patterns, or dependencies before building new code.
-5. Apply the non-negotiable safety lines before network, dependency,
+4. Add implementation-specific fields: milestone, task type, owner, owner
+   evidence, placement, dependency direction, abstraction level, public API
+   touched, persistence touched, tests expected, comment impact, and forbidden
+   changes.
+5. Search for existing owners, helpers, boundary converters, tests, fixtures,
+   validators, documented patterns, or dependencies before building new code.
+6. Apply the non-negotiable safety lines before network, dependency,
    environment, database, destructive, credential, deployment, or
    security-sensitive actions.
-6. Trace upstream callers and downstream consumers before replacing behavior.
-7. Implement the smallest scoped change.
-8. Add or update tests for changed behavior, failure paths, boundaries, or
+7. Trace upstream callers and downstream consumers before replacing behavior.
+8. Implement the smallest scoped change.
+9. Add or update tests for changed behavior, failure paths, boundaries, or
    invariants.
-9. Stop if a new write target, contract boundary, verification gate, or
+10. Stop if a new write target, contract boundary, verification gate, or
    out-of-scope change appears.
 
 Effect:
 
-1. Implementation is owner-aware and contract-aware.
+1. Implementation is owner-aware, dependency-aware, and contract-aware.
 2. Existing project patterns are reused before new abstractions are introduced.
 3. Riskier actions are classified before they happen.
 4. Hidden scope expansion is caught during work.
@@ -822,6 +829,7 @@ responsibility.
 | Context was compressed | `outcome-boundary`, `session-state` | Recover boundary and relevant handoff card | Continuity without transcript replay |
 | User asks for a small deterministic edit | `outcome-boundary` task class gate | Treat as direct action after boundary recovery | Avoid unnecessary planning ceremony |
 | User asks for implementation | `project-development`, `development-workflow` | Fill Task Brief and implementation addendum | Scoped implementation with owner/test clarity |
+| Work adds files, structure, abstractions, shared helpers, or dependency-direction changes | `engineering-architecture` | Infer owner from repository evidence, decide placement and abstraction level | Prevents generic template categories from replacing the project's real architecture |
 | User asks for bug fix | `project-fix` | Reproduce or trace, locate owner, smallest fix | Fix addresses root cause, not symptom only |
 | User asks for code review | `project-review` | Pure review mode, findings first, no edits | Review does not mutate code unexpectedly |
 | AI changes code as part of work | `review-gates` code review gate | Run checks and review boundaries/tests/security | Implementation has internal quality gate |
@@ -850,6 +858,7 @@ responsibility.
 | Simple tasks get over-planned | Task class gate | Direct actions can proceed with a light process. |
 | Hard tasks proceed without enough planning | Task class gate plus design readiness | Architecture/contract work must become development-ready first. |
 | AI invents product or architecture decisions | `decision-gates` | Future-affecting choices require human confirmation. |
+| AI creates generic structure that does not fit the repository | `engineering-architecture` | Owners, placement, dependency direction, and abstraction level must be justified from repository evidence. |
 | AI follows a changed trusted skill without noticing | `check-agent-trust.sh` plus external trust state | Changed built-in/reviewed skills and managed scripts interrupt the workflow before use. |
 | Imported skills override project rules | Skill index metadata and priority rules | Missing metadata defaults to `source: unknow`, `trust: custom`; custom skills are advisory only. |
 | User-proposed partial solutions bypass design review | User-proposed approach gate | The AI must inspect project context, evaluate fit, and ask when future behavior changes. |

@@ -157,12 +157,13 @@ Generic reusable protocol:
 1. Outcome boundary.
 2. Context loading.
 3. Session-state lifecycle.
-4. Development workflow.
-5. Testing gates.
-6. Review gates.
-7. Evidence gates.
-8. Change-risk gates.
-9. Skill lifecycle rules.
+4. Engineering architecture: repository-evidence ownership, placement, dependency direction, abstraction, and reuse.
+5. Development workflow.
+6. Testing gates.
+7. Review gates.
+8. Evidence gates.
+9. Change-risk gates.
+10. Skill lifecycle rules.
 
 Project customization layer:
 
