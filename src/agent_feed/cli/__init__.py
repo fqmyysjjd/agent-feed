@@ -34,7 +34,16 @@ from agent_feed.asset_trust import (
     validate_config_shape,
 )
 from agent_feed.checks import collect_status, run_checks
-from agent_feed.choices import parse_choice_csv
+from agent_feed.cli._helpers import (
+    _is_path_like_argument,
+    _parse_checks,
+    _parse_clients,
+    _parse_verification_profile,
+    _print_errors,
+    _safe_skill_name,
+    _with_client_checks,
+    build_skill_delete_actions,
+)
 from agent_feed.config import check_config, get_config_value, set_config_value
 from agent_feed.console import (
     console,
@@ -44,7 +53,6 @@ from agent_feed.console import (
     print_diff_hint,
     print_check_report,
     print_config_check_report,
-    print_error_panel,
     print_markdown_panel,
     print_action_result,
     print_recommended_command,
@@ -936,35 +944,6 @@ def skills_remove_cmd(
     )
 
 
-def build_skill_delete_actions(
-    *,
-    skill_root: Path,
-    names: list[str],
-    action: str,
-) -> list[WriteAction]:
-    return [
-        WriteAction(
-            path=skill_root / name,
-            action=action,
-            detail="installed skill",
-        )
-        for name in names
-    ]
-
-
-def _is_path_like_argument(name: str) -> bool:
-    """Return True for tokens that look like a filesystem path rather than a skill name."""
-    if not name:
-        return False
-    if "/" in name or "\\" in name:
-        return True
-    if name in {".", ".."}:
-        return True
-    if name.startswith(".") or name.startswith("~"):
-        return True
-    return False
-
-
 @config_app.command("get")
 def config_get_cmd(
     key: Annotated[
@@ -1680,59 +1659,6 @@ def _prompt_skills_to_remove(skills: list[SkillMetadata]) -> list[str]:
     return prompt_skills_to_remove(choices)
 
 
-def _safe_skill_name(name: str) -> bool:
-    if not name or name in {".", ".."} or name.startswith("."):
-        return False
-    return all(character.isalnum() or character in {"-", "_", "."} for character in name)
-
-
-def _parse_clients(raw: str | None, *, default: tuple[Client, ...]) -> tuple[Client, ...]:
-    try:
-        return parse_choice_csv(
-            raw,
-            enum_type=Client,
-            default=default,
-            value_name="clients",
-            allow_none=True,
-        )
-    except ValueError as exc:
-        raise typer.BadParameter(str(exc)) from exc
-
-
-def _parse_checks(raw: str | None, *, default: tuple[Check, ...]) -> tuple[Check, ...]:
-    try:
-        return parse_choice_csv(
-            raw,
-            enum_type=Check,
-            default=default,
-            value_name="checks",
-            allow_none=False,
-        )
-    except ValueError as exc:
-        raise typer.BadParameter(str(exc)) from exc
-
-
-def _parse_verification_profile(
-    raw: str | None, *, default: VerificationProfile
-) -> VerificationProfile:
-    if raw is None or raw.strip() == "":
-        return default
-    value = raw.strip().lower()
-    aliases = {
-        "python-uv": VerificationProfile.PYTHON,
-        "node-pnpm": VerificationProfile.NODE,
-    }
-    if value in aliases:
-        return aliases[value]
-    try:
-        return VerificationProfile(value)
-    except ValueError as exc:
-        allowed = ", ".join(profile.value for profile in VerificationProfile)
-        raise typer.BadParameter(
-            f"unknown verification profile: {value}. Allowed values: {allowed}."
-        ) from exc
-
-
 def resolve_init_verification_profile(
     raw: str | None,
     *,
@@ -1753,17 +1679,6 @@ def resolve_init_verification_profile(
     return prompt_verification_profile_step(DEFAULT_VERIFICATION_PROFILE)
 
 
-def _with_client_checks(
-    checks: tuple[Check, ...], clients: tuple[Client, ...]
-) -> tuple[Check, ...]:
-    mapped = {
-        Client.CODEX: Check.CODEX,
-        Client.CLAUDE: Check.CLAUDE,
-        Client.CURSOR: Check.CURSOR,
-    }
-    return tuple(dict.fromkeys((*checks, *(mapped[client] for client in clients))))
-
-
 def _should_offer_env_replace(
     errors: tuple[str, ...],
     *,
@@ -1774,10 +1689,6 @@ def _should_offer_env_replace(
         return False
     replace_errors = [error for error in errors if "pass --force to replace it" in error]
     return bool(replace_errors) and len(replace_errors) == len(errors)
-
-
-def _print_errors(title: str, errors: list[str]) -> None:
-    print_error_panel(title, errors)
 
 
 def prompt_init_wizard(
