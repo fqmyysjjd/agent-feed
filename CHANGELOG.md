@@ -9,6 +9,14 @@ This project uses semantic versioning. Patch releases preserve the public comman
 ### Added
 
 - Added an `upgrade` downgrade guard so older Agent Feed CLIs cannot rewrite projects last managed by newer versions unless `--allow-downgrade` is passed.
+- Added a Light Resume Checklist anchor in `.agents/rules/outcome-boundary.md` so AGENTS.md and `context-loading.md` can route same-session resumes to a single short block, and wired `context-loading.md` Light Resume steps to that anchor instead of re-reading the entire rule.
+
+### Changed
+
+- Compressed `AGENTS.md` Mandatory Gates from 22 entries to 11 grouped gates that each name the owning rule/skill, and replaced the duplicated full-startup reading list with a pointer to the canonical list in `.agents/rules/context-loading.md`.
+- Clarified the AGENTS.md Mandatory Gates preamble: "mandatory" means non-bypassable when an entry's trigger fires, not always-read; the canonical full-startup reading list still lives in `.agents/rules/context-loading.md`.
+- Collapsed `.agents/rules/context-loading.md` triple routing (Quick Trigger Map / Task Routing list / Mixed Task Routing) into a single layered routing table that names the owner, why, and tells the reader to layer matching rows.
+- Reframed `.agents/README.md` to defer rule priority and Mandatory Gates to `AGENTS.md` instead of re-listing them; this README now indexes which rule files exist and how layers reference each other.
 
 ## 1.1.6 - 2026-05-08
 

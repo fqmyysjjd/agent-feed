@@ -30,6 +30,18 @@ At the start of a new session, after context compression, or before continuing a
 
 If the frame cannot be recovered, infer the smallest reasonable frame and state the assumption. Ask the user when `.agents/rules/decision-gates.md` says the missing boundary can affect future development results.
 
+## Light Resume Checklist
+
+When `.agents/rules/context-loading.md` Light Resume conditions hold, this is the only block of `outcome-boundary.md` you must re-read. Confirm in order:
+
+1. **Goal** — restate the user's near-term result in one sentence.
+2. **Stop** — restate the stopping condition; if missing or stale, fall back to Full Startup.
+3. **Write set & boundaries** — confirm the in-scope files and contracts have not changed since the last turn.
+4. **Verification gate** — confirm the evidence that proves the result is still the same.
+5. **Decisions outstanding** — if any new gap or unconfirmed choice appeared, stop and apply `.agents/rules/decision-gates.md`.
+
+If any of the above is unclear, abandon the light resume and run the Full Startup read in `.agents/rules/context-loading.md`.
+
 ## Task Brief
 
 For any implementation, fix, review, design, or AI-protocol change, turn the task frame into a compact Task Brief before making edits.

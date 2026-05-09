@@ -6,24 +6,9 @@ It defines how an AI assistant should enter the project, resolve rule priority, 
 
 ## Startup Policy
 
-Use full startup only when the AI session is new, context compression occurred or is suspected, the current task boundary cannot be recovered, or the task shifts into design, implementation, fix, review, or protocol work.
+Use full startup when the AI session is new, context compression occurred or is suspected, the current task boundary cannot be recovered, or the task shifts into design, implementation, fix, review, or protocol work. The canonical full-startup reading list lives in `.agents/rules/context-loading.md` (Full Startup section); follow it there rather than duplicating it here.
 
-For same-session continuation with a clear task boundary, use the light resume path in `.agents/rules/context-loading.md`: re-read `.agents/rules/outcome-boundary.md`, then load only the rule, project, domain, or skill file needed for the next action.
-
-During full startup, read:
-
-1. `.agents/rules/outcome-boundary.md`
-2. `.agents/rules/decision-gates.md`
-3. `.agents/rules/context-loading.md`
-4. `.agents/rules/session-state.md`
-5. `.agents/rules/testing-gates.md`
-6. `.agents/rules/engineering-architecture.md`
-7. `.agents/README.md`
-8. `.agents/skills/README.md`
-9. `.agents/project/README.md`
-10. `.agents/domain/README.md`
-11. `.agents/skills/project-architecture/SKILL.md`
-12. `.agents/skills/project-development/SKILL.md`
+For same-session continuation with a clear task boundary, use the Light Resume Checklist in `.agents/rules/context-loading.md`: re-read the Light Resume Checklist anchor in `.agents/rules/outcome-boundary.md`, then load only the rule, project, domain, or skill file needed for the next action.
 
 Before continuing any design, implementation, review, or fix task, recover the current task result boundary and Task Brief from `.agents/rules/outcome-boundary.md`.
 
@@ -66,27 +51,16 @@ Do not duplicate detailed checklists or templates in `AGENTS.md` when a rule or 
 
 ## Mandatory Gates
 
-These gates are always active, but their details live in the owning rule files:
+These gates are non-bypassable: when an entry's trigger condition fires, the AI must follow the named rule or skill before continuing. "Mandatory" means non-skippable on trigger, not always-read — only the files listed in `.agents/rules/context-loading.md` Full Startup are read up front; the rest are loaded on the trigger described in each gate. Each entry below states its trigger plus the owning rule or skill that holds the detailed checklist.
 
-1. Define the current outcome boundary and Task Brief before deep work.
-2. Stop for human confirmation when `.agents/rules/decision-gates.md` requires a decision.
-3. Preserve project architecture, source layout, security, trace, and contract boundaries.
-4. Apply `.agents/rules/change-risk-gates.md` before network, dependency, environment, database, destructive, credential, deployment, or security-sensitive actions; its non-negotiable safety lines override task convenience.
-5. Apply the testing gate before implementation, after failures, and before final verification claims.
-6. Apply `.agents/rules/engineering-architecture.md` before file creation, project-structure changes, abstraction, dependency-direction changes, or non-trivial implementation so ownership, placement, reuse, and boundaries are inferred from repository evidence instead of template categories.
-7. Follow the development workflow, including comment/docstring discipline, before implementation.
-8. Before implementation, fix, refactor, test, file creation, or project-structure work, use `.agents/skills/engineering-planning/SKILL.md` to decide owner, reuse, placement, write set, boundaries, and verification before editing.
-9. Run the code/design review gate after code or document changes.
-10. Do not stage, commit, or push unless the current user request explicitly asks for that git action. Use `.agents/rules/git-collaboration.md` for git diff, review, commit, and push handling.
-11. Before every final handoff, decide whether session state must be updated, cleaned, promoted, or left unchanged according to `.agents/rules/session-state.md`.
-12. Maintain `README.md` when a human project reader needs to know a changed capability, workflow, command, directory, entry point, or design location.
-13. Read `.agents/project/README.md` before applying repository-specific constraints, and maintain it as the index for every file under `.agents/project/`.
-14. Maintain related indexes and README files when changing `.agents/`, `AGENTS.md`, `.agents/scripts/`, design entrypoints, or repository structure.
-15. Run `sh .agents/scripts/check-agent-assets.sh` or `sh .agents/scripts/verify-agent-dev.sh docs` after AI protocol, `.agents/`, skill/rule/project constraint names, document links, or session-state JSON changes.
-16. Before using built-in or reviewed skills, run `sh .agents/scripts/check-agent-trust.sh`. If it reports changed `.agents/skills/*/SKILL.md` or `.agents/scripts/*` hashes, the highest-priority Agent Feed rule requires stopping before those files are used. Tell the user the concrete changed Agent Feed files, inspect with `agent-feed preview`, and accept intentional changes only with `agent-feed index-skills -y`.
-17. `AGENT_FEED_HOME` is required for Agent Feed trust checks. Trusted AI asset hashes live in `$AGENT_FEED_HOME/config.json`, outside the current project. Do not store or recreate the accepted-hash trust state under `.agents/` or any project-local path.
-18. After any `.agents/skills/` change, run `agent-feed index-skills` or `sh .agents/scripts/index-skills.sh`, then run `sh .agents/scripts/sync-agent-assets.sh` and verify configured client adapters. Codex uses `.agents/skills` directly; Claude uses `.claude/skills`.
-19. Before implementing a user-proposed design, workflow, architecture, environment, persistence, verification, or public-behavior change, first understand the project context and relevant code, assess whether the proposed approach is sound, identify gaps or risks, and ask for confirmation when `.agents/rules/decision-gates.md` applies. Trivial typo, spelling, or local clarity fixes may proceed when they do not affect results.
-20. Treat `.agents/project/` and `.agents/domain/` as living project-specific source-of-truth files. Before and after feature, architecture, source layout, verification, persistence, security, public contract, domain, or ownership changes, review the related project/domain files and update stale guidance in the same task when the change is supported by repository evidence.
-21. If `.agents/project/` or `.agents/domain/` still contains scaffold placeholders or does not describe the current repository when project-specific work starts, infer concrete project/domain guidance from existing docs and code before continuing. Write supported facts directly, mark uncertain assumptions, and stop for user confirmation only when `.agents/rules/decision-gates.md` says the missing decision could affect future development results.
-22. If `.feed-backup/` exists, it contains pre-Agent Feed AI instruction assets moved aside during initialization. Before project-specific development, inspect the newest backup's `AI_MIGRATION_GUIDE.md` and `manifest.json`. Preserve every decisive legacy workflow, project AI rule, verification rule, security rule, architecture boundary, domain concept, contract, and source-of-truth rule by migrating supported facts into `.agents/project/` or `.agents/domain/`. Do not blindly copy generic, stale, duplicated, or conflicting instructions. If a legacy rule conflicts with the generic Agent Feed workflow, is redundant but could affect the AI development loop, lacks enough evidence, or cannot be safely classified, stop and ask the user.
+1. **Outcome & session state.** Define the current outcome boundary and Task Brief before deep work; recover them before continuing any design, implementation, review, or fix task; at every final handoff, decide whether session state must be updated, cleaned, promoted, or left unchanged per `.agents/rules/outcome-boundary.md` and `.agents/rules/session-state.md`.
+2. **Decision gates.** Stop for human confirmation when `.agents/rules/decision-gates.md` applies. This includes user-proposed design, workflow, architecture, environment, persistence, verification, or public-behavior changes — first understand the project context and relevant code, assess whether the proposal is sound, and ask for confirmation. Trivial typo or local clarity fixes may proceed when they do not affect results.
+3. **Change risk & trust.** Apply `.agents/rules/change-risk-gates.md` before network, dependency, environment, database, destructive, credential, deployment, or security-sensitive actions; its non-negotiable safety lines override task convenience. Before using built-in or reviewed skills, run `sh .agents/scripts/check-agent-trust.sh`; if it reports changed `.agents/skills/*/SKILL.md` or `.agents/scripts/*` hashes, stop, tell the user the concrete changed files, inspect with `agent-feed preview`, and accept intentional changes only with `agent-feed index-skills -y`. `AGENT_FEED_HOME` is required for trust checks; the accepted-hash state lives in `$AGENT_FEED_HOME/config.json`, never under `.agents/` or any project-local path.
+4. **Architecture & engineering planning.** Before file creation, project-structure changes, abstraction, dependency-direction changes, refactor, fix, tests, or non-trivial implementation, apply `.agents/rules/engineering-architecture.md` and run `.agents/skills/engineering-planning/SKILL.md` to decide owner, reuse, placement, write set, boundaries, and verification from repository evidence instead of template categories. Preserve project architecture, source layout, security, trace, and contract boundaries.
+5. **Testing gate.** Apply `.agents/rules/testing-gates.md` before implementation, after failures, and before final verification claims.
+6. **Development workflow.** Follow `.agents/rules/development-workflow.md`, including comment/docstring discipline, during implementation.
+7. **Review gate.** Run the code/design review per `.agents/rules/review-gates.md` after code or document changes.
+8. **Git collaboration.** Do not stage, commit, or push unless the current user request explicitly asks for that git action. Use `.agents/rules/git-collaboration.md` for git diff, review, commit, and push handling.
+9. **Living project & domain layer.** Treat `.agents/project/` and `.agents/domain/` as repository source-of-truth files: read `.agents/project/README.md` before applying repository-specific constraints, and update stale guidance in the same task when changes are supported by evidence. If those folders still contain scaffold placeholders when project-specific work starts, infer concrete project/domain guidance from existing docs and code, write supported facts directly, mark uncertain assumptions, and stop only when `.agents/rules/decision-gates.md` requires confirmation.
+10. **Documentation, indexes & migration.** Maintain `README.md`, `.agents/project/README.md`, `.agents/skills/README.md`, and related indexes whenever capability, workflow, command, directory, entry point, design location, `.agents/`, `AGENTS.md`, or `.agents/scripts/` content changes. If `.feed-backup/` exists, inspect the newest backup's `AI_MIGRATION_GUIDE.md` and `manifest.json` before project-specific development and migrate decisive legacy workflow, AI rule, verification, security, architecture, domain, contract, and source-of-truth content into `.agents/project/` or `.agents/domain/`. Do not blindly copy generic, stale, duplicated, or conflicting instructions; stop and ask the user when a legacy rule conflicts, is redundant but could affect the AI development loop, or lacks evidence to classify.
+11. **Verification scripts.** After AI protocol, `.agents/`, skill/rule/project constraint names, document links, or session-state JSON changes, run `sh .agents/scripts/check-agent-assets.sh` or `sh .agents/scripts/verify-agent-dev.sh docs`. After any `.agents/skills/` change, run `agent-feed index-skills` (or `sh .agents/scripts/index-skills.sh`), then `sh .agents/scripts/sync-agent-assets.sh`, and verify configured client adapters — Codex uses `.agents/skills` directly; Claude uses `.claude/skills`.
