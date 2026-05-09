@@ -24,6 +24,16 @@ For implementation gates, route P0/P1 findings and default-fix P2 findings throu
 
 If a finding requires an unconfirmed decision outside the current Task Brief, stop and apply `.agents/rules/decision-gates.md`.
 
+## Fix-Loop Budget Tracking
+
+This section applies **only to Implementation gate reviews and Fix tasks** (see Review Mode above). Pure Review tasks do not write `review_round` — return findings and stop.
+
+`current_task.review_round` records the **number of completed review rounds** on the current task. Treat an absent field as `0`.
+
+1. Before starting a round, read `current_task.review_round` (or treat absent as `0`). If it is already `>= 2`, stop and apply `.agents/rules/review-gates.md` Fix-Loop Budget — do not start another round unless the user asked or a P0/P1 was newly introduced by the last fix; if you proceed, state the reason.
+2. After the round finishes (findings reported, in-task fixes applied, verification rerun), increment `current_task.review_round` (set it to `1` if absent). Do not increment at the start of a round.
+3. The counter is per-task. Drop it from session-state when the task boundary is satisfied.
+
 ## Required Reading
 
 1. `.agents/rules/outcome-boundary.md`

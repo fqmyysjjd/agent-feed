@@ -14,6 +14,9 @@ This project uses semantic versioning. Patch releases preserve the public comman
 - Added a `custom → reviewed` skill promotion checklist to `.agents/skills/skill-maintainer/SKILL.md` and a corresponding routing note in `specialist-router/SKILL.md`, so the previously orphaned `trust: reviewed` level has an end-to-end flow.
 - Added an extension-point note and example profile skeleton in `.agents/agents/README.md` so users know the layer is empty by default and when to add a profile.
 - Added an explicit "domain vs project split" clarification to `.agents/project/README.md` and `.agents/domain/README.md` so future readers know the durable source-of-truth fact map lives in the domain layer while project-layer rows are stop-rule pointers.
+- Added a fix-loop budget section to `.agents/rules/review-gates.md` capping review→fix loops at 2 rounds before stopping for human input.
+- Added an optional `current_task.review_round` counter to `.agents/rules/session-state.md` so the Fix-Loop Budget in `.agents/rules/review-gates.md` is enforceable across context compression; `.agents/skills/project-review/SKILL.md` now updates the counter and stops before a third round unless explicitly justified.
+- Added a Light Resume guard to `.agents/skills/project-development/SKILL.md` and `.agents/skills/project-fix/SKILL.md` Workflow step 1: when the session entered through a Light Resume from another task class, run the Full Startup read before continuing instead of silently assuming the Mandatory Gate files are loaded.
 
 ### Changed
 
@@ -25,6 +28,11 @@ This project uses semantic versioning. Patch releases preserve the public comman
 - Removed the duplicate Architecture Card from `.agents/rules/engineering-architecture.md`; the Engineering Planning Card in `.agents/skills/engineering-planning/SKILL.md` is now the single per-task working artefact, and the rule layer keeps only invariants and Review Questions.
 - Tightened `.agents/skills/project-architecture/SKILL.md` Required Use to read-only orientation and pointed write/refactor work at `project-development/SKILL.md`, eliminating the routing ambiguity between the two skills.
 - Trimmed `.agents/project/README.md` so the AI maintenance contract has a single owning section instead of three overlapping ones.
+- Reduced the Context Capsule format in `.agents/rules/session-state.md` to a delta on top of the Task Brief — stable fields (goal, stop condition, constraints, write set) are not repeated in every handoff.
+- Unified the Fix-Loop Budget counter semantics across `.agents/rules/review-gates.md`, `.agents/rules/session-state.md`, and `.agents/skills/project-review/SKILL.md`: `current_task.review_round` now records the **number of completed review rounds** (absent = 0), incremented after a round finishes (not at its start), so the `>= 2` stop condition reliably yields two completed rounds rather than one.
+- Reordered `.agents/skills/project-fix/SKILL.md` Workflow so symptom intake, reproduction, and root-cause location run before `engineering-planning` is invoked, and added an explicit step 12 routing through the Final Handoff Gate in `.agents/rules/session-state.md` so fix tasks no longer skip the handoff decision. Required Reading was deduped against the AGENTS.md Mandatory Gate files (matching the project-development skill).
+- Realigned the Required Reading dedupe sentence in `.agents/skills/project-development/SKILL.md` and `.agents/skills/project-fix/SKILL.md` to point at the `.agents/rules/context-loading.md` Full Startup 6-file list (outcome-boundary, decision-gates, context-loading, session-state, testing-gates, engineering-architecture). `.agents/rules/review-gates.md` and `.agents/rules/change-risk-gates.md` are explicitly marked trigger-loaded so the AI no longer assumes them already in context and silently skips them.
+- Limited `.agents/skills/project-review/SKILL.md` Fix-Loop Budget Tracking to Implementation gate reviews and Fix tasks; Pure Review tasks no longer write `current_task.review_round` to session-state.
 
 ## 1.1.6 - 2026-05-08
 

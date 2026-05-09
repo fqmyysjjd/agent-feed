@@ -27,6 +27,18 @@ Use this boundary when review finds issues:
 3. `Fix task`: use `.agents/skills/project-fix/SKILL.md`, then run `.agents/skills/project-review/SKILL.md` on the fix before final handoff.
 4. If a finding requires a decision outside the current Task Brief, apply `.agents/rules/decision-gates.md` instead of silently fixing it.
 
+## Fix-Loop Budget
+
+Cap the review → fix → re-review loop to keep an Implementation review or Fix task from spinning forever:
+
+1. `current_task.review_round` records the **number of completed review rounds** on the current task. Treat an absent field as `0` (no review has run yet). Do not pre-initialize when a task starts — the field appears only after the first round completes.
+2. `.agents/skills/project-review/SKILL.md` is responsible for incrementing this counter **after** finishing a round (after findings are reported and any in-task fixes plus re-verification are done). Do not bump the counter at the start of a round.
+3. After **2** completed review rounds on the same task (`review_round >= 2`), stop the loop and report status to the user before starting a third round.
+4. If a third round is justified (the user asked, or a P0/P1 was newly introduced by the last fix), explicitly state why before proceeding and continue incrementing `review_round` after that round completes.
+5. If the same finding survives two fix attempts, treat it as a decision gap, not a coding bug — apply `.agents/rules/decision-gates.md` and ask the user.
+6. P3 findings do not justify another full review round. Either fix them in the current round or record them as residual risk.
+7. When the task boundary is satisfied or the user closes the loop, the next session-state update may drop the counter (it is per-task, not per-session).
+
 ## Design Review Gate
 
 After every design document, architecture plan, module plan, implementation route, gap analysis, proposal, README, AGENTS, rule, domain, or skill update:
