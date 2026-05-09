@@ -36,8 +36,8 @@ Use this skill when:
 3. Match candidate skills by task intent, changed surface, failure type, risk category, file type, domain trigger, and user wording.
 4. Exclude skills that do not serve the current Task Brief or that conflict with `AGENTS.md`, `.agents/rules/`, `.agents/project/`, `.agents/domain/`, or the current user request.
 5. Choose at most three candidate skills. Prefer the smallest method that directly helps the current result.
-6. Classify each candidate's `source` and `trust` (`core` / `reviewed` / `custom`). The promotion criteria for `custom → reviewed` live in `.agents/skills/skill-maintainer/SKILL.md` — do not promote here, just record the level you observed.
-7. For `trust: custom` or external skills, inspect the skill before following it. Treat it as advisory method guidance only. `trust: reviewed` may be used like `core` for routing, but its commands still go through `change-risk-gates.md` when they touch network/dependency/persistence/credential surfaces.
+6. Classify each candidate's `source` and `trust`.
+7. For `trust: custom` or external skills, inspect the skill before following it. Treat it as advisory method guidance only.
 8. If a skill suggests commands, network access, destructive changes, credential handling, persistence changes, dependency changes, or writes outside the Task Brief, apply `.agents/rules/change-risk-gates.md` before acting.
 9. Ask for confirmation when using the skill would change scope, write set, public behavior, risk class, or future development results.
 10. Use the selected skill as a method, then return to the normal Agent Feed gates for verification, review, and handoff.

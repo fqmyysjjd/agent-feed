@@ -217,129 +217,93 @@ say "Checking active .agents path references and indexes..."
 
 python3 - <<'PY'
 import json
+import re
 import sys
 from pathlib import Path
 
 root = Path(".").resolve()
 errors: list[str] = []
+path_pattern = re.compile(r"\.agents/[A-Za-z0-9_.*/<>-]+")
+skip_parts = {".git", "node_modules", ".venv", ".feed-backup"}
+optional_local_paths = {".agents/session-state/current.json"}
+reference_roots = [
+    Path("AGENTS.md"),
+    Path("CLAUDE.md"),
+    Path(".cursor/rules/agent-feed.mdc"),
+    Path(".agents"),
+]
 
-# Prefer the canonical implementation from `agent_feed.checks` so the shell
-# script and `agent-feed check` cannot drift on recall-index rules. Fall back
-# to a self-contained inline check only when the CLI is not importable (for
-# example, on a system that runs the script before installing agent-feed).
-try:
-    from agent_feed.checks import validate_references_and_indexes  # type: ignore
-except Exception:  # noqa: BLE001
-    validate_references_and_indexes = None  # type: ignore[assignment]
+def active_reference_markdown_files() -> list[Path]:
+    files: list[Path] = []
+    for reference_root in reference_roots:
+        path = root / reference_root
+        if path.is_file() and path.suffix == ".md":
+            files.append(path)
+        elif path.is_dir():
+            files.extend(sorted(path.rglob("*.md")))
+    return files
 
-if validate_references_and_indexes is not None:
-    errors.extend(validate_references_and_indexes(root))
-else:
-    import re
 
-    path_pattern = re.compile(r"\.agents/[A-Za-z0-9_.*/<>-]+")
-    skip_parts = {".git", "node_modules", ".venv", ".feed-backup"}
-    optional_local_paths = {".agents/session-state/current.json"}
-    reference_roots = [
-        Path("AGENTS.md"),
-        Path("CLAUDE.md"),
-        Path(".cursor/rules/agent-feed.mdc"),
-        Path(".agents"),
-    ]
-
-    def active_reference_markdown_files() -> list[Path]:
-        files: list[Path] = []
-        for reference_root in reference_roots:
-            path = root / reference_root
-            if path.is_file() and path.suffix == ".md":
-                files.append(path)
-            elif path.is_dir():
-                files.extend(sorted(path.rglob("*.md")))
-        return files
-
-    for md in active_reference_markdown_files():
-        rel = md.relative_to(root)
-        if any(part in skip_parts for part in rel.parts):
+for md in active_reference_markdown_files():
+    rel = md.relative_to(root)
+    if any(part in skip_parts for part in rel.parts):
+        continue
+    text = md.read_text(encoding="utf-8")
+    for match in path_pattern.findall(text):
+        path_text = match.rstrip(".,):")
+        if any(token in path_text for token in ("*", "<", ">", "YYYYMMDD")):
             continue
-        text = md.read_text(encoding="utf-8")
-        for match in path_pattern.findall(text):
-            path_text = match.rstrip(".,):")
-            if any(token in path_text for token in ("*", "<", ">", "YYYYMMDD")):
-                continue
-            if path_text in optional_local_paths:
-                continue
-            if not (root / path_text).exists():
-                errors.append(f"{rel}: missing referenced path {path_text}")
+        if path_text in optional_local_paths:
+            continue
+        if not (root / path_text).exists():
+            errors.append(f"{rel}: missing referenced path {path_text}")
 
-    agents_readme = (root / ".agents/README.md").read_text(encoding="utf-8")
-    for rule_file in sorted((root / ".agents/rules").glob("*.md")):
-        if rule_file.name not in agents_readme:
-            errors.append(f".agents/README.md does not list rule {rule_file.name}")
+agents_readme = (root / ".agents/README.md").read_text(encoding="utf-8")
+for rule_file in sorted((root / ".agents/rules").glob("*.md")):
+    if rule_file.name not in agents_readme:
+        errors.append(f".agents/README.md does not list rule {rule_file.name}")
 
-    project_readme = (root / ".agents/project/README.md").read_text(encoding="utf-8")
-    for heading in ("## Boundary", "## Maintenance Contract", "## Current Project Constraints"):
-        if heading not in project_readme:
-            errors.append(f".agents/project/README.md missing required heading {heading}")
+project_readme = (root / ".agents/project/README.md").read_text(encoding="utf-8")
+for heading in ("## Boundary", "## Maintenance Contract", "## Current Project Constraints"):
+    if heading not in project_readme:
+        errors.append(f".agents/project/README.md missing required heading {heading}")
 
-    STANDARD_TEMPLATE_PROJECT_FILES = frozenset({
-        "architecture-boundaries.md",
-        "milestones.md",
-        "project-structure.md",
-    })
-    STANDARD_TEMPLATE_DOMAIN_FILES = frozenset({
-        "concepts.md",
-        "contracts.md",
-        "source-of-truth.md",
-    })
 
-    def check_indexed_md_files(directory: str, readme_text: str, strict_files: frozenset[str]) -> None:
-        """Validate the README index for ``directory``.
-
-        ``strict_files`` lists template-shipped files that must use the structured
-        table-row entry and the standard ``## Owns`` / ``## Read When`` /
-        ``## Evidence`` headings. User-authored files only need to be listed in
-        the README so the AI can route to them.
-        """
-
-        readme_lower = readme_text.lower()
-        for term in ("owns", "read when", "evidence"):
-            if term not in readme_lower:
-                errors.append(f"{directory}/README.md missing recall index term {term!r}")
-        for indexed_file in sorted((root / directory).glob("*.md")):
-            if indexed_file.name == "README.md":
-                continue
-            index_entry = None
-            token = f"`{indexed_file.name}`"
-            for line in readme_text.splitlines():
-                stripped = line.strip()
-                if not (stripped.startswith("|") or stripped.startswith("- ")):
-                    continue
-                if token in stripped:
-                    index_entry = stripped
-                    break
-            if index_entry is None:
-                errors.append(f"{directory}/README.md does not list {indexed_file.name}")
-                continue
-            if indexed_file.name not in strict_files:
-                continue
+def check_indexed_md_files(directory: str, readme_text: str) -> None:
+    readme_lower = readme_text.lower()
+    for term in ("owns", "read when", "evidence"):
+        if term not in readme_lower:
+            errors.append(f"{directory}/README.md missing recall index term {term!r}")
+    for indexed_file in sorted((root / directory).glob("*.md")):
+        if indexed_file.name == "README.md":
+            continue
+        index_entry = None
+        for line in readme_text.splitlines():
+            if indexed_file.name in line:
+                index_entry = line.strip()
+                break
+        if index_entry is None:
+            errors.append(f"{directory}/README.md does not list {indexed_file.name}")
+        else:
             cells = [cell.strip() for cell in index_entry.strip("|").split("|")]
             if not index_entry.startswith("|") or not index_entry.endswith("|") or len(cells) < 4 or not all(cells[:4]):
                 errors.append(
                     f"{directory}/README.md entry for {indexed_file.name} must be a "
                     "table row with File, Owns, Read when, and Evidence expectation"
                 )
-            indexed_text = indexed_file.read_text(encoding="utf-8")
-            for heading in ("## Owns", "## Read When", "## Evidence"):
-                if heading not in indexed_text:
-                    errors.append(f"{directory}/{indexed_file.name} missing required heading {heading}")
+        indexed_text = indexed_file.read_text(encoding="utf-8")
+        for heading in ("## Owns", "## Read When", "## Evidence"):
+            if heading not in indexed_text:
+                errors.append(f"{directory}/{indexed_file.name} missing required heading {heading}")
 
-    check_indexed_md_files(".agents/project", project_readme, STANDARD_TEMPLATE_PROJECT_FILES)
 
-    domain_readme = (root / ".agents/domain/README.md").read_text(encoding="utf-8")
-    for heading in ("## Core Concepts", "## Use Cases"):
-        if heading not in domain_readme:
-            errors.append(f".agents/domain/README.md missing required heading {heading}")
-    check_indexed_md_files(".agents/domain", domain_readme, STANDARD_TEMPLATE_DOMAIN_FILES)
+check_indexed_md_files(".agents/project", project_readme)
+
+domain_readme = (root / ".agents/domain/README.md").read_text(encoding="utf-8")
+for heading in ("## Core Concepts", "## Use Cases"):
+    if heading not in domain_readme:
+        errors.append(f".agents/domain/README.md missing required heading {heading}")
+check_indexed_md_files(".agents/domain", domain_readme)
 
 if errors:
     print("check-agent-assets: ERROR: structural checks failed", file=sys.stderr)

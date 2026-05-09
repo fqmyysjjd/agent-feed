@@ -15,43 +15,43 @@ These files guide AI assistants while they design, implement, review, and fix th
 7. `.agents/scripts/`: protocol helper scripts for index sync, client adapter sync, validation, and verification.
 8. `agents/`: narrow specialist profiles for delegated checks or worker tasks.
 
-## Priority And Gates
+## Highest-Priority Rule
 
-Rule priority and Mandatory Gates are owned by `AGENTS.md`. This README does not restate them — read `AGENTS.md` for the canonical ordering.
+Always load `.agents/rules/outcome-boundary.md` and `.agents/rules/decision-gates.md` before continuing design, development, review, or fix work.
 
-This README only indexes which rule files exist under `rules/`, what each owns, and how layers reference each other.
+The current task boundary decides when to stop. Decision gates decide when unconfirmed choices require human confirmation. Other rules and skills serve those boundaries.
 
 ## Current Rules
 
-| File | Owns |
-| --- | --- |
-| `outcome-boundary.md` | Near-term task result, Task Brief, task class gate, stopping condition, anti-drift rules, and the Light Resume Checklist anchor. |
-| `decision-gates.md` | Human confirmation rules for unconfirmed choices that affect future development results. |
-| `context-loading.md` | Startup/context-compression loading order and the single task routing map. |
-| `session-state.md` | Final handoff gate, Context Capsule format, compact JSON handoff cards, carry-forward cleanup, and multi-session pointer rules. |
-| `testing-gates.md` | Test selection, minimum coverage, failure handling, and verification evidence rules. |
-| `evidence-gates.md` | External research sourcing, classification, and adoption rules. |
-| `change-risk-gates.md` | Project-level change risk classes, non-negotiable safety lines, and verification command rules. |
-| `engineering-architecture.md` | Repository-agnostic ownership, placement, dependency-direction, abstraction, and reuse gate. |
-| `development-workflow.md` | Task Brief implementation addendum, reuse-before-build discipline, comment/docstring discipline, gap handling, and verification ladder. |
-| `review-gates.md` | Code/design review gates and final handoff routing into session-state. |
-| `git-collaboration.md` | Git diff, staging, commit, merge, and review handoff rules. |
+1. `outcome-boundary.md`: near-term task result, Task Brief, task class gate, stopping condition, and anti-drift rules.
+2. `decision-gates.md`: human confirmation rules for unconfirmed choices that affect future development results.
+3. `context-loading.md`: startup/context-compression loading order and task routing.
+4. `session-state.md`: final handoff gate, Context Capsule format, compact JSON handoff cards, carry-forward cleanup, and optional multi-session pointer rules.
+5. `testing-gates.md`: test selection, minimum coverage, failure handling, and verification evidence rules.
+6. `evidence-gates.md`: external research sourcing, classification, and adoption rules.
+7. `change-risk-gates.md`: project-level change risk classes, non-negotiable safety lines, and verification command rules.
+8. `engineering-architecture.md`: repository-agnostic ownership, placement, dependency-direction, abstraction, and reuse gate.
+9. `development-workflow.md`: Task Brief implementation addendum, reuse-before-build discipline, comment/docstring discipline, gap handling, and verification ladder.
+10. `review-gates.md`: code/design review gates and final handoff routing into session-state.
+11. `git-collaboration.md`: git diff, staging, commit, merge, and review handoff rules.
 
 ## Reference Direction
 
-The arrows below describe *file-level* reference relationships (who may import what), not gate priority — gate priority lives in `AGENTS.md`.
-
 ```txt
 AGENTS.md
-  -> rules/*           (canonical reusable constraints)
-  -> .agents/README.md (this index)
-  -> project/*         (repository-specific constraints; indexed by project/README.md)
-  -> domain/*          (stable domain knowledge; indexed by domain/README.md)
+  -> rules/outcome-boundary.md
+  -> rules/decision-gates.md
+  -> rules/context-loading.md
+  -> rules/session-state.md
+  -> rules/testing-gates.md
+  -> .agents/README.md
+  -> project/*
+  -> session-state/<session_id>.json when long-running session state exists
+  -> domain/*
   -> skills/README.md
-  -> skills/*          (task workflows)
-  -> session-state/<session_id>.json   when long-running session state exists
-  -> scripts/*
-  -> agents/*          when delegation is useful
+  -> skills/*
+  -> .agents/scripts/*
+  -> agents/* when delegation is useful
 ```
 
 Rules may reference skills only for routing. Skills may reference rules, project constraints, and domain docs as required reading. Domain docs should avoid referencing skills unless explaining usage context.

@@ -27,13 +27,10 @@ from agent_feed.asset_trust import (
     trust_preview_actions,
     validate_config_shape,
 )
-from agent_feed.checks import collect_status, run_checks
 from agent_feed.cli._helpers import (
-    _parse_checks,
     _parse_clients,
     _parse_verification_profile,
     _print_errors,
-    _with_client_checks,
 )
 from agent_feed.console import (
     console,
@@ -41,22 +38,17 @@ from agent_feed.console import (
     has_diff_details,
     print_diff_details,
     print_diff_hint,
-    print_check_report,
     print_markdown_panel,
     print_action_result,
     print_recommended_command,
-    print_status,
     print_update_notice,
     print_welcome,
     print_write_plan,
-    print_write_plan_with_title,
 )
 from agent_feed.install_source import latest_update_notice
 from agent_feed.models import (
-    DEFAULT_CHECKS,
     DEFAULT_CLIENTS,
     DEFAULT_VERIFICATION_PROFILE,
-    Check,
     Client,
     VerificationProfile,
     WriteAction,
@@ -69,7 +61,7 @@ from agent_feed.env_setup import (
 )
 from agent_feed.prompts import (
     can_prompt,
-    prompt_checks,
+    prompt_checks,  # noqa: F401  (re-exported for tests via cli.prompt_checks)
     prompt_clients,
     prompt_clients_step,
     prompt_confirm,
@@ -96,7 +88,7 @@ from agent_feed.services.lifecycle import (
     downgrade_preflight_errors,
     init_backup_dir,
     init_project,
-    preview_actions,
+    preview_actions,  # noqa: F401  (re-exported for tests via cli.preview_actions)
     upgrade_project,
 )
 from agent_feed.skill_index import index_skill_metadata
@@ -108,6 +100,12 @@ from agent_feed.upgrade import (
 from agent_feed.cli.commands.config import config_app
 from agent_feed.cli.commands.env import env_app
 from agent_feed.cli.commands.skills import skills_app
+from agent_feed.cli.commands import verification as _verification
+from agent_feed.cli.commands.verification import (
+    check_cmd,
+    preview_cmd,
+    status_cmd,
+)
 
 
 app = typer.Typer(
@@ -123,6 +121,7 @@ app = typer.Typer(
 app.add_typer(env_app, name="env")
 app.add_typer(config_app, name="config")
 app.add_typer(skills_app, name="skills")
+_verification.register(app)
 
 
 @app.callback()
@@ -792,100 +791,6 @@ def upgrade_cmd(
     maybe_print_update_notice()
 
 
-@app.command("check")
-def check_cmd(
-    path: Annotated[
-        Path | None, typer.Argument(help="Target project path. Defaults to cwd.")
-    ] = None,
-    checks: Annotated[
-        str | None,
-        typer.Option(
-            "--checks",
-            "--only",
-            help="Comma-separated checks: structure,config,skills,references,session,scripts,codex,claude,cursor,all.",
-        ),
-    ] = None,
-    clients: Annotated[
-        str | None,
-        typer.Option("--clients", help="Add client checks: codex,claude,cursor,all,none."),
-    ] = None,
-    all_checks: Annotated[
-        bool,
-        typer.Option(
-            "--all",
-            "-a",
-            help="Run every protocol and client check without opening the checkbox prompt.",
-        ),
-    ] = False,
-    no_input: Annotated[
-        bool,
-        typer.Option("--no-input", help="Never prompt; fail instead of asking for input."),
-    ] = False,
-    json_output: Annotated[
-        bool, typer.Option("--json", help="Print machine-readable JSON.")
-    ] = False,
-) -> None:
-    """Validate AI development docs/assets and selected client adapters."""
-    target = (path or Path(".")).resolve()
-    selected_checks = tuple(Check) if all_checks else _parse_checks(checks, default=DEFAULT_CHECKS)
-    if clients:
-        selected_checks = _with_client_checks(selected_checks, _parse_clients(clients, default=()))
-
-    if (
-        not all_checks
-        and checks is None
-        and can_prompt()
-        and not no_input
-    ):
-        selected_checks = prompt_checks(selected_checks)
-        if not selected_checks:
-            _print_errors("Check blocked", ["select at least one check or pass -a"])
-            raise typer.Exit(3)
-
-    report = run_checks(target, selected_checks)
-    print_check_report(report, as_json=json_output)
-    if not report.ok:
-        raise typer.Exit(1)
-
-
-@app.command("c", hidden=True)
-def check_alias(
-    path: Annotated[
-        Path | None, typer.Argument(help="Target project path. Defaults to cwd.")
-    ] = None,
-    checks: Annotated[str | None, typer.Option("--checks", "--only")] = None,
-) -> None:
-    """Shortcut for check."""
-    check_cmd(path=path, checks=checks, no_input=True)
-
-
-@app.command("status")
-def status_cmd(
-    path: Annotated[
-        Path | None, typer.Argument(help="Target project path. Defaults to cwd.")
-    ] = None,
-    json_output: Annotated[
-        bool, typer.Option("--json", help="Print machine-readable JSON.")
-    ] = False,
-) -> None:
-    """Inspect current Agent Feed drift and adapter health."""
-    target = (path or Path(".")).resolve()
-    if json_output:
-        print_status(collect_status(target), as_json=True)
-        return
-    actions, errors = preview_actions(
-        target=target,
-        project_name=None,
-        clients=None,
-        verification_profile=None,
-    )
-    if actions:
-        print_inspection_plan(actions, target=target)
-    if errors:
-        _print_errors("Status blocked", errors)
-        raise typer.Exit(3)
-
-
 @app.command("uninstall")
 def uninstall_cmd(
     path: Annotated[
@@ -932,49 +837,6 @@ def uninstall_cmd(
     if applied:
         print_write_plan(applied)
     console.print("[green]agent-feed: uninstall complete[/green]")
-
-
-@app.command("preview")
-def preview_cmd(
-    path: Annotated[
-        Path | None, typer.Argument(help="Target project path. Defaults to cwd.")
-    ] = None,
-    project_name: Annotated[
-        str | None,
-        typer.Option("--project-name", help="Override the display name used in previewed files."),
-    ] = None,
-    clients: Annotated[
-        str | None,
-        typer.Option("--clients", help="Comma-separated clients: codex,claude,cursor,all,none."),
-    ] = None,
-    verification_profile: Annotated[
-        str | None,
-        typer.Option(
-            "--profile", help="Verification profile to preview before a project is initialized."
-        ),
-    ] = None,
-) -> None:
-    """Show full init writes or installed-project upgrade diffs."""
-    target = (path or Path(".")).resolve()
-    selected_clients = (
-        _parse_clients(clients, default=DEFAULT_CLIENTS) if clients is not None else None
-    )
-    selected_verification_profile = (
-        _parse_verification_profile(verification_profile, default=DEFAULT_VERIFICATION_PROFILE)
-        if verification_profile is not None
-        else None
-    )
-    actions, errors = preview_actions(
-        target=target,
-        project_name=project_name,
-        clients=selected_clients,
-        verification_profile=selected_verification_profile,
-    )
-    if actions:
-        print_write_plan(actions, show_diffs=True)
-    if errors:
-        _print_errors("Preview blocked", errors)
-        raise typer.Exit(3)
 
 
 def resolve_init_verification_profile(
@@ -1616,19 +1478,6 @@ def print_upgrade_plan(
     print_diff_hint(command=f"{command} {target}", interactive=interactive)
     if interactive and prompt_view_diff_key():
         print_diff_details(actions)
-
-
-def print_inspection_plan(actions: list[WriteAction], *, target: Path) -> None:
-    print_write_plan_with_title(actions, title=f"Agent Feed Inspection: {target}")
-    if not has_diff_details(actions):
-        return
-    interactive = can_prompt()
-    print_diff_hint(
-        command=f"agent-feed preview {target}",
-        interactive=interactive,
-    )
-    if interactive and prompt_view_diff_key():
-        preview_cmd(path=target)
 
 
 def print_skill_preview(package: RemoteSkillPackage) -> None:

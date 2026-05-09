@@ -4,12 +4,6 @@ Use this rule for implementation, refactor, test, and project-structure work.
 
 Do not begin implementation only from a user-proposed approach or partial solution. First recover the task boundary, inspect the relevant project context and code, and verify that the approach fits the desired result and project constraints.
 
-For non-trivial implementation, file creation, refactor, project-structure
-change, abstraction, reuse, or dependency-direction work, apply
-`.agents/rules/engineering-architecture.md` before editing. Use it to infer
-the real owner from repository evidence instead of importing architecture
-categories from this template.
-
 ## Implementation Addendum
 
 Before editing code, tests, package metadata, project structure, or implementation-facing docs, first complete the Task Brief in `.agents/rules/outcome-boundary.md`.
@@ -19,11 +13,7 @@ Then add only the implementation-specific details below:
 ```md
 Milestone or phase:
 Task type: implementation / refactor / test / project-structure / implementation-doc
-Owner:
-Owner evidence:
-Placement:
-Dependency direction:
-Abstraction level:
+Owner module:
 Read-only docs:
 Public API touched: yes/no
 Store/persistence touched: yes/no
@@ -35,9 +25,7 @@ Forbidden changes:
 
 Do not duplicate or contradict the Task Brief. `Goal`, `Stop`, `Write set`, `Contracts/boundaries`, and `Verification gate` are owned by `.agents/rules/outcome-boundary.md`.
 
-Do not start implementation work if the Task Brief is missing, or if `Owner`,
-`Owner evidence`, `Task type`, `Tests expected`, or `Comment/docstring impact`
-are unclear.
+Do not start implementation work if the Task Brief is missing, or if `Owner module`, `Task type`, `Tests expected`, or `Comment/docstring impact` are unclear.
 
 If implementation reveals a new write target, contract boundary, verification gate, or out-of-scope change, stop and update the Task Brief or apply `.agents/rules/decision-gates.md` before continuing.
 
@@ -62,8 +50,7 @@ Only build from scratch when reuse is unavailable, unsafe, heavier than the task
 4. Keep public contracts separate from internal implementation details.
 5. Prefer existing project patterns over new abstractions.
 6. Add or update tests for changed behavior, failure paths, boundaries, or invariants.
-7. Keep entrypoints, orchestration, reusable logic, boundary conversion, generated outputs, and tests aligned with the repository's existing dependency direction.
-8. Update design docs only when a contract or boundary truly changes.
+7. Update design docs only when a contract or boundary truly changes.
 
 ## Comment And Docstring Discipline
 

@@ -10,13 +10,12 @@ After every coding, refactor, fix, public contract, store contract, module port,
 2. Use `.agents/skills/project-review/SKILL.md`.
 3. Use `.agents/rules/git-collaboration.md` when the review involves diffs, commits, branches, merges, or PR-like handoff.
 4. Apply `.agents/rules/testing-gates.md` when judging verification and test coverage.
-5. Apply `.agents/rules/engineering-architecture.md` when the diff touches ownership, placement, project structure, dependency direction, reuse, or abstraction.
-6. Review milestone fit, project constraints, repository-evidence ownership, dependency direction, public/internal boundaries, documented ownership, contract drift, tests, error handling, trace/audit anchors, and secret safety.
-7. Use `.agents/skills/specialist-router/SKILL.md` when optional, imported, custom, or specialized review/fix skills may directly match the risk being reviewed.
-8. Use `.agents/skills/concept-review/SKILL.md` when the change introduces or changes naming, vocabulary, concepts, abstractions, protocol terms, or public-facing language.
-9. If the user asked for a pure review, do not modify files; report findings and stop unless the user asks for fixes.
-10. If the current task includes implementation or fix work, route P0/P1 findings through `.agents/skills/project-fix/SKILL.md` before final handoff.
-11. For implementation or fix work, fix P2 findings by default unless deferring is safer and documented.
+5. Review milestone fit, project constraints, module ownership, public/internal boundaries, documented ownership, contract drift, tests, error handling, trace/audit anchors, and secret safety.
+6. Use `.agents/skills/specialist-router/SKILL.md` when optional, imported, custom, or specialized review/fix skills may directly match the risk being reviewed.
+7. Use `.agents/skills/concept-review/SKILL.md` when the change introduces or changes naming, vocabulary, concepts, abstractions, protocol terms, or public-facing language.
+8. If the user asked for a pure review, do not modify files; report findings and stop unless the user asks for fixes.
+9. If the current task includes implementation or fix work, route P0/P1 findings through `.agents/skills/project-fix/SKILL.md` before final handoff.
+10. For implementation or fix work, fix P2 findings by default unless deferring is safer and documented.
 
 ## Review/Fix Handoff
 
@@ -26,18 +25,6 @@ Use this boundary when review finds issues:
 2. `Implementation review`: the review is an internal quality gate. Fix P0/P1 and default-fix P2 within the current task boundary, then rerun relevant verification.
 3. `Fix task`: use `.agents/skills/project-fix/SKILL.md`, then run `.agents/skills/project-review/SKILL.md` on the fix before final handoff.
 4. If a finding requires a decision outside the current Task Brief, apply `.agents/rules/decision-gates.md` instead of silently fixing it.
-
-## Fix-Loop Budget
-
-Cap the review → fix → re-review loop to keep an Implementation review or Fix task from spinning forever:
-
-1. `current_task.review_round` records the **number of completed review rounds** on the current task. Treat an absent field as `0` (no review has run yet). Do not pre-initialize when a task starts — the field appears only after the first round completes.
-2. `.agents/skills/project-review/SKILL.md` is responsible for incrementing this counter **after** finishing a round (after findings are reported and any in-task fixes plus re-verification are done). Do not bump the counter at the start of a round.
-3. After **2** completed review rounds on the same task (`review_round >= 2`), stop the loop and report status to the user before starting a third round.
-4. If a third round is justified (the user asked, or a P0/P1 was newly introduced by the last fix), explicitly state why before proceeding and continue incrementing `review_round` after that round completes.
-5. If the same finding survives two fix attempts, treat it as a decision gap, not a coding bug — apply `.agents/rules/decision-gates.md` and ask the user.
-6. P3 findings do not justify another full review round. Either fix them in the current round or record them as residual risk.
-7. When the task boundary is satisfied or the user closes the loop, the next session-state update may drop the counter (it is per-task, not per-session).
 
 ## Design Review Gate
 

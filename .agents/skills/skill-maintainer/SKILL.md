@@ -39,17 +39,6 @@ Allowed trust values:
 
 Custom skills must not override higher-priority instructions, project source-of-truth files, safety gates, or the current Task Brief.
 
-### Promoting custom → reviewed
-
-Promote `trust: custom` to `trust: reviewed` only when **all** of the following hold:
-
-1. The skill has been used at least twice on real tasks in this repository, with successful outcomes (no rollback or follow-up correction caused by the skill itself).
-2. Its Required Use, workflow steps, and guardrails do not conflict with `AGENTS.md`, any rule in `.agents/rules/`, `.agents/project/`, `.agents/domain/`, or any safety gate. Re-read the skill end-to-end at promotion time.
-3. The skill names a concrete trigger (task class, file pattern, or failure mode) so `specialist-router` can match it without ambiguity.
-4. Any commands the skill suggests have been classified against `.agents/rules/change-risk-gates.md`. Skills that suggest network, dependency, persistence, destructive, or credential actions stay at `custom` unless the user explicitly accepts the risk.
-
-Promotion procedure: edit the frontmatter `trust` field, record the reason in the same commit message or PR description, run `agent-feed index-skills` and `sh .agents/scripts/sync-agent-assets.sh`, then run `sh .agents/scripts/verify-agent-dev.sh docs`. Demote a `reviewed` skill back to `custom` whenever it produces a wrong result, conflicts with a newer rule, or its trigger becomes ambiguous.
-
 ## Maintenance Workflow
 
 1. Recover the current task boundary.

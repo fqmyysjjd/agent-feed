@@ -14,7 +14,7 @@ This threshold is intentionally broader than only "major decisions." Record any 
 
 Store only:
 
-1. `current_task`: what is being advanced, where it currently stands, when to stop, and the next action. May include an optional `review_round` integer counter — the **number of completed review rounds** — when an Implementation review or Fix task is running, so `.agents/rules/review-gates.md` Fix-Loop Budget is enforceable across compression. The field is absent until the first round completes (absent = 0), incremented by `.agents/skills/project-review/SKILL.md` after each completed round, and dropped when the task is closed.
+1. `current_task`: what is being advanced, where it currently stands, when to stop, and the next action.
 2. `carry_forwards`: short conclusions that must survive compression because they affect later behavior.
 
 Do not store:
@@ -61,23 +61,26 @@ When the Final Handoff Gate decides session-state action is needed:
 
 ## Context Capsule
 
-Code or document design tasks must end with a Markdown table Context Capsule. The capsule is a **delta on top of the Task Brief**, not a full restatement of it. Stable fields owned by the Task Brief (goal, stop condition, constraints, write set) are not repeated here.
+Code or document design tasks must end with a Markdown table Context Capsule.
 
 ```md
 ## Context Capsule
 
 | Item | Content |
 | --- | --- |
-| Completed this turn | What changed since the last handoff |
-| Changed files | Files actually written or deleted |
-| Verification | Evidence run and outcome |
+| Milestone/phase | ... |
+| Completed | ... |
+| Changed files | ... |
+| Verification | ... |
+| Current task boundary | ... |
 | Session state | updated / cleaned / promoted / not needed, with reason |
-| Known gaps | New gaps that appeared this turn (omit if none) |
-| Next action | One executable step |
-| Next required reading | Only context the next action needs (omit if none) |
+| Known gaps | ... |
+| Next action | ... |
+| Next required reading | ... |
+| Constraints not to break | ... |
 ```
 
-`Session state` must explain the action and reason, not only the status word. `Next action` must be executable. If the Task Brief boundary itself changed (rare), record that change in the carry-forwards instead of duplicating it in the capsule.
+`Session state` must explain the action and reason, not only the status word. `Next action` must be executable. `Next required reading` records only the context needed before that action.
 
 ## Current Registry
 

@@ -25,8 +25,8 @@ Use a light resume when all of these are true:
 
 Light resume steps:
 
-1. Re-read the **Light Resume Checklist** anchor in `.agents/rules/outcome-boundary.md` (do not re-read the entire rule).
-2. Re-read only the rule, project, domain, or skill file directly needed for the next action.
+1. Re-read `.agents/rules/outcome-boundary.md`.
+2. Re-read only the rule or project/domain file directly needed for the next action.
 3. Read additional files only if the task boundary changed, verification failed, or a new decision appeared.
 
 If the light resume path reveals uncertainty about priority, source-of-truth, or the current stop condition, immediately fall back to the full startup read.
@@ -40,13 +40,12 @@ During full startup, read:
 3. `.agents/rules/context-loading.md`
 4. `.agents/rules/session-state.md`
 5. `.agents/rules/testing-gates.md`
-6. `.agents/rules/engineering-architecture.md`
-7. `.agents/README.md`
-8. `.agents/skills/README.md`
-9. `.agents/project/README.md`
-10. `.agents/domain/README.md`
-11. `.agents/skills/project-architecture/SKILL.md`
-12. `.agents/skills/project-development/SKILL.md`
+6. `.agents/README.md`
+7. `.agents/skills/README.md`
+8. `.agents/project/README.md`
+9. `.agents/domain/README.md`
+10. `.agents/skills/project-architecture/SKILL.md`
+11. `.agents/skills/project-development/SKILL.md`
 
 If `AGENTS.local.md` exists, read it before project-wide rules and let it override local workflow details that do not violate project boundaries.
 
@@ -58,25 +57,76 @@ If the conversation is long-running, has been context-compressed, or contains se
 
 ## Task Routing
 
-This is the single routing map. When a task matches multiple rows, apply every matching row — they layer rather than replace each other.
+Use this quick trigger map before detailed routing. If a trigger matches, load the listed owner before acting.
 
 | Trigger | Required owner | Why |
 | --- | --- | --- |
 | Architecture, module, runtime, requirement, contract, or ownership decision | `.agents/skills/project-architecture/SKILL.md` | Prevents the AI from inventing project structure or future-facing decisions. |
-| Implementation, refactor, test, file creation, or project-structure change | `.agents/rules/engineering-architecture.md` → `.agents/skills/engineering-planning/SKILL.md` → `.agents/skills/project-development/SKILL.md` | Forces repository-evidence ownership, reuse, placement, write set, boundaries, and verification before edits. |
-| Bug, regression, failed test, or review finding fix | `.agents/rules/engineering-architecture.md` when ownership/structure is involved → `.agents/skills/engineering-planning/SKILL.md` → `.agents/skills/project-fix/SKILL.md` | Keeps fixes rooted in the failing behavior and existing owner. |
-| Code, diff, commit, or merge review | `.agents/skills/project-review/SKILL.md`, `.agents/rules/git-collaboration.md` | Keeps review read-only unless the user asks for fixes. |
-| README, AGENTS, rule, project/domain doc, plan, or skill review | `.agents/skills/design-review/SKILL.md`, plus `.agents/skills/concept-review/SKILL.md` when wording or concepts changed | Checks whether the next development step can proceed without invented decisions. |
-| Naming, vocabulary, concept, abstraction, or public terminology drift | `.agents/skills/concept-review/SKILL.md` | Catches term drift before it propagates. |
-| `.agents/skills/` itself is added, renamed, removed, or rewritten | `.agents/skills/skill-maintainer/SKILL.md` | Keeps the skill index, frontmatter, and client mirrors consistent. |
-| User corrections, repeated AI failures, or stable session-state promotion | `.agents/skills/guidance-promoter/SKILL.md` | Promotes recurring lessons into the right rule/skill layer. |
-| Optional, imported, custom, or specialized skill may match the task, diff, failure, or review finding | `.agents/skills/specialist-router/SKILL.md` | Routes to specialist methods without letting them override core gates. |
+| Implementation, refactor, test, file creation, or project-structure change | `.agents/skills/engineering-planning/SKILL.md`, then `project-development` | Forces owner, reuse, placement, write set, boundaries, and verification before edits. |
+| Bug, regression, failed test, or review finding fix | `.agents/skills/engineering-planning/SKILL.md`, then `project-fix` | Keeps fixes rooted in the failing behavior and existing owner. |
+| Code, diff, commit, or merge review | `project-review`, `git-collaboration` | Keeps review read-only unless the user asks for fixes. |
+| README, AGENTS, rule, project/domain doc, plan, or skill review | `design-review`, plus `concept-review` when wording or concepts changed | Checks whether the next development step can proceed without invented decisions. |
+| Optional, imported, custom, or specialized skill may match the task, diff, failure, or review finding | `.agents/skills/specialist-router/SKILL.md` | Routes to useful external or specialist methods without letting them override core gates. |
 | Network, dependency, environment, database, destructive, credential, deployment, or security-sensitive action | `.agents/rules/change-risk-gates.md` | Applies risk classes and non-negotiable safety lines before the action. |
 | External facts, current ecosystem behavior, public standards, or web-sourced recommendations | `.agents/rules/evidence-gates.md` | Separates sourced facts from project inference. |
-| Any changed surface needs verification | `.agents/rules/testing-gates.md` for evidence; `.agents/rules/review-gates.md` for review routing | Keeps verification claims grounded. |
 | Long-running handoff, context compression risk, or final response | `.agents/rules/session-state.md` | Preserves active conclusions without turning session state into noisy memory. |
 
-If a task matches several rows, run the primary execution row first, then layer review/concept/risk/evidence/session rows on top. If the user asked for pure review, stay read-only unless they also asked for fixes.
+Use these routes:
+
+1. Architecture, module ownership, runtime behavior, or requirement decisions:
+   - `.agents/skills/project-architecture/SKILL.md`
+2. Coding, refactor, tests, or project structure changes:
+   - `.agents/skills/engineering-planning/SKILL.md`
+   - `.agents/skills/project-development/SKILL.md`
+3. Bug fixes, regressions, failed tests, or review finding fixes:
+   - `.agents/skills/engineering-planning/SKILL.md`
+   - `.agents/skills/project-fix/SKILL.md`
+4. Code review, diff review, commit review, or merge review:
+   - `.agents/skills/project-review/SKILL.md`
+   - `.agents/rules/git-collaboration.md`
+   - Use `.agents/skills/specialist-router/SKILL.md` when optional, imported, custom, or specialized review skills may match the concrete risk.
+5. Design document, plan, protocol, README, AGENTS, rule, domain, or skill review:
+   - `.agents/skills/design-review/SKILL.md`
+   - Use `.agents/skills/concept-review/SKILL.md` when the work introduces or changes concepts, vocabulary, naming, abstraction, or skill terminology.
+6. User corrections, repeated AI development failures, or stable session-state promotion:
+   - `.agents/skills/guidance-promoter/SKILL.md`
+7. Creating, updating, reviewing, renaming, deleting, or syncing skills:
+   - `.agents/skills/skill-maintainer/SKILL.md`
+8. External research, current ecosystem validation, protocol/API facts, or web-sourced recommendations:
+   - `.agents/rules/evidence-gates.md`
+9. Project-level actions that write files, change environment state, use network access, touch databases, or perform destructive operations:
+   - `.agents/rules/change-risk-gates.md`
+10. Naming, concept, terminology, abstraction, or vocabulary drift review:
+    - `.agents/skills/concept-review/SKILL.md`
+11. Optional, imported, custom, or specialized skill selection:
+    - `.agents/skills/specialist-router/SKILL.md`
+    - Read only candidate skills that directly match the task boundary.
+
+## Mixed Task Routing
+
+When a task matches multiple routes, apply every relevant gate instead of choosing only one.
+
+Use the primary execution skill first, then add only the gates that the changed surface requires:
+
+1. Code or implementation changed:
+   - use `.agents/skills/engineering-planning/SKILL.md` before editing to decide owner, reuse, placement, boundaries, and verification
+   - start with `.agents/skills/project-development/SKILL.md` or `.agents/skills/project-fix/SKILL.md`
+   - then run `.agents/skills/project-review/SKILL.md`
+2. README, AGENTS, rules, project/domain docs, or other design/protocol docs changed:
+   - run `.agents/skills/design-review/SKILL.md`
+3. `.agents/skills/` changed:
+   - run `.agents/skills/skill-maintainer/SKILL.md`
+4. Optional, imported, custom, or specialized skill may apply:
+   - run `.agents/skills/specialist-router/SKILL.md`
+5. Naming, vocabulary, concepts, abstractions, or public terminology changed:
+   - run `.agents/skills/concept-review/SKILL.md`
+6. Any changed surface needs verification:
+   - let `.agents/rules/testing-gates.md` choose evidence
+   - let `.agents/rules/review-gates.md` own review routing
+7. Final handoff:
+   - route only through `.agents/rules/session-state.md`
+
+If the user asked for pure review, stay read-only unless they also asked for fixes.
 
 ## Context Budget
 
