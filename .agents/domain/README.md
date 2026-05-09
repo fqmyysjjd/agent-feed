@@ -4,6 +4,8 @@ This directory stores stable domain knowledge used by AI assistants while develo
 
 It describes the project being built, but it is still development context for AI-assisted work. It is not a user-facing product specification by itself.
 
+**Domain vs project split.** This layer owns *stable domain knowledge* — concepts, contracts, and the durable source-of-truth fact map. The project layer (`.agents/project/`) owns *repository constraints and stop rules*. When a project-layer constraint references a durable source of truth, follow the pointer back to `source-of-truth.md` here.
+
 ## Core Concepts
 
 | File | Owns | Read when | Evidence expectation |

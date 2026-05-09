@@ -10,6 +10,10 @@ This project uses semantic versioning. Patch releases preserve the public comman
 
 - Added an `upgrade` downgrade guard so older Agent Feed CLIs cannot rewrite projects last managed by newer versions unless `--allow-downgrade` is passed.
 - Added a Light Resume Checklist anchor in `.agents/rules/outcome-boundary.md` so AGENTS.md and `context-loading.md` can route same-session resumes to a single short block, and wired `context-loading.md` Light Resume steps to that anchor instead of re-reading the entire rule.
+- Added a "How This Rule Relates To Engineering Planning" section to `.agents/rules/engineering-architecture.md` and matching "Position In The Stack" notes in `engineering-planning` and `project-development` skills to clarify the rule/skill/workflow division.
+- Added a `custom → reviewed` skill promotion checklist to `.agents/skills/skill-maintainer/SKILL.md` and a corresponding routing note in `specialist-router/SKILL.md`, so the previously orphaned `trust: reviewed` level has an end-to-end flow.
+- Added an extension-point note and example profile skeleton in `.agents/agents/README.md` so users know the layer is empty by default and when to add a profile.
+- Added an explicit "domain vs project split" clarification to `.agents/project/README.md` and `.agents/domain/README.md` so future readers know the durable source-of-truth fact map lives in the domain layer while project-layer rows are stop-rule pointers.
 
 ### Changed
 
@@ -17,6 +21,10 @@ This project uses semantic versioning. Patch releases preserve the public comman
 - Clarified the AGENTS.md Mandatory Gates preamble: "mandatory" means non-bypassable when an entry's trigger fires, not always-read; the canonical full-startup reading list still lives in `.agents/rules/context-loading.md`.
 - Collapsed `.agents/rules/context-loading.md` triple routing (Quick Trigger Map / Task Routing list / Mixed Task Routing) into a single layered routing table that names the owner, why, and tells the reader to layer matching rows.
 - Reframed `.agents/README.md` to defer rule priority and Mandatory Gates to `AGENTS.md` instead of re-listing them; this README now indexes which rule files exist and how layers reference each other.
+- Trimmed `.agents/skills/project-development/SKILL.md` Required Reading from 10 files to the 5 unique to this skill; gates already mandated by `AGENTS.md` (outcome-boundary, decision-gates, context-loading, session-state, testing-gates, engineering-architecture, change-risk-gates) are no longer re-listed.
+- Removed the duplicate Architecture Card from `.agents/rules/engineering-architecture.md`; the Engineering Planning Card in `.agents/skills/engineering-planning/SKILL.md` is now the single per-task working artefact, and the rule layer keeps only invariants and Review Questions.
+- Tightened `.agents/skills/project-architecture/SKILL.md` Required Use to read-only orientation and pointed write/refactor work at `project-development/SKILL.md`, eliminating the routing ambiguity between the two skills.
+- Trimmed `.agents/project/README.md` so the AI maintenance contract has a single owning section instead of three overlapping ones.
 
 ## 1.1.6 - 2026-05-08
 

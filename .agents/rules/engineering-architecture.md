@@ -8,6 +8,25 @@ This rule is intentionally repository-agnostic. Do not assume a fixed project
 shape such as CLI/core/UI, frontend/backend, service/repository/controller, or
 package/module/app. Infer the actual architecture from the current repository.
 
+## How This Rule Relates To Engineering Planning
+
+Three assets cooperate on every implementation/fix/refactor turn. Use them in
+this order:
+
+1. **`engineering-architecture.md` (this file, rule layer).** Stable invariants
+   and review questions for ownership, placement, dependency direction, reuse,
+   and abstraction. Read it before any non-trivial code or structure change.
+2. **`.agents/skills/engineering-planning/SKILL.md` (pre-edit routine).** The
+   per-task decision routine that produces a concrete planning card (owner,
+   reuse, write set, verification) using the invariants above. Run it before
+   editing.
+3. **`.agents/skills/project-development/SKILL.md` (full task workflow).** The
+   end-to-end implementation flow that calls the planning skill, performs the
+   smallest scoped change, applies testing/review gates, and ends through the
+   final handoff gate.
+
+The per-task working artefact lives in `.agents/skills/engineering-planning/SKILL.md` (the Engineering Planning Card). This rule does **not** define a separate card — fill the planning card and use the Review Questions in this rule to validate it.
+
 ## Core Rule
 
 Before changing code or structure, identify the smallest existing project unit
@@ -34,7 +53,7 @@ Apply this rule before:
 5. Replacing existing behavior or changing dependency direction.
 6. Reviewing a diff for maintainability, coupling, duplication, or structure.
 
-Skip the visible architecture card only for tiny edits where the owner,
+Skip the visible Engineering Planning Card only for tiny edits where the owner,
 placement, dependency direction, and verification are obvious from adjacent
 code.
 
@@ -124,24 +143,6 @@ Treat these as review findings or reasons to redesign before editing:
    an owner-level unit or integration boundary.
 7. Names introduce new concepts that wrap existing behavior without a durable
    contract.
-
-## Architecture Card
-
-For non-trivial implementation, refactor, file creation, or structure work,
-record this compact card in the plan or working notes:
-
-```md
-| Item | Decision |
-| --- | --- |
-| Existing owner | Smallest current project unit that owns related behavior |
-| Evidence | Files, calls, tests, docs, or config proving the owner |
-| Placement | Where the change belongs and why |
-| Reuse | Existing behavior, helper, dependency, pattern, or test reused |
-| New owner | Needed? If yes, ownership, non-ownership, callers, dependencies |
-| Dependency direction | Existing direction preserved or decision required |
-| Abstraction level | Local code / helper / shared utility / public contract |
-| Verification | Owner-level tests/checks that prove the boundary |
-```
 
 ## Review Questions
 

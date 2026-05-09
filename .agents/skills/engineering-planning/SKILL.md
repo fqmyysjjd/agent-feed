@@ -13,6 +13,14 @@ Use this skill before any task that writes code, creates files, changes tests, m
 
 This skill exists to prevent "just add a file" work. The output must explain where the change belongs, what can be reused, and how the implementation will remain maintainable.
 
+## Position In The Stack
+
+This skill is the *pre-edit decision routine*. It sits between the
+`.agents/rules/engineering-architecture.md` invariants (stable rule layer) and
+the `.agents/skills/project-development/SKILL.md` task workflow (full
+implementation flow). The Engineering Planning Card below is the per-task
+working artefact; do not re-explain the rule layer's invariants inside it.
+
 ## Required Reading
 
 1. `.agents/rules/outcome-boundary.md`
