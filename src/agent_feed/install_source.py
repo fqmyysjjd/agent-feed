@@ -17,6 +17,8 @@ from agent_feed import __version__
 
 
 PYPI_PACKAGE = "agent-feed"
+# Keep NPM_PACKAGE in sync with `npm/package.json#name`. The npm wrapper relies on this exact
+# name in its registry and update-command output; if you rename one, rename both.
 NPM_PACKAGE = "@yysjjd/agent-feed"
 BREW_FORMULA_URL = (
     "https://raw.githubusercontent.com/fqmyysjjd/homebrew-tap/main/Formula/agent-feed.rb"

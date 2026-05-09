@@ -1,6 +1,12 @@
 #!/usr/bin/env sh
 
 # Project-owned custom code verification hook.
+#
+# THIS FILE IS ONLY READ WHEN verification_profile = "custom" IN
+# .agents/agent-feed.json. For "python", "node", or "docs" profiles, this file
+# is unused and you can ignore it. It is generated for every project so
+# switching to the custom profile later does not require regenerating templates.
+#
 # Source of active profile: .agents/agent-feed.json verification_profile
 # Used by .agents/scripts/verify-agent-dev.sh when the selected profile is custom.
 

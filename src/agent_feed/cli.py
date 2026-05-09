@@ -7,7 +7,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, List
 
 import typer
 from rich import box
@@ -200,6 +200,16 @@ def maybe_print_update_notice() -> None:
         latest_version=notice.latest_version,
         source_label=notice.source.label,
         command=notice.source.update_command,
+    )
+
+
+def _print_trust_config_location() -> None:
+    """Surface the AI-asset trust file path so users can find it after init/upgrade."""
+    config_file, _errors = trust_config_path()
+    if config_file is None:
+        return
+    console.print(
+        f"[dim]Trust state: {display_path(config_file)} (under {AGENT_FEED_HOME_ENV})[/dim]"
     )
 
 
@@ -557,6 +567,7 @@ def init_cmd(
 
     if not dry_run:
         console.print("[green]agent-feed: init complete[/green]")
+        _print_trust_config_location()
         backup_dir = init_backup_dir(actions, target=target)
         if backup_dir is not None:
             console.print(
@@ -748,18 +759,14 @@ def skills_list_cmd(
 @skills_app.command("remove")
 def skills_remove_cmd(
     names: Annotated[
-        list[str] | None,
+        List[str],
         typer.Argument(
             help=(
                 "Installed skill directory names to remove. Omit for interactive selection. "
-                "For compatibility, a final path-like value is treated as the target project path."
+                "Skill names only; the current working directory is the target project."
             )
         ),
-    ] = None,
-    path: Annotated[
-        Path | None,
-        typer.Option("--path", help="Target project path. Defaults to cwd."),
-    ] = None,
+    ] = [],
     dry_run: Annotated[
         bool, typer.Option("--dry-run", help="Preview skill removal without deleting files.")
     ] = False,
@@ -775,17 +782,19 @@ def skills_remove_cmd(
         typer.Option("--force", help="Allow removal of bundled core skills after review."),
     ] = False,
 ) -> None:
-    """Remove one or more installed local skills and refresh indexes."""
-    raw_names = list(names or ())
-    if path is not None and len(raw_names) >= 2 and _looks_like_project_path(Path(raw_names[-1]).expanduser()):
+    """Remove one or more installed local skills from the current working directory."""
+    selected_names = list(names)
+    path_like = [name for name in selected_names if _is_path_like_argument(name)]
+    if path_like:
         _print_errors(
             "Skill removal blocked",
-            ["pass the target project path either as --path or as the final legacy argument, not both"],
+            [
+                f"path-like argument is not allowed: {name}" for name in path_like
+            ]
+            + ["skills remove only accepts skill directory names; cd into the project first."],
         )
         raise typer.Exit(3)
-    selected_names, legacy_path = _resolve_skill_remove_args(raw_names)
-    path = path or legacy_path
-    target = (path or Path(".")).resolve()
+    target = Path(".").resolve()
     skill_root = target / ".agents/skills"
     if not skill_root.exists():
         _print_errors("Skill removal blocked", ["missing .agents/skills; run agent-feed init first"])
@@ -801,21 +810,20 @@ def skills_remove_cmd(
         )
         return
 
-    if selected_names:
-        selected_names = list(selected_names)
-    elif not no_input and can_prompt():
-        selected_names = _prompt_skills_to_remove(all_skills)
-        if not selected_names:
-            print_action_result(
-                title="Skills",
-                message="Canceled",
-                kind="warning",
-                detail="No skills were selected for removal.",
-            )
-            return
-    else:
-        _print_errors("Skill removal blocked", ["pass skill names or use an interactive terminal"])
-        raise typer.Exit(3)
+    if not selected_names:
+        if not no_input and can_prompt():
+            selected_names = _prompt_skills_to_remove(all_skills)
+            if not selected_names:
+                print_action_result(
+                    title="Skills",
+                    message="Canceled",
+                    kind="warning",
+                    detail="No skills were selected for removal.",
+                )
+                return
+        else:
+            _print_errors("Skill removal blocked", ["pass skill names or use an interactive terminal"])
+            raise typer.Exit(3)
 
     errors: list[str] = []
     validated_names: list[str] = []
@@ -854,18 +862,15 @@ def skills_remove_cmd(
         _print_errors("Skill removal blocked", ["no valid skills to remove"])
         raise typer.Exit(3)
 
-    delete_actions = [
-        WriteAction(
-            path=skill_root / name,
-            action="would delete" if dry_run else "delete",
-            detail="installed skill",
-        )
-        for name in validated_names
-    ]
     if dry_run:
+        delete_actions = build_skill_delete_actions(
+            skill_root=skill_root,
+            names=validated_names,
+            action="would delete",
+        )
         print_write_plan(delete_actions)
         names_arg = " ".join(validated_names)
-        print_recommended_command("Preview complete", f"agent-feed skills remove {names_arg} --path {target} -y")
+        print_recommended_command("Preview complete", f"agent-feed skills remove {names_arg} -y")
         return
     if not yes:
         if no_input or not can_prompt():
@@ -881,8 +886,15 @@ def skills_remove_cmd(
             )
             return
 
+    removed_names: list[str] = []
+    delete_errors: list[str] = []
     for name in validated_names:
-        shutil.rmtree(skill_root / name)
+        try:
+            shutil.rmtree(skill_root / name)
+        except OSError as exc:
+            delete_errors.append(f"{name}: {exc}")
+        else:
+            removed_names.append(name)
     index_actions, index_errors = index_skill_metadata(target, dry_run=False)
     adapter_actions, adapter_errors = sync_clients(
         target,
@@ -896,8 +908,18 @@ def skills_remove_cmd(
         accept_changed=True,
         project_name=infer_project_name(target),
     )
-    actions = [*delete_actions, *index_actions, *adapter_actions, *trust_actions]
-    refresh_errors = [*index_errors, *adapter_errors, *trust_errors]
+    actions = [
+        *build_skill_delete_actions(skill_root=skill_root, names=removed_names, action="delete"),
+        *index_actions,
+        *adapter_actions,
+        *trust_actions,
+    ]
+    refresh_errors = [
+        *delete_errors,
+        *index_errors,
+        *adapter_errors,
+        *trust_errors,
+    ]
     if actions:
         print_write_plan(actions)
     if refresh_errors:
@@ -912,36 +934,33 @@ def skills_remove_cmd(
     )
 
 
-def _resolve_skill_remove_args(
-    names: tuple[str, ...] | list[str],
-) -> tuple[list[str], Path | None]:
-    selected_names = list(names)
-    legacy_path: Path | None = None
-    if len(selected_names) >= 2:
-        candidate = Path(selected_names[-1]).expanduser()
-        if _looks_like_project_path(candidate):
-            legacy_path = candidate
-            selected_names = selected_names[:-1]
-    return selected_names, legacy_path
+def build_skill_delete_actions(
+    *,
+    skill_root: Path,
+    names: list[str],
+    action: str,
+) -> list[WriteAction]:
+    return [
+        WriteAction(
+            path=skill_root / name,
+            action=action,
+            detail="installed skill",
+        )
+        for name in names
+    ]
 
 
-def _looks_like_project_path(path: Path) -> bool:
-    """Heuristic for backward-compatible ``skills remove <name> <path>`` parsing.
-
-    False positives (e.g. a skill name containing ``/``) are safe because
-    ``_safe_skill_name`` rejects those values before any deletion occurs.
-    """
-    text = str(path)
-    if path.exists() and path.is_dir() and (path / ".agents").exists():
+def _is_path_like_argument(name: str) -> bool:
+    """Return True for tokens that look like a filesystem path rather than a skill name."""
+    if not name:
+        return False
+    if "/" in name or "\\" in name:
         return True
-    return (
-        "/" in text
-        or "\\" in text
-        or path.is_absolute()
-        or text in {".", ".."}
-        or text.startswith(".")
-        or text.startswith("~")
-    )
+    if name in {".", ".."}:
+        return True
+    if name.startswith(".") or name.startswith("~"):
+        return True
+    return False
 
 
 @config_app.command("get")
@@ -1459,6 +1478,7 @@ def upgrade_cmd(
         console.print("[cyan]agent-feed: upgrade preview complete; no files changed[/cyan]")
     else:
         console.print("[green]agent-feed: upgrade complete[/green]")
+        _print_trust_config_location()
     maybe_print_update_notice()
 
 
@@ -2178,13 +2198,16 @@ def _preferred_github_token(target: Path) -> str | None:
         )
         for error in errors:
             console.print(f"- {error}")
-        console.print("[dim]Trying GitHub CLI token fallback or anonymous GitHub API access.[/dim]")
+        console.print("[dim]Trying GitHub CLI token fallback.[/dim]")
     elif token:
         return token
 
     gh_token = _github_cli_token()
     if gh_token:
+        console.print("[dim]Using GitHub token from gh auth token.[/dim]")
         return gh_token
+    if errors:
+        console.print("[dim]GitHub CLI token fallback was unavailable; using anonymous GitHub API access.[/dim]")
     return None
 
 

@@ -24,6 +24,7 @@ from agent_feed.skill_index import (
     read_frontmatter,
     skill_index_errors,
 )
+from agent_feed.upgrade import installed_version
 
 SKILL_NAME_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 AGENTS_PATH_PATTERN = re.compile(r"\.agents/[A-Za-z0-9_.*/<>-]+")
@@ -33,6 +34,15 @@ SESSION_EXPIRY_PATTERN = re.compile(
 )
 RECALL_INDEX_REQUIRED_TERMS = ("owns", "read when", "evidence")
 RECALL_FILE_REQUIRED_HEADINGS = ("## Owns", "## Read When", "## Evidence")
+# Files that the standard template ships and is responsible for keeping
+# structured. User-authored files under .agents/project/ and .agents/domain/
+# only need to be listed in the README index so the AI can route to them.
+STANDARD_TEMPLATE_PROJECT_FILES = frozenset(
+    {"architecture-boundaries.md", "milestones.md", "project-structure.md"}
+)
+STANDARD_TEMPLATE_DOMAIN_FILES = frozenset(
+    {"concepts.md", "contracts.md", "source-of-truth.md"}
+)
 
 
 def run_checks(root: Path, checks: tuple[Check, ...]) -> CheckReport:
@@ -111,7 +121,7 @@ def collect_status(root: Path) -> ProjectStatus:
 
 
 def downgrade_warnings(root: Path) -> list[str]:
-    version = installed_agent_feed_version(root)
+    version = installed_version(root)
     if not version or not is_older_version(__version__, version):
         return []
     return [
@@ -120,20 +130,6 @@ def downgrade_warnings(root: Path) -> list[str]:
             f"but this CLI is {__version__}. Update the CLI before running upgrade."
         )
     ]
-
-
-def installed_agent_feed_version(root: Path) -> str | None:
-    metadata_file = root / ".agents/agent-feed.json"
-    if not metadata_file.is_file():
-        return None
-    try:
-        data = json.loads(metadata_file.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
-        return None
-    if not isinstance(data, dict):
-        return None
-    version = data.get("agent_feed_version")
-    return version if isinstance(version, str) and version else None
 
 
 def configured_clients(root: Path) -> set[str]:
@@ -169,11 +165,18 @@ def validate_structure(root: Path) -> list[str]:
         ".agents/scripts/sync-agent-assets.sh",
         ".agents/scripts/verify-agent-dev.sh",
     ]
-    return [
+    errors = [
         f"missing required path: {rel_path}"
         for rel_path in required_paths
         if not (root / rel_path).exists()
-    ] + validate_agent_feed_metadata(root)
+    ]
+    arch_rule = ".agents/rules/engineering-architecture.md"
+    if any(error.endswith(arch_rule) for error in errors) and (root / ".agents/agent-feed.json").exists():
+        errors.append(
+            f"hint: {arch_rule} was added in a newer Agent Feed release; "
+            "run `agent-feed upgrade` to install it before re-running checks."
+        )
+    return errors + validate_agent_feed_metadata(root)
 
 
 def validate_agent_feed_metadata(root: Path) -> list[str]:
@@ -327,6 +330,7 @@ def validate_references_and_indexes(root: Path) -> list[str]:
                 root=root,
                 directory=".agents/project",
                 readme_text=project_readme_text,
+                strict_files=STANDARD_TEMPLATE_PROJECT_FILES,
             )
         )
 
@@ -344,6 +348,7 @@ def validate_references_and_indexes(root: Path) -> list[str]:
                 root=root,
                 directory=".agents/domain",
                 readme_text=domain_readme_text,
+                strict_files=STANDARD_TEMPLATE_DOMAIN_FILES,
             )
         )
 
@@ -363,7 +368,21 @@ def validate_references_and_indexes(root: Path) -> list[str]:
     return errors
 
 
-def validate_recall_index(*, root: Path, directory: str, readme_text: str) -> list[str]:
+def validate_recall_index(
+    *,
+    root: Path,
+    directory: str,
+    readme_text: str,
+    strict_files: frozenset[str],
+) -> list[str]:
+    """Validate the README recall index for ``directory``.
+
+    ``strict_files`` lists template-shipped files that must use the structured
+    table-row entry and the standard ``## Owns`` / ``## Read When`` /
+    ``## Evidence`` headings. Files outside this set are user-authored: they
+    only need to be listed in the README so the AI can route to them.
+    """
+
     errors: list[str] = []
     readme_lower = readme_text.lower()
     for term in RECALL_INDEX_REQUIRED_TERMS:
@@ -376,7 +395,10 @@ def validate_recall_index(*, root: Path, directory: str, readme_text: str) -> li
         index_entry = recall_index_entry(readme_text, indexed_file.name)
         if index_entry is None:
             errors.append(f"{directory}/README.md does not list {indexed_file.name}")
-        elif not recall_index_entry_is_structured(index_entry):
+            continue
+        if indexed_file.name not in strict_files:
+            continue
+        if not recall_index_entry_is_structured(index_entry):
             errors.append(
                 f"{directory}/README.md entry for {indexed_file.name} must be a "
                 "table row with File, Owns, Read when, and Evidence expectation"
@@ -390,7 +412,10 @@ def validate_recall_index(*, root: Path, directory: str, readme_text: str) -> li
 
 def recall_index_entry(readme_text: str, file_name: str) -> str | None:
     for line in readme_text.splitlines():
-        if file_name in line:
+        stripped = line.strip()
+        if not (stripped.startswith("|") or stripped.startswith("- ")):
+            continue
+        if f"`{file_name}`" in stripped:
             return line.strip()
     return None
 

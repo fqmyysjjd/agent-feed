@@ -224,6 +224,10 @@ Good output from the AI should include:
    when`, and `Evidence expectation`.
 5. Verification evidence.
 
+Keep those index labels in English. Agent Feed validates the stable `Owns`,
+`Read when`, and `Evidence expectation` terms so the recall index remains
+machine-checkable across repositories.
+
 ### Migrate Old AI Instructions From `.feed-backup/`
 
 If your project had previous AI instructions, `agent-feed init` moves them into
@@ -477,18 +481,17 @@ agent-feed sync -a
 agent-feed check -a
 ```
 
-List and remove installed skills:
+List and remove installed skills (operates on the current working directory):
 
 ```sh
 agent-feed skills list
 agent-feed skills remove <name> [name ...]
-agent-feed skills remove <name> [name ...] --path /path/to/project
 ```
 
 When no names are provided in an interactive terminal, Agent Feed opens a
-checkbox selector. The older `agent-feed skills remove <name> /path/to/project`
-form remains accepted for compatibility, but `--path` is the recommended form
-when removing multiple skills.
+checkbox selector. `skills remove` accepts skill directory names only — any
+path-like argument (`./demo`, `..`, `/abs`, `~/x`, or names containing `/`)
+is rejected before any deletion. `cd` into the project first.
 
 Custom or imported skills are lower priority than the current user request,
 `AGENTS.md`, `.agents/rules/`, `.agents/project/`, and `.agents/domain/`. They
@@ -535,6 +538,10 @@ intend to downgrade the managed assets, run:
 ```sh
 agent-feed upgrade --allow-downgrade
 ```
+
+In an interactive terminal, Agent Feed may also ask you to confirm the downgrade
+inline before it writes files. Without `--allow-downgrade` (and no interactive
+confirmation), the upgrade is blocked with exit code `3`.
 
 Agent Feed does not overwrite user-maintained `.agents/project/` or
 `.agents/domain/` content just because the template changed. Those files are

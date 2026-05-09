@@ -17,9 +17,13 @@ This project uses semantic versioning. Patch releases preserve the public comman
 - Added a fix-loop budget section to `.agents/rules/review-gates.md` capping review→fix loops at 2 rounds before stopping for human input.
 - Added an optional `current_task.review_round` counter to `.agents/rules/session-state.md` so the Fix-Loop Budget in `.agents/rules/review-gates.md` is enforceable across context compression; `.agents/skills/project-review/SKILL.md` now updates the counter and stops before a third round unless explicitly justified.
 - Added a Light Resume guard to `.agents/skills/project-development/SKILL.md` and `.agents/skills/project-fix/SKILL.md` Workflow step 1: when the session entered through a Light Resume from another task class, run the Full Startup read before continuing instead of silently assuming the Mandatory Gate files are loaded.
+- Surfaced the trust-config file path after `init` and `upgrade` so users can find `$AGENT_FEED_HOME/config.json` without reading docs.
+- Added a friendly hint when `agent-feed check` reports a missing `.agents/rules/engineering-architecture.md`, pointing to `agent-feed upgrade`.
+- Added a `test_offline_commands_do_not_open_http_connections` smoke test that disables `httpx.Client` and asserts `init`, `check`, `sync`, `status`, and `preview` complete without opening any HTTP connection, while `upgrade` still completes when its best-effort version probe fails closed.
 
 ### Changed
 
+- **Breaking**: `agent-feed skills remove` no longer accepts a target project path. The `--path` option and the legacy positional path form are removed; the command now operates on the current working directory only and rejects any path-like argument (`./demo`, `..`, absolute paths, `~/x`, or names containing `/`). `cd` into the project before running. This closes a typo class where `agent-feed skills remove demo-a ./demo-b -y` could silently delete the wrong skill.
 - Compressed `AGENTS.md` Mandatory Gates from 22 entries to 11 grouped gates that each name the owning rule/skill, and replaced the duplicated full-startup reading list with a pointer to the canonical list in `.agents/rules/context-loading.md`.
 - Clarified the AGENTS.md Mandatory Gates preamble: "mandatory" means non-bypassable when an entry's trigger fires, not always-read; the canonical full-startup reading list still lives in `.agents/rules/context-loading.md`.
 - Collapsed `.agents/rules/context-loading.md` triple routing (Quick Trigger Map / Task Routing list / Mixed Task Routing) into a single layered routing table that names the owner, why, and tells the reader to layer matching rows.
@@ -33,6 +37,19 @@ This project uses semantic versioning. Patch releases preserve the public comman
 - Reordered `.agents/skills/project-fix/SKILL.md` Workflow so symptom intake, reproduction, and root-cause location run before `engineering-planning` is invoked, and added an explicit step 12 routing through the Final Handoff Gate in `.agents/rules/session-state.md` so fix tasks no longer skip the handoff decision. Required Reading was deduped against the AGENTS.md Mandatory Gate files (matching the project-development skill).
 - Realigned the Required Reading dedupe sentence in `.agents/skills/project-development/SKILL.md` and `.agents/skills/project-fix/SKILL.md` to point at the `.agents/rules/context-loading.md` Full Startup 6-file list (outcome-boundary, decision-gates, context-loading, session-state, testing-gates, engineering-architecture). `.agents/rules/review-gates.md` and `.agents/rules/change-risk-gates.md` are explicitly marked trigger-loaded so the AI no longer assumes them already in context and silently skips them.
 - Limited `.agents/skills/project-review/SKILL.md` Fix-Loop Budget Tracking to Implementation gate reviews and Fix tasks; Pure Review tasks no longer write `current_task.review_round` to session-state.
+- Updated `agent-feed skills remove` partial-failure UX so successfully removed skills still appear in the action plan even when one deletion fails.
+- Loosened recall-index validation in `agent_feed.checks.validate_recall_index` and the inline `.agents/scripts/check-agent-assets.sh` Python so user-authored files under `.agents/project/` and `.agents/domain/` only need to be listed in the README index. The structured-table-row and `## Owns` / `## Read When` / `## Evidence` heading requirements now apply only to the standard template-shipped files (`architecture-boundaries.md`, `milestones.md`, `project-structure.md`, `concepts.md`, `contracts.md`, `source-of-truth.md`).
+- Updated `.agents/project/architecture-boundaries.md` Non-Negotiable Boundary #4 and Stop Rule #4 to allow `agent-feed upgrade` to perform a best-effort, fail-closed version probe; the offline guarantee for `init`, `check`, `sync`, `status`, and `preview` is unchanged and now pinned by a smoke test.
+- Reworked the inline Python in `.agents/scripts/check-agent-assets.sh` (and its template mirror) to delegate to `agent_feed.checks.validate_references_and_indexes` when the CLI is importable, falling back to the inline implementation only when it is not. Eliminates the drift risk that previously had the recall-index rules duplicated across `agent_feed.checks` and the shell script.
+
+### Fixed
+
+- `agent-feed check` no longer flags a recall index entry that is referenced only as prose; entries must now be table rows or list items containing the file name in backticks. Aligned the inline check inside `.agents/scripts/check-agent-assets.sh` with the same rule so the shell-driven verification matches the canonical Python check.
+- Fixed PEP8 blank-line spacing in `agent_feed.checks` (`downgrade_warnings` / `configured_clients`) and migrated `installed_agent_feed_version` lookups to the canonical `agent_feed.upgrade.installed_version` helper.
+- Logged the GitHub CLI token fallback path explicitly in `_preferred_github_token` so users can tell whether `gh auth token` was used or anonymous GitHub API access took over.
+- Documented the `--allow-downgrade` exit-code-3 behavior and the recall-index English-term requirement in the usage guide.
+- Added a `NPM_PACKAGE` sync comment in `agent_feed.install_source` to keep the npm registry name aligned with `npm/package.json#name`.
+- Clarified at the top of `.agents/project/verification-commands.sh` that the file is only read when `verification_profile = "custom"` and is harmless for `python`/`node`/`docs` profiles.
 
 ## 1.1.6 - 2026-05-08
 

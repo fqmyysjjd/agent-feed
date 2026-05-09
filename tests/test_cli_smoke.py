@@ -793,7 +793,8 @@ def test_init_and_check(tmp_path: Path) -> None:
     project_bootstrap = (tmp_path / ".agents/project/README.md").read_text(encoding="utf-8")
     domain_bootstrap = (tmp_path / ".agents/domain/README.md").read_text(encoding="utf-8")
     agents_text = (tmp_path / "AGENTS.md").read_text(encoding="utf-8")
-    assert "Personalization Bootstrap" in project_bootstrap
+    assert "AI Maintenance Loop" in project_bootstrap
+    assert "infer supported facts" in project_bootstrap
     assert "Personalization Bootstrap" in domain_bootstrap
     assert "infer concrete project/domain guidance" in agents_text
     assert "repository evidence" in agents_text
@@ -1208,6 +1209,70 @@ def test_upgrade_does_not_block_when_latest_check_fails(
     assert "Update available:" not in upgrade_result.output
 
 
+def test_offline_commands_do_not_open_http_connections(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`init`, `check`, `sync`, `status`, and `preview` must remain offline.
+
+    `upgrade` is allowed to perform a best-effort version probe but must still
+    complete when the probe fails closed. This pins the architecture boundary
+    in `.agents/project/architecture-boundaries.md` (Non-Negotiable #4) so
+    future changes that add network access to additional commands fail loudly.
+    """
+
+    import agent_feed.install_source as install_source
+
+    # Pre-init: no .agents/ exists yet, so do init while httpx is still real.
+    init_result = invoke(
+        ["init", str(tmp_path), "--project-name", "Example", "--profile", "python"],
+        tmp_path,
+    )
+    assert init_result.exit_code == 0, init_result.output
+
+    construction_calls: list[str] = []
+
+    class _NoNetworkClient:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            construction_calls.append("called")
+            # Raising HTTPError lets `upgrade`'s best-effort probe fail closed
+            # while still proving the constructor was reached.
+            raise httpx.HTTPError("offline test: network disabled")
+
+    monkeypatch.setattr(httpx, "Client", _NoNetworkClient)
+    monkeypatch.setattr(install_source.httpx, "Client", _NoNetworkClient)
+
+    # init was already validated above; rerun against an alternate target to
+    # confirm the second invocation also stays offline.
+    second_target = tmp_path.parent / f"{tmp_path.name}-second-init"
+    second_init = invoke(
+        ["init", str(second_target), "--project-name", "Other", "--profile", "python"],
+        tmp_path,
+    )
+    assert second_init.exit_code == 0, second_init.output
+
+    for command in (
+        ["check", str(tmp_path), "-a"],
+        ["sync", str(tmp_path), "-a", "--dry-run"],
+        ["status", str(tmp_path)],
+        ["preview", str(tmp_path), "--project-name", "Example", "--profile", "python"],
+    ):
+        result = invoke(command, tmp_path)
+        assert result.exit_code == 0, f"{command} failed offline: {result.output}"
+
+    # No offline command should have attempted to open an HTTP client.
+    offline_calls = list(construction_calls)
+    assert offline_calls == [], (
+        f"offline commands attempted {len(offline_calls)} HTTP client constructions"
+    )
+
+    # `upgrade` is allowed to attempt a best-effort version probe; with httpx
+    # disabled the probe must fail closed and the command must still complete.
+    upgrade_result = invoke(["upgrade", str(tmp_path), "-y"], tmp_path)
+    assert upgrade_result.exit_code == 0, upgrade_result.output
+    assert "Update available:" not in upgrade_result.output
+
+
 def test_upgrade_blocks_older_cli_from_downgrading_project_assets(tmp_path: Path) -> None:
     init_result = invoke(
         ["init", str(tmp_path), "--project-name", "Example", "--clients", "none", "--profile", "python"],
@@ -1531,7 +1596,8 @@ def test_skills_list_and_remove_refreshes_index_and_trust(
     assert list_result.exit_code == 0, list_result.output
     assert "remote-remove" in list_result.output
 
-    remove_result = invoke(["skills", "remove", "remote-remove", str(tmp_path), "-y"], tmp_path)
+    monkeypatch.chdir(tmp_path)
+    remove_result = invoke(["skills", "remove", "remote-remove", "-y"], tmp_path)
     assert remove_result.exit_code == 0, remove_result.output
     assert not (tmp_path / ".agents/skills/remote-remove").exists()
     skill_index = (tmp_path / ".agents/skills/README.md").read_text(encoding="utf-8")
@@ -1559,9 +1625,11 @@ def test_skills_remove_supports_multiple_names(
             encoding="utf-8",
         )
     invoke(["index-skills", str(tmp_path), "-y"], tmp_path)
+    assert "`demo-a`" in (tmp_path / ".agents/skills/README.md").read_text(encoding="utf-8")
 
+    monkeypatch.chdir(tmp_path)
     remove_result = invoke(
-        ["skills", "remove", "demo-a", "demo-b", "--path", str(tmp_path), "-y"],
+        ["skills", "remove", "demo-a", "demo-b", "-y"],
         tmp_path,
     )
     assert remove_result.exit_code == 0, remove_result.output
@@ -1570,7 +1638,10 @@ def test_skills_remove_supports_multiple_names(
     assert "2 skill(s) removed" in remove_result.output
 
 
-def test_skills_remove_blocks_all_deletions_when_any_name_is_invalid(tmp_path: Path) -> None:
+def test_skills_remove_blocks_all_deletions_when_any_name_is_invalid(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     init_result = invoke(
         ["init", str(tmp_path), "--project-name", "Example", "--profile", "python"],
         tmp_path,
@@ -1585,8 +1656,9 @@ def test_skills_remove_blocks_all_deletions_when_any_name_is_invalid(tmp_path: P
     )
     invoke(["index-skills", str(tmp_path), "-y"], tmp_path)
 
+    monkeypatch.chdir(tmp_path)
     remove_result = invoke(
-        ["skills", "remove", "valid-remove", "missing-remove", "--path", str(tmp_path), "-y"],
+        ["skills", "remove", "valid-remove", "missing-remove", "-y"],
         tmp_path,
     )
     assert remove_result.exit_code == 3, remove_result.output
@@ -1594,29 +1666,75 @@ def test_skills_remove_blocks_all_deletions_when_any_name_is_invalid(tmp_path: P
     assert skill_file.parent.exists()
 
 
-def test_skills_remove_rejects_mixed_path_forms(tmp_path: Path) -> None:
+def test_skills_remove_rejects_path_like_argument(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     init_result = invoke(
         ["init", str(tmp_path), "--project-name", "Example", "--profile", "python"],
         tmp_path,
     )
     assert init_result.exit_code == 0, init_result.output
 
-    skill_file = tmp_path / ".agents/skills/mixed-path/SKILL.md"
+    skill_file = tmp_path / ".agents/skills/demo-a/SKILL.md"
     skill_file.parent.mkdir(parents=True, exist_ok=True)
     skill_file.write_text(
-        "---\nname: mixed-path\ndescription: Disposable test skill.\nsource: test\ntrust: custom\n---\n\n# mixed-path\n",
+        "---\nname: demo-a\ndescription: Disposable test skill.\nsource: test\ntrust: custom\n---\n\n# demo-a\n",
         encoding="utf-8",
     )
     invoke(["index-skills", str(tmp_path), "-y"], tmp_path)
 
-    remove_result = invoke(
-        ["skills", "remove", "mixed-path", str(tmp_path), "--path", str(tmp_path), "-y"],
+    monkeypatch.chdir(tmp_path)
+    for path_like in ("./demo-b", "../demo-b", str(tmp_path), "~/demo-b", "demo/b"):
+        remove_result = invoke(["skills", "remove", "demo-a", path_like, "-y"], tmp_path)
+        assert remove_result.exit_code == 3, remove_result.output
+        assert "path-like argument is not allowed" in remove_result.output
+        assert "skills remove only accepts skill directory names" in remove_result.output
+        assert skill_file.parent.exists(), path_like
+
+
+def test_skills_remove_refreshes_index_after_partial_delete_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    init_result = invoke(
+        ["init", str(tmp_path), "--project-name", "Example", "--profile", "python"],
         tmp_path,
     )
+    assert init_result.exit_code == 0, init_result.output
+
+    skill_a = tmp_path / ".agents/skills/delete-ok/SKILL.md"
+    skill_b = tmp_path / ".agents/skills/delete-fails/SKILL.md"
+    for skill_file, name in [(skill_a, "delete-ok"), (skill_b, "delete-fails")]:
+        skill_file.parent.mkdir(parents=True, exist_ok=True)
+        skill_file.write_text(
+            f"---\nname: {name}\ndescription: Disposable test skill.\nsource: test\ntrust: custom\n---\n\n# {name}\n",
+            encoding="utf-8",
+        )
+    invoke(["index-skills", str(tmp_path), "-y"], tmp_path)
+
+    real_rmtree = cli.shutil.rmtree
+
+    def flaky_rmtree(path: Path) -> None:
+        if Path(path).name == "delete-fails":
+            raise OSError("permission denied")
+        real_rmtree(path)
+
+    monkeypatch.setattr(cli.shutil, "rmtree", flaky_rmtree)
+
+    monkeypatch.chdir(tmp_path)
+    remove_result = invoke(
+        ["skills", "remove", "delete-ok", "delete-fails", "-y"],
+        tmp_path,
+    )
+
     assert remove_result.exit_code == 3, remove_result.output
-    assert "Skill removal blocked" in remove_result.output
-    assert "either as --path" in remove_result.output
-    assert skill_file.parent.exists()
+    assert "delete-fails: permission denied" in remove_result.output
+    assert not skill_a.parent.exists()
+    assert skill_b.parent.exists()
+    skill_index = (tmp_path / ".agents/skills/README.md").read_text(encoding="utf-8")
+    assert "`delete-ok`" not in skill_index
+    assert "`delete-fails`" in skill_index
 
 
 def test_index_skills_prunes_manual_skill_deletion_from_index(
@@ -2040,6 +2158,23 @@ def test_github_cli_token_used_when_config_has_errors(
     monkeypatch.setattr(cli, "_github_cli_token", lambda: "gh-from-errors-path")
 
     assert cli._preferred_github_token(tmp_path) == "gh-from-errors-path"
+
+
+def test_github_cli_token_feedback_when_config_has_errors(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    monkeypatch.setenv("AGENT_FEED_HOME", str(tmp_path / "nonexistent-home"))
+    monkeypatch.setattr(cli, "_github_cli_token", lambda: "gh-from-errors-path")
+
+    assert cli._preferred_github_token(tmp_path) == "gh-from-errors-path"
+    output = capsys.readouterr().out
+
+    assert "Trying GitHub CLI token fallback." in output
+    assert "Using GitHub token from gh auth token." in output
+    assert "fallback was unavailable" not in output
 
 
 def test_github_cli_token_returns_none_when_gh_is_not_installed(
@@ -3314,6 +3449,32 @@ def test_check_requires_project_domain_recall_index_table_rows(tmp_path: Path) -
         ".agents/project/README.md entry for project-structure.md must be a table row "
         "with File, Owns, Read when, and Evidence expectation"
     ) in errors
+
+
+def test_recall_index_ignores_prose_and_substring_mentions(tmp_path: Path) -> None:
+    init_result = invoke(["init", str(tmp_path), "--project-name", "Example", "--profile", "python"], tmp_path)
+    assert init_result.exit_code == 0, init_result.output
+
+    project_readme = tmp_path / ".agents/project/README.md"
+    original = project_readme.read_text(encoding="utf-8")
+    project_readme.write_text(
+        original.replace(
+            "`.agents/project/`, the AI assistant must infer project constraints",
+            "`.agents/project/`, the AI assistant must infer project constraints. See `project-structure.md` for context",
+        ).replace(
+            "| `project-structure.md` | Source layout, placement rules, and generated-template ownership. | Before adding, moving, importing, generating, or deleting files. | Source tree, package config, adapters, generated assets, tests, and documented owners. |",
+            "| `arch-project-structure.md` | Similar name only. | Before unrelated work. | Evidence only. |",
+        ),
+        encoding="utf-8",
+    )
+
+    errors = validate_references_and_indexes(tmp_path)
+
+    assert ".agents/project/README.md does not list project-structure.md" in errors
+    assert not any(
+        error.startswith(".agents/project/README.md entry for project-structure.md must be a table row")
+        for error in errors
+    )
 
 
 def test_preview_and_upgrade_diff_installed_protocol(tmp_path: Path) -> None:
