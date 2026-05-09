@@ -21,7 +21,8 @@ files, modules, tests, docs, protocol assets, or client adapters.
 5. `docs/`: public user and protocol documentation.
 
 ```txt
-src/agent_feed/             Python CLI, checks, prompts, adapters, trust, settings, and templates
+src/agent_feed/             Python CLI, services orchestration, checks, prompts, adapters, trust, settings, and templates
+src/agent_feed/services/    Project lifecycle orchestration (init/preview/upgrade/sync); imports no Typer
 npm/                        thin npm wrapper that delegates to the Python CLI
 tests/                      Python CLI smoke and behavior tests
 package.json                npm wrapper package contract
@@ -32,7 +33,7 @@ docs/                       public protocol and template docs
 
 ## Placement Rules
 
-1. Python CLI command wiring belongs in `src/agent_feed/cli.py`; adapters, checks, prompts, and console output belong in focused modules.
+1. Python CLI command wiring (Typer commands, argument parsing, exit codes, prompt orchestration) belongs in `src/agent_feed/cli.py`. High-level project lifecycle orchestration (`init_project`, `preview_project`, `preview_actions`, `upgrade_project`, `sync_clients`, `find_init_conflicts`, `downgrade_preflight_errors`, etc.) belongs in `src/agent_feed/services/` and must not import Typer. Adapters, checks, prompts, and console output belong in focused modules.
 2. npm code belongs in `npm/` and must remain a thin packaging wrapper. It must not reimplement Agent Feed CLI behavior.
 3. Generated protocol assets belong under `src/agent_feed/templates/standard/`.
 4. Root `.agents/` guides development of this CLI repo; it is not the generated template source.

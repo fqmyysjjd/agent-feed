@@ -16,7 +16,6 @@ from rich.table import Table
 
 import agent_feed
 from agent_feed import __version__
-from agent_feed.adapters import claude, codex, cursor
 from agent_feed.asset_trust import (
     AGENT_FEED_HOME_ENV,
     CONFIG_FILE_NAME,
@@ -34,7 +33,7 @@ from agent_feed.asset_trust import (
     trust_preview_actions,
     validate_config_shape,
 )
-from agent_feed.checks import collect_status, downgrade_warnings, run_checks
+from agent_feed.checks import collect_status, run_checks
 from agent_feed.choices import parse_choice_csv
 from agent_feed.config import check_config, get_config_value, set_config_value
 from agent_feed.console import (
@@ -56,9 +55,7 @@ from agent_feed.console import (
     print_write_plan,
     print_write_plan_with_title,
 )
-from agent_feed.fs import has_existing_content
-from agent_feed.install_source import is_older_version, latest_update_notice
-from agent_feed.legacy_migration import backup_actions_include, backup_legacy_ai_assets
+from agent_feed.install_source import latest_update_notice
 from agent_feed.models import (
     DEFAULT_CHECKS,
     DEFAULT_CLIENTS,
@@ -104,16 +101,21 @@ from agent_feed.skill_hub import (
     preview_skill_tree,
     search_remote_skills,
 )
+from agent_feed.services.clients import installed_clients, sync_clients
+from agent_feed.services.lifecycle import (
+    downgrade_preflight_errors,
+    init_backup_dir,
+    init_project,
+    preview_actions,
+    upgrade_project,
+)
 from agent_feed.skill_index import SkillMetadata, discover_skills, index_skill_metadata
-from agent_feed.templates import canonical_write_plan, write_text
 from agent_feed.uninstall import apply_uninstall_plan, has_deletions, uninstall_plan
 from agent_feed.upgrade import (
     infer_project_name,
     infer_verification_profile,
-    installed_version,
     is_installed,
     settings_asset_plan as build_settings_asset_plan,
-    upgrade_plan as build_upgrade_plan,
 )
 
 
@@ -1649,286 +1651,22 @@ def preview_cmd(
     selected_clients = (
         _parse_clients(clients, default=DEFAULT_CLIENTS) if clients is not None else None
     )
+    selected_verification_profile = (
+        _parse_verification_profile(verification_profile, default=DEFAULT_VERIFICATION_PROFILE)
+        if verification_profile is not None
+        else None
+    )
     actions, errors = preview_actions(
         target=target,
         project_name=project_name,
         clients=selected_clients,
-        verification_profile=verification_profile,
+        verification_profile=selected_verification_profile,
     )
     if actions:
         print_write_plan(actions, show_diffs=True)
     if errors:
         _print_errors("Preview blocked", errors)
         raise typer.Exit(3)
-
-
-def init_project(
-    *,
-    target: Path,
-    project_name: str,
-    clients: tuple[Client, ...],
-    verification_profile: VerificationProfile,
-    dry_run: bool,
-    force_generated: bool,
-) -> tuple[list[WriteAction], list[str]]:
-    errors = find_init_conflicts(target, clients)
-    if errors:
-        return [], errors
-
-    actions: list[WriteAction] = []
-    backup_actions, backup_errors = backup_legacy_ai_assets(
-        target,
-        project_name=project_name,
-        verification_profile=verification_profile,
-        dry_run=dry_run,
-    )
-    if backup_errors:
-        return backup_actions, backup_errors
-    actions.extend(backup_actions)
-
-    plan = canonical_write_plan(
-        target,
-        project_name,
-        verification_profile,
-    )
-    if dry_run:
-        for path, content in plan:
-            actions.append(write_text(path, content, dry_run=True, force=force_generated))
-    else:
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            MofNCompleteColumn(),
-            TextColumn("[dim]{task.fields[path]}[/dim]"),
-            console=console,
-        ) as progress:
-            task_id = progress.add_task(
-                "Copying Agent Feed assets",
-                total=len(plan),
-                path="",
-            )
-            for path, content in plan:
-                rel_path = path.relative_to(target)
-                progress.update(task_id, path=rel_path.as_posix())
-                actions.append(write_text(path, content, dry_run=False, force=force_generated))
-                progress.advance(task_id)
-
-    adapter_actions, adapter_errors = sync_clients(
-        target,
-        clients=clients,
-        dry_run=dry_run,
-        force_generated=force_generated,
-    )
-    if dry_run and backup_actions:
-        adapter_errors = [
-            error
-            for error in adapter_errors
-            if not planned_backup_resolves_init_adapter_error(error, backup_actions, target=target)
-        ]
-    trust_actions, trust_errors = sync_asset_trust(
-        target,
-        dry_run=dry_run,
-        accept_changed=True,
-        project_name=project_name,
-    )
-    return [*actions, *adapter_actions, *trust_actions], [*adapter_errors, *trust_errors]
-
-
-def init_backup_dir(actions: list[WriteAction], *, target: Path) -> Path | None:
-    for action in actions:
-        if action.action != "backup":
-            continue
-        detail = action.detail.strip()
-        if not detail.startswith("-> "):
-            continue
-        destination = (target / detail.removeprefix("-> ")).resolve()
-        try:
-            relative = destination.relative_to(target / ".feed-backup")
-        except ValueError:
-            continue
-        if relative.parts:
-            return target / ".feed-backup" / relative.parts[0]
-    return None
-
-
-def preview_project(
-    target: Path,
-    *,
-    project_name: str,
-    clients: tuple[Client, ...],
-    verification_profile: VerificationProfile,
-) -> list[WriteAction]:
-    actions = [
-        WriteAction(path=path, action="would update" if path.exists() else "would create")
-        for path, _content in canonical_write_plan(
-            target,
-            project_name,
-            verification_profile,
-        )
-    ]
-    adapter_actions, _errors = sync_clients(
-        target,
-        clients=clients,
-        dry_run=True,
-        force_generated=False,
-    )
-    return [*actions, *adapter_actions]
-
-
-def preview_actions(
-    *,
-    target: Path,
-    project_name: str | None,
-    clients: tuple[Client, ...] | None,
-    verification_profile: str | None,
-) -> tuple[list[WriteAction], list[str]]:
-    if is_installed(target):
-        selected_clients = clients if clients is not None else installed_clients(target)
-        actions, errors = upgrade_project(
-            target=target,
-            project_name=project_name or infer_project_name(target),
-            clients=selected_clients,
-            verification_profile=infer_verification_profile(target),
-            dry_run=True,
-        )
-        actions.extend(trust_preview_actions(target))
-        downgrade_warning = _downgrade_warning(target)
-        if downgrade_warning:
-            actions.insert(0, downgrade_warning)
-        return actions, errors
-
-    selected_verification_profile = _parse_verification_profile(
-        verification_profile, default=DEFAULT_VERIFICATION_PROFILE
-    )
-    return (
-        preview_project(
-            target,
-            project_name=project_name or target.name,
-            clients=clients if clients is not None else DEFAULT_CLIENTS,
-            verification_profile=selected_verification_profile,
-        ),
-        [],
-    )
-
-
-def _downgrade_warning(target: Path) -> WriteAction | None:
-    """Return a visible warning action when the CLI is older than the project."""
-    warnings = downgrade_warnings(target)
-    if not warnings:
-        return None
-    return WriteAction(
-        path=target / ".agents/agent-feed.json",
-        action="review",
-        detail=warnings[0],
-    )
-
-
-def downgrade_preflight_errors(*, target: Path, interactive: bool) -> list[str]:
-    project_version = installed_version(target)
-    if not project_version or not is_older_version(__version__, project_version):
-        return []
-
-    message = (
-        f"This project was last managed by Agent Feed {project_version}, "
-        f"but this CLI is {__version__}. Running upgrade with an older CLI can "
-        "rewrite managed assets to older templates."
-    )
-    if interactive and prompt_confirm(
-        f"{message} Continue with a downgrade?",
-        default=False,
-    ):
-        return []
-
-    return [
-        message,
-        "Update this CLI first, or rerun with --allow-downgrade if this downgrade is intentional.",
-    ]
-
-
-def upgrade_project(
-    *,
-    target: Path,
-    project_name: str,
-    clients: tuple[Client, ...],
-    verification_profile: VerificationProfile,
-    dry_run: bool,
-) -> tuple[list[WriteAction], list[str]]:
-    canonical_actions, canonical_errors = build_upgrade_plan(
-        target,
-        project_name=project_name,
-        verification_profile=verification_profile,
-        dry_run=dry_run,
-    )
-    if canonical_errors:
-        return canonical_actions, canonical_errors
-
-    adapter_actions, adapter_errors = sync_clients(
-        target,
-        clients=clients,
-        dry_run=dry_run,
-        force_generated=True,
-        prune_generated=False,
-    )
-    if dry_run:
-        return [*canonical_actions, *adapter_actions], adapter_errors
-
-    trust_actions, trust_errors = sync_asset_trust(
-        target,
-        dry_run=dry_run,
-        accept_changed=True,
-        project_name=project_name,
-    )
-    return [*canonical_actions, *adapter_actions, *trust_actions], [
-        *adapter_errors,
-        *trust_errors,
-    ]
-
-
-def sync_clients(
-    root: Path,
-    *,
-    clients: tuple[Client, ...],
-    dry_run: bool,
-    force_generated: bool,
-    prune_generated: bool = True,
-) -> tuple[list[WriteAction], list[str]]:
-    if not clients:
-        return [WriteAction(path=root, action="skip", detail="no clients selected")], []
-
-    if not (root / ".agents").exists() and not dry_run:
-        return [], ["missing .agents; run agent-feed init first"]
-
-    actions: list[WriteAction] = []
-    errors: list[str] = []
-    for client in clients:
-        if client == Client.CODEX:
-            actions.extend(codex.sync(root, dry_run=dry_run))
-        elif client == Client.CLAUDE:
-            client_actions, client_errors = claude.sync(
-                root,
-                dry_run=dry_run,
-                force_generated=force_generated,
-                prune_generated=prune_generated,
-            )
-            actions.extend(client_actions)
-            errors.extend(client_errors)
-        elif client == Client.CURSOR:
-            client_actions, client_errors = cursor.sync(
-                root, dry_run=dry_run, force_generated=force_generated
-            )
-            actions.extend(client_actions)
-            errors.extend(client_errors)
-    return actions, errors
-
-
-def installed_clients(root: Path) -> tuple[Client, ...]:
-    clients: list[Client] = [Client.CODEX]
-    if (root / "CLAUDE.md").exists() or (root / ".claude/skills").exists():
-        clients.append(Client.CLAUDE)
-    if (root / ".cursor/rules/agent-feed.mdc").exists():
-        clients.append(Client.CURSOR)
-    return tuple(clients)
 
 
 def _prompt_skills_to_remove(skills: list[SkillMetadata]) -> list[str]:
@@ -1946,53 +1684,6 @@ def _safe_skill_name(name: str) -> bool:
     if not name or name in {".", ".."} or name.startswith("."):
         return False
     return all(character.isalnum() or character in {"-", "_", "."} for character in name)
-
-
-def planned_backup_resolves_init_adapter_error(
-    error: str,
-    backup_actions: list[WriteAction],
-    *,
-    target: Path,
-) -> bool:
-    if "CLAUDE.md" in error and backup_actions_include(
-        backup_actions, Path("CLAUDE.md"), target=target
-    ):
-        return True
-    if ".claude/skills" in error and backup_actions_include(
-        backup_actions, Path(".claude/skills"), target=target
-    ):
-        return True
-    if ".cursor/rules/agent-feed.mdc" in error and backup_actions_include(
-        backup_actions, Path(".cursor/rules"), target=target
-    ):
-        return True
-    return False
-
-
-def find_init_conflicts(target: Path, clients: tuple[Client, ...]) -> list[str]:
-    errors: list[str] = []
-    if is_installed(target) and (target / ".agents/agent-feed.json").is_file():
-        errors.append("Agent Feed is already installed; use agent-feed status or upgrade")
-    if (target / "AGENTS.md").exists() and not (target / "AGENTS.md").is_file():
-        errors.append("AGENTS.md exists but is not a file")
-    if (target / ".agents").exists() and not (target / ".agents").is_dir():
-        errors.append(".agents exists but is not a directory")
-    if Client.CLAUDE in clients:
-        claude_file = target / "CLAUDE.md"
-        if claude_file.exists():
-            if not claude_file.is_file():
-                errors.append("CLAUDE.md exists but is not a file")
-        if has_existing_content(target / ".claude/skills") and not claude.is_managed_skill_mirror(
-            target / ".claude"
-        ):
-            skills_path = target / ".claude/skills"
-            if not skills_path.is_dir():
-                errors.append(".claude/skills exists but is not a directory")
-    if Client.CURSOR in clients:
-        cursor_file = target / ".cursor/rules/agent-feed.mdc"
-        if cursor_file.exists() and not cursor_file.is_file():
-            errors.append(".cursor/rules/agent-feed.mdc exists but is not a file")
-    return errors
 
 
 def _parse_clients(raw: str | None, *, default: tuple[Client, ...]) -> tuple[Client, ...]:
