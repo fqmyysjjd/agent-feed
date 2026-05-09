@@ -1713,14 +1713,16 @@ def test_skills_remove_refreshes_index_after_partial_delete_failure(
         )
     invoke(["index-skills", str(tmp_path), "-y"], tmp_path)
 
-    real_rmtree = cli.shutil.rmtree
+    from agent_feed.cli.commands import skills as skills_module
+
+    real_rmtree = skills_module.shutil.rmtree
 
     def flaky_rmtree(path: Path) -> None:
         if Path(path).name == "delete-fails":
             raise OSError("permission denied")
         real_rmtree(path)
 
-    monkeypatch.setattr(cli.shutil, "rmtree", flaky_rmtree)
+    monkeypatch.setattr(skills_module.shutil, "rmtree", flaky_rmtree)
 
     monkeypatch.chdir(tmp_path)
     remove_result = invoke(
